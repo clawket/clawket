@@ -11,7 +11,7 @@
     {
       "name": "lattice",
       "version": "0.1.0",
-      "source": ".",
+      "source": "./",
       "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions"
     }
   ]
