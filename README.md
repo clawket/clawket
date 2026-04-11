@@ -1,8 +1,12 @@
 [한국어](README.ko.md)
 
-# Lattice
+<p align="center">
+  <img src="logo.svg" width="80" alt="Lattice logo" />
+</p>
 
-LLM-native work management plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+<h1 align="center">Lattice</h1>
+
+<p align="center">LLM-native work management plugin for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a></p>
 
 Lattice is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, phases, steps, artifacts, and execution history across sessions via a local SQLite database and a lightweight daemon.
 

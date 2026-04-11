@@ -1,8 +1,12 @@
 [English](README.md)
 
-# Lattice
+<p align="center">
+  <img src="logo.svg" width="80" alt="Lattice logo" />
+</p>
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code)용 LLM 네이티브 작업 관리 플러그인.
+<h1 align="center">Lattice</h1>
+
+<p align="center"><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>용 LLM 네이티브 작업 관리 플러그인</p>
 
 Lattice는 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + Confluence를 대체합니다. 프로젝트 계획, 단계, 작업, 산출물, 실행 이력을 로컬 SQLite 데이터베이스와 경량 데몬을 통해 세션 간 영구 보존합니다.
 
