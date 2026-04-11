@@ -32,6 +32,10 @@ function ensureMigrated(db) {
     { version: 2, file: '002_questions_and_approval.sql' },
     { version: 3, file: '003_v3.sql' },
     { version: 4, file: '004_bolts.sql' },
+    { version: 5, file: '005_activity_log.sql' },
+    { version: 6, file: '006_labels.sql' },
+    { version: 7, file: '007_reporter_review.sql' },
+    { version: 8, file: '008_step_relations.sql' },
   ];
   for (const m of migrations) {
     if (m.version > currentVersion) {
