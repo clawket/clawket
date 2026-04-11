@@ -43,10 +43,20 @@ Claude Code ──(훅)──→ latticed (Node.js 데몬)
 ## 설치
 
 ```bash
-claude plugin install Seungwoo321/lattice
+# 1. 마켓플레이스 추가
+/plugin marketplace add Seungwoo321/lattice
+
+# 2. 플러그인 설치
+/plugin install lattice@Seungwoo321/lattice
 ```
 
-플러그인의 setup 스크립트가 첫 설치 시 CLI 바이너리와 데몬을 자동으로 설정합니다.
+또는 로컬 개발 시:
+
+```bash
+claude --plugin-dir /path/to/lattice
+```
+
+setup 스크립트가 첫 설치 시 XDG 디렉토리를 자동 생성합니다.
 
 ### 사전 요구사항
 

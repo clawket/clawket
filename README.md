@@ -43,10 +43,20 @@ Web Dashboard (React) ──→ latticed HTTP API
 ## Installation
 
 ```bash
-claude plugin install Seungwoo321/lattice
+# 1. Add marketplace
+/plugin marketplace add Seungwoo321/lattice
+
+# 2. Install plugin
+/plugin install lattice@Seungwoo321/lattice
 ```
 
-The plugin's setup hook will automatically install the CLI binary and daemon on first use.
+Or for local development:
+
+```bash
+claude --plugin-dir /path/to/lattice
+```
+
+The plugin's setup script will automatically create XDG directories on first use.
 
 ### Prerequisites
 

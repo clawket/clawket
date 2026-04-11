@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {
+      "name": "lattice",
+      "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions",
+      "path": "."
+    }
+  ]
+}
