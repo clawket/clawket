@@ -11,5 +11,11 @@
     "work-dashboard",
     "state-layer",
     "project-management"
-  ]
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "setup": {
+    "command": "node scripts/setup.js",
+    "timeout": 120
+  }
 }
