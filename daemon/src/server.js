@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, extname, basename } from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { getRequestListener, serve } from '@hono/node-server';
@@ -467,6 +468,92 @@ export function startServer() {
       project: project.id,
       plan: activePlan.id,
     });
+  });
+
+  // ========== Wiki Files (project cwd file scanner) ==========
+  app.get('/wiki/files', (c) => {
+    const cwd = c.req.query('cwd') || null;
+    if (!cwd || !existsSync(cwd)) return c.json([]);
+
+    const SCAN_DIRS = ['docs', 'wiki', 'documentation', '.claude', '.github'];
+    const MD_EXTS = new Set(['.md', '.mdx']);
+    const MAX_SIZE = 512 * 1024; // 512KB max per file
+    const results = [];
+
+    function scanDir(dir, depth = 0) {
+      if (depth > 3) return;
+      try {
+        for (const entry of readdirSync(dir)) {
+          if (entry.startsWith('.') && entry !== '.claude') continue;
+          const full = join(dir, entry);
+          try {
+            const stat = statSync(full);
+            if (stat.isDirectory()) {
+              scanDir(full, depth + 1);
+            } else if (MD_EXTS.has(extname(entry).toLowerCase()) && stat.size < MAX_SIZE) {
+              results.push({
+                path: relative(cwd, full),
+                name: basename(entry, extname(entry)),
+                size: stat.size,
+                modified_at: stat.mtimeMs,
+              });
+            }
+          } catch { /* permission error, skip */ }
+        }
+      } catch { /* dir not readable */ }
+    }
+
+    // Scan known doc directories
+    for (const dir of SCAN_DIRS) {
+      const full = join(cwd, dir);
+      if (existsSync(full)) scanDir(full);
+    }
+
+    // Also include root-level .md files (README, CHANGELOG, etc.)
+    try {
+      for (const entry of readdirSync(cwd)) {
+        if (MD_EXTS.has(extname(entry).toLowerCase())) {
+          const full = join(cwd, entry);
+          const stat = statSync(full);
+          if (stat.isFile() && stat.size < MAX_SIZE) {
+            results.push({
+              path: entry,
+              name: basename(entry, extname(entry)),
+              size: stat.size,
+              modified_at: stat.mtimeMs,
+            });
+          }
+        }
+      }
+    } catch {}
+
+    return c.json(results);
+  });
+
+  app.get('/wiki/file', (c) => {
+    const cwd = c.req.query('cwd') || '';
+    const filePath = c.req.query('path') || '';
+    if (!cwd || !filePath) return c.json({ error: 'cwd and path required' }, 400);
+
+    const full = join(cwd, filePath);
+    // Security: ensure resolved path is within cwd
+    if (!full.startsWith(cwd)) return c.json({ error: 'path outside project' }, 403);
+    if (!existsSync(full)) return c.json({ error: 'file not found' }, 404);
+
+    try {
+      const content = readFileSync(full, 'utf-8');
+      const stat = statSync(full);
+      return c.json({
+        path: filePath,
+        name: basename(filePath, extname(filePath)),
+        content,
+        content_format: 'markdown',
+        size: stat.size,
+        modified_at: stat.mtimeMs,
+      });
+    } catch (e) {
+      return c.json({ error: e.message }, 500);
+    }
   });
 
   // ========== Handoff ==========
