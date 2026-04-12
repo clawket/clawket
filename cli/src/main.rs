@@ -31,51 +31,61 @@ enum Command {
         show: String,
     },
     /// Manage latticed daemon
+    #[command(alias = "d")]
     Daemon {
         #[command(subcommand)]
         action: DaemonAction,
     },
     /// Manage projects
+    #[command(alias = "proj")]
     Project {
         #[command(subcommand)]
         action: ProjectAction,
     },
     /// Manage plans
+    #[command(alias = "pl")]
     Plan {
         #[command(subcommand)]
         action: PlanAction,
     },
     /// Manage phases
+    #[command(alias = "ph")]
     Phase {
         #[command(subcommand)]
         action: PhaseAction,
     },
     /// Manage bolts (sprint / AIDLC bolt cycles)
+    #[command(alias = "b")]
     Bolt {
         #[command(subcommand)]
         action: BoltAction,
     },
     /// Manage steps
+    #[command(alias = "s")]
     Step {
         #[command(subcommand)]
         action: StepAction,
     },
     /// Manage artifacts
+    #[command(alias = "art")]
     Artifact {
         #[command(subcommand)]
         action: ArtifactAction,
     },
     /// Manage runs
+    #[command(alias = "r")]
     Run {
         #[command(subcommand)]
         action: RunAction,
     },
     /// Manage step comments
+    #[command(alias = "c")]
     Comment {
         #[command(subcommand)]
         action: CommentAction,
     },
     /// Manage questions
+    #[command(alias = "q")]
     Question {
         #[command(subcommand)]
         action: QuestionAction,
@@ -255,8 +265,9 @@ enum BoltAction {
 enum StepAction {
     New {
         title: String,
+        /// Phase ID (auto-inferred from active plan if omitted)
         #[arg(long)]
-        phase: String,
+        phase: Option<String>,
         #[arg(long, allow_hyphen_values = true)]
         body: Option<String>,
         #[arg(long)]
@@ -273,8 +284,12 @@ enum StepAction {
         complexity: Option<String>,
         #[arg(long)]
         estimated_edits: Option<i64>,
+        /// Bolt ID (auto-inferred from active bolt if omitted)
         #[arg(long)]
         bolt: Option<String>,
+        /// Step type: task, bug, feature, enhancement, refactor, docs, test, chore
+        #[arg(long, default_value = "task")]
+        r#type: String,
     },
     Show { id: String },
     List {
@@ -466,11 +481,27 @@ enum CommentAction {
     Delete { id: String },
 }
 
+fn strip_nulls(val: &serde_json::Value) -> serde_json::Value {
+    match val {
+        serde_json::Value::Object(map) => {
+            let filtered: serde_json::Map<String, serde_json::Value> = map.iter()
+                .filter(|(_, v)| !v.is_null())
+                .map(|(k, v)| (k.clone(), strip_nulls(v)))
+                .collect();
+            serde_json::Value::Object(filtered)
+        }
+        serde_json::Value::Array(arr) => {
+            serde_json::Value::Array(arr.iter().map(strip_nulls).collect())
+        }
+        other => other.clone(),
+    }
+}
+
 fn output_fmt(val: &serde_json::Value, format: &str) {
     match format {
         "table" => print_table(val),
         "yaml" => print_yaml(val, 0),
-        _ => println!("{}", serde_json::to_string(val).unwrap()),
+        _ => println!("{}", serde_json::to_string(&strip_nulls(val)).unwrap()),
     }
 }
 
@@ -494,17 +525,27 @@ fn print_table(val: &serde_json::Value) {
                             serde_json::Value::Bool(b) => b.to_string(),
                             _ => serde_json::to_string(v).unwrap_or_default(),
                         };
-                        if s.len() > 50 { format!("{}...", &s[..47]) } else { s }
+                        if s.chars().count() > 50 {
+                            let truncated: String = s.chars().take(47).collect();
+                            format!("{}...", truncated)
+                        } else { s }
                     }).collect()
                 }).collect();
-                // Compute widths
+                // Compute widths (use Unicode display width for CJK chars)
+                fn display_width(s: &str) -> usize {
+                    s.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum()
+                }
+                fn pad_to_width(s: &str, target: usize) -> String {
+                    let w = display_width(s);
+                    if w >= target { s.to_string() } else { format!("{}{}", s, " ".repeat(target - w)) }
+                }
                 let widths: Vec<usize> = headers.iter().enumerate().map(|(i, h)| {
-                    let max_row = rows.iter().map(|r| r.get(i).map_or(0, |c| c.len())).max().unwrap_or(0);
-                    h.len().max(max_row)
+                    let max_row = rows.iter().map(|r| r.get(i).map_or(0, |c| display_width(c))).max().unwrap_or(0);
+                    display_width(h).max(max_row)
                 }).collect();
                 let sep: String = format!("+{}+", widths.iter().map(|w| "-".repeat(w + 2)).collect::<Vec<_>>().join("+"));
                 let fmt_row = |cells: &[String]| -> String {
-                    format!("| {} |", cells.iter().enumerate().map(|(i, c)| format!("{:width$}", c, width = widths[i])).collect::<Vec<_>>().join(" | "))
+                    format!("| {} |", cells.iter().enumerate().map(|(i, c)| pad_to_width(c, widths[i])).collect::<Vec<_>>().join(" | "))
                 };
                 println!("{}", sep);
                 println!("{}", fmt_row(&headers.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
@@ -751,13 +792,15 @@ async fn main() -> Result<()> {
 
         // ===== Step =====
         Command::Step { action } => match action {
-            StepAction::New { title, phase, body, assignee, idx, depends_on, parent_step, priority, complexity, estimated_edits, bolt } => {
+            StepAction::New { title, phase, body, assignee, idx, depends_on, parent_step, priority, complexity, estimated_edits, bolt, r#type } => {
+                let cwd = std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string());
+                let type_val = r#type;
                 output(&client::request(&c, "POST", "/steps", Some(json!({
                     "phase_id": phase, "title": title, "body": body.unwrap_or_default(),
                     "assignee": assignee, "idx": idx, "depends_on": depends_on,
                     "parent_step_id": parent_step, "priority": priority,
                     "complexity": complexity, "estimated_edits": estimated_edits,
-                    "bolt_id": bolt,
+                    "bolt_id": bolt, "cwd": cwd, "type": type_val,
                 }))).await?);
             }
             StepAction::Show { id } => output(&client::get(&c, &format!("/steps/{id}")).await?),
