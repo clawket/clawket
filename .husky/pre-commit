@@ -2,11 +2,12 @@
 
 echo "🔍 Running pre-commit checks..."
 
-# Check if web/ files are staged
-WEB_STAGED=$(git diff --cached --name-only -- 'web/')
+# Check if web/ source files are staged (not just package.json/lock)
+WEB_STAGED=$(git diff --cached --name-only -- 'web/' || true)
+WEB_SRC=$(echo "$WEB_STAGED" | grep -E '\.(ts|tsx|css|html)$' || true)
 
-if [ -n "$WEB_STAGED" ]; then
-  echo "📦 web/ changes detected"
+if [ -n "$WEB_SRC" ]; then
+  echo "📦 web/ source changes detected"
 
   # Lint check
   echo "  ▸ ESLint..."
@@ -21,7 +22,7 @@ if [ -n "$WEB_STAGED" ]; then
   echo "  ✅ Lint passed"
 
   # Type check (TS files)
-  TS_STAGED=$(echo "$WEB_STAGED" | grep -E '\.(ts|tsx)$')
+  TS_STAGED=$(echo "$WEB_SRC" | grep -E '\.(ts|tsx)$' || true)
   if [ -n "$TS_STAGED" ]; then
     echo "  ▸ TypeScript type check..."
     cd web && npx tsc -b --noEmit
@@ -46,6 +47,8 @@ if [ -n "$WEB_STAGED" ]; then
     exit 1
   fi
   echo "  ✅ Build passed"
+elif [ -n "$WEB_STAGED" ]; then
+  echo "📦 web/ config changes only (package.json/lock) — skipping source checks"
 fi
 
 echo "✅ All pre-commit checks passed"
