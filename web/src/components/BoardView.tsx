@@ -72,7 +72,8 @@ export default function BoardView({ projectId, onSelectStep }: BoardViewProps) {
 
       if (allBolts.length > 0) {
         const activeBolt = allBolts.find((b) => b.status === 'active');
-        const toSelect = activeBolt ?? allBolts[0];
+        const nonCompleted = allBolts.filter((b) => b.status !== 'completed');
+        const toSelect = activeBolt ?? nonCompleted[0] ?? allBolts[0];
         setSelectedBoltId(toSelect.id);
         const boltSteps = await api.listBoltSteps(toSelect.id);
         setSteps(boltSteps);
@@ -173,7 +174,9 @@ export default function BoardView({ projectId, onSelectStep }: BoardViewProps) {
       {/* Bolt toolbar */}
       <div className="flex-shrink-0 flex items-center gap-3 flex-wrap">
         <Select size="sm" className="w-auto min-w-[200px] max-w-[320px]" value={selectedBoltId ?? ''} onChange={(e) => handleBoltSelect(e.target.value)}>
-          {bolts.map((b) => <option key={b.id} value={b.id}>{b.title} [{BOLT_STATUS_LABEL[b.status]}]</option>)}
+          {bolts.filter(b => b.status !== 'completed').map((b) => <option key={b.id} value={b.id}>{b.title} [{BOLT_STATUS_LABEL[b.status]}]</option>)}
+          {bolts.some(b => b.status === 'completed') && <option disabled>── Completed ──</option>}
+          {bolts.filter(b => b.status === 'completed').map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
         </Select>
         <Button variant="outline" size="sm" onClick={() => setShowNewBoltModal(true)}>+ New Bolt</Button>
         <div className="flex-1" />
