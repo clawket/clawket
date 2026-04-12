@@ -9,6 +9,7 @@ import type {
   Question,
   StepComment,
   ArtifactVersion,
+  TimelineEvent,
 } from './types';
 
 const BASE = '';
@@ -69,14 +70,6 @@ function post<T>(path: string, data?: unknown): Promise<T> {
   });
 }
 
-function _put<T>(path: string, data?: unknown): Promise<T> {
-  return request<T>(path, {
-    method: 'PUT',
-    body: data !== undefined ? JSON.stringify(data) : undefined,
-  });
-}
-void _put; // reserved for future use
-
 function patch<T>(path: string, data?: unknown): Promise<T> {
   return request<T>(path, {
     method: 'PATCH',
@@ -117,6 +110,17 @@ export function updateProject(
 
 export function deleteProject(id: string): Promise<void> {
   return del(`/projects/${encodeURIComponent(id)}`);
+}
+
+export function addProjectCwd(id: string, cwd: string): Promise<Project> {
+  return post(`/projects/${encodeURIComponent(id)}/cwds`, { cwd });
+}
+
+export function removeProjectCwd(id: string, cwd: string): Promise<Project> {
+  return request(`/projects/${encodeURIComponent(id)}/cwds`, {
+    method: 'DELETE',
+    body: JSON.stringify({ cwd }),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -389,6 +393,17 @@ export function finishRun(
 }
 
 // ---------------------------------------------------------------------------
+// Project Timeline
+// ---------------------------------------------------------------------------
+
+export function listProjectTimeline(
+  projectId: string,
+  params?: { limit?: number; offset?: number; types?: string },
+): Promise<TimelineEvent[]> {
+  return get(`/projects/${encodeURIComponent(projectId)}/timeline${qs(params)}`);
+}
+
+// ---------------------------------------------------------------------------
 // Questions
 // ---------------------------------------------------------------------------
 
@@ -463,6 +478,8 @@ const api = {
   createProject,
   updateProject,
   deleteProject,
+  addProjectCwd,
+  removeProjectCwd,
   listPlans,
   getPlan,
   createPlan,
@@ -493,6 +510,7 @@ const api = {
   getRun,
   startRun,
   finishRun,
+  listProjectTimeline,
   listQuestions,
   getQuestion,
   createQuestion,

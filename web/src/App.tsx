@@ -64,12 +64,10 @@ function App() {
   // Derive project, view, and selected item from URL
   const { projectId: urlProjectId, view: activeView, item: selectedItem } = parseLocation(location.pathname);
 
-  // Sync URL project with selected project
-  useEffect(() => {
-    if (urlProjectId && urlProjectId !== selectedProjectId) {
-      setSelectedProjectId(urlProjectId);
-    }
-  }, [urlProjectId, selectedProjectId]);
+  // Sync URL project with selected project (avoid setState in effect)
+  if (urlProjectId && urlProjectId !== selectedProjectId) {
+    setSelectedProjectId(urlProjectId);
+  }
 
   // Build URL prefix with project
   const urlPrefix = selectedProjectId ? `/${selectedProjectId}` : '';
@@ -151,15 +149,10 @@ function App() {
   // SSE: real-time updates from daemon
   useEffect(() => {
     const es = new EventSource('/events');
-    es.addEventListener('step:created', () => setTreeKey(k => k + 1));
-    es.addEventListener('step:updated', () => setTreeKey(k => k + 1));
-    es.addEventListener('step:deleted', () => setTreeKey(k => k + 1));
-    es.addEventListener('phase:updated', () => setTreeKey(k => k + 1));
-    es.addEventListener('plan:updated', () => setTreeKey(k => k + 1));
-    es.addEventListener('bolt:updated', () => setTreeKey(k => k + 1));
-    es.onerror = () => {
-      // Auto-reconnect on daemon restart (EventSource reconnects automatically)
-    };
+    const refresh = () => setTreeKey(k => k + 1);
+    for (const evt of ['step:created', 'step:updated', 'step:deleted', 'phase:updated', 'plan:updated', 'bolt:updated']) {
+      es.addEventListener(evt, refresh);
+    }
     return () => es.close();
   }, []);
 
@@ -196,13 +189,14 @@ function App() {
           <>
             {activeView === 'summary' && (
               <SummaryView
+                key={`summary-${selectedProjectId}-${treeKey}`}
                 projectId={selectedProjectId}
                 onSelectStep={(id) => setSelectedItem({ type: 'step', id })}
               />
             )}
             {activeView === 'plans' && (
               <PlanTree
-                key={`${selectedProjectId}-${treeKey}`}
+                key={`plans-${selectedProjectId}-${treeKey}`}
                 projectId={selectedProjectId}
                 selectedItem={selectedItem}
                 onSelectItem={setSelectedItem}
@@ -213,24 +207,27 @@ function App() {
             )}
             {activeView === 'board' && (
               <BoardView
+                key={`board-${selectedProjectId}-${treeKey}`}
                 projectId={selectedProjectId}
                 onSelectStep={(id) => setSelectedItem({ type: 'step', id })}
               />
             )}
             {activeView === 'backlog' && (
               <BacklogView
+                key={`backlog-${selectedProjectId}-${treeKey}`}
                 projectId={selectedProjectId}
                 onSelectStep={(id) => setSelectedItem({ type: 'step', id })}
               />
             )}
             {activeView === 'timeline' && (
               <TimelineView
+                key={`timeline-${selectedProjectId}-${treeKey}`}
                 projectId={selectedProjectId}
                 onSelectStep={(id) => setSelectedItem({ type: 'step', id })}
               />
             )}
             {activeView === 'wiki' && (
-              <WikiView projectId={selectedProjectId} />
+              <WikiView key={`wiki-${selectedProjectId}-${treeKey}`} projectId={selectedProjectId} />
             )}
           </>
         ) : (

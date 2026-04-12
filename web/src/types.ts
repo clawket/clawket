@@ -110,6 +110,30 @@ export interface Run {
   notes: string | null;
 }
 
+export type TimelineEventType =
+  | 'status_change' | 'comment' | 'artifact' | 'run_start' | 'run_end'
+  | 'question' | 'created' | 'updated' | 'assignment';
+
+export interface TimelineEvent {
+  id: string;
+  event_type: TimelineEventType;
+  entity_type: 'step' | 'phase' | 'bolt' | 'plan';
+  entity_id: string;
+  entity_title: string;
+  actor: string | null;
+  created_at: number;
+  detail: {
+    field?: string;
+    old_value?: string;
+    new_value?: string;
+    body?: string;
+    artifact_type?: string;
+    agent?: string;
+    duration_ms?: number;
+    result?: string;
+  };
+}
+
 export interface Question {
   id: string;
   plan_id: string | null;
