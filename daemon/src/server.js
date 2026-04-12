@@ -349,7 +349,65 @@ export function startServer() {
     return c.json(rows.map(r => r.agent));
   });
 
-  // ========== Web Dashboard ==========
+  // ========== Web Dashboard (static file serving) ==========
+  const MIME_TYPES = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.json': 'application/json',
+    '.ico': 'image/x-icon',
+  };
+
+  // Resolve web directory: try daemon/web first, then web/dist (dev mode)
+  const DAEMON_ROOT = join(import.meta.dirname, '..');
+  const WEB_DIR_CANDIDATES = [
+    join(DAEMON_ROOT, 'web'),                    // plugin: daemon/web/
+    join(DAEMON_ROOT, '..', 'web', 'dist'),      // dev: lattice-dev/web/dist/
+  ];
+  const WEB_DIR = WEB_DIR_CANDIDATES.find(d => existsSync(join(d, 'index.html'))) || WEB_DIR_CANDIDATES[0];
+
+  function serveStaticFile(c, filePath) {
+    if (!existsSync(filePath)) return null;
+    const ext = extname(filePath);
+    const mime = MIME_TYPES[ext] || 'application/octet-stream';
+    const content = readFileSync(filePath);
+    return c.body(content, 200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=31536000, immutable' });
+  }
+
+  // Serve static assets (JS, CSS, SVG, etc.)
+  app.get('/assets/*', (c) => {
+    const assetPath = join(WEB_DIR, c.req.path);
+    const res = serveStaticFile(c, assetPath);
+    if (res) return res;
+    return c.text('Not Found', 404);
+  });
+
+  app.get('/favicon.svg', (c) => {
+    const res = serveStaticFile(c, join(WEB_DIR, 'favicon.svg'));
+    if (res) return res;
+    return c.text('Not Found', 404);
+  });
+
+  app.get('/icons.svg', (c) => {
+    const res = serveStaticFile(c, join(WEB_DIR, 'icons.svg'));
+    if (res) return res;
+    return c.text('Not Found', 404);
+  });
+
+  // SPA fallback: serve index.html for all non-API routes
+  app.get('/', (c) => {
+    const indexPath = join(WEB_DIR, 'index.html');
+    if (existsSync(indexPath)) {
+      const html = readFileSync(indexPath, 'utf-8');
+      return c.html(html);
+    }
+    // Fallback to legacy dashboard
+    return c.html(webDashboardHtml(''));
+  });
+
+  // Legacy route
   app.get('/web', (c) => c.html(webDashboardHtml('')));
 
   // ========== Dashboard (SessionStart context injection) ==========
