@@ -250,7 +250,7 @@ export const steps = {
 
   create({ phase_id, title, body = '', assignee = null, idx = null, depends_on = [],
            parent_step_id = null, priority = 'medium', complexity = null, estimated_edits = null,
-           bolt_id = null, reporter = null }) {
+           bolt_id = null, reporter = null, type = 'task' }) {
     const db = getDb();
     const id = newId('STEP');
     const ts = now();
@@ -263,10 +263,10 @@ export const steps = {
     const tx = db.transaction(() => {
       db.prepare(
         `INSERT INTO steps (id, phase_id, idx, title, body, created_at, status, assignee,
-         ticket_number, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter)
-         VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?, ?)`
+         ticket_number, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter, type)
+         VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(id, phase_id, finalIdx, title, body, ts, assignee,
-            ticketNumber, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter);
+            ticketNumber, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter, type);
       const insDep = db.prepare(`INSERT INTO step_depends_on (step_id, depends_on_id) VALUES (?, ?)`);
       for (const dep of depends_on) insDep.run(id, dep);
     });
@@ -315,7 +315,7 @@ export const steps = {
   },
   update(id, fields) {
     const db = getDb();
-    const allowed = ['title', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_step_id', 'bolt_id', 'phase_id', 'reporter'];
+    const allowed = ['title', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_step_id', 'bolt_id', 'phase_id', 'reporter', 'type'];
     const sets = [];
     const vals = [];
 
@@ -403,16 +403,50 @@ export const steps = {
   bulkUpdate(ids, fields) {
     return ids.map(id => steps.update(id, fields));
   },
-  search(query, { limit = 20 } = {}) {
+  search(query, { limit = 20, mode = 'keyword' } = {}) {
     const db = getDb();
-    // Auto-prefix: each whitespace-separated term gets a trailing * unless user wrote fts5 operators
-    const ftsQuery = /[*":()]/.test(query)
-      ? query
-      : query.split(/\s+/).filter(Boolean).map(t => t + '*').join(' ');
-    return db.prepare(
-      `SELECT s.* FROM steps_fts f JOIN steps s ON s.rowid = f.rowid
-       WHERE steps_fts MATCH ? ORDER BY rank LIMIT ?`
-    ).all(ftsQuery, limit);
+
+    if (mode === 'keyword' || mode === 'hybrid') {
+      // FTS5 keyword search
+      const ftsQuery = /[*":()]/.test(query)
+        ? query
+        : query.split(/\s+/).filter(Boolean).map(t => t + '*').join(' ');
+      const ftsResults = db.prepare(
+        `SELECT s.* FROM steps_fts f JOIN steps s ON s.rowid = f.rowid
+         WHERE steps_fts MATCH ? ORDER BY rank LIMIT ?`
+      ).all(ftsQuery, limit);
+
+      if (mode === 'keyword') return ftsResults;
+
+      // Hybrid: combine FTS + vector results (vector search handled async in server)
+      return ftsResults;
+    }
+
+    // Semantic-only: handled in server.js (async embedding required)
+    return [];
+  },
+  /** Vector search — call from server with pre-computed query embedding */
+  vectorSearch(queryEmbedding, { limit = 20 } = {}) {
+    const db = getDb();
+    try {
+      const rows = db.prepare(
+        `SELECT step_id, distance FROM vec_steps
+         WHERE embedding MATCH ? ORDER BY distance LIMIT ?`
+      ).all(new Float32Array(queryEmbedding), limit);
+      return rows.map(r => {
+        const step = steps.get(r.step_id);
+        return step ? { ...step, _distance: r.distance } : null;
+      }).filter(Boolean);
+    } catch {
+      return [];
+    }
+  },
+  /** Store embedding for a step */
+  storeEmbedding(stepId, embedding) {
+    const db = getDb();
+    try {
+      db.prepare(`INSERT OR REPLACE INTO vec_steps (step_id, embedding) VALUES (?, ?)`).run(stepId, new Float32Array(embedding));
+    } catch { /* vec not available */ }
   },
   addLabel(id, label) {
     const db = getDb();

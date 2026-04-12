@@ -154,10 +154,34 @@ export function startServer() {
     }));
   });
   app.post('/steps', async (c) => c.json(steps.create(await c.req.json())));
-  app.get('/steps/search', (c) => {
+  app.get('/steps/search', async (c) => {
     const query = c.req.query('q') || '';
     const limit = Number(c.req.query('limit') || 20);
-    return c.json(steps.search(query, { limit }));
+    const mode = c.req.query('mode') || 'keyword'; // keyword | semantic | hybrid
+
+    if (mode === 'semantic' || mode === 'hybrid') {
+      try {
+        const { embed } = await import('./embeddings.js');
+        const queryEmbedding = await embed(query);
+        if (queryEmbedding) {
+          const vecResults = steps.vectorSearch(Array.from(queryEmbedding), { limit });
+          if (mode === 'semantic') return c.json(vecResults);
+
+          // Hybrid: merge FTS + vector, deduplicate by ID
+          const ftsResults = steps.search(query, { limit, mode: 'keyword' });
+          const seen = new Set();
+          const merged = [];
+          for (const s of [...ftsResults, ...vecResults]) {
+            if (!seen.has(s.id)) { seen.add(s.id); merged.push(s); }
+          }
+          return c.json(merged.slice(0, limit));
+        }
+      } catch {
+        // Fallback to keyword if vector search fails
+      }
+    }
+
+    return c.json(steps.search(query, { limit, mode: 'keyword' }));
   });
   app.get('/steps/:id', (c) => {
     const s = steps.get(c.req.param('id'));
