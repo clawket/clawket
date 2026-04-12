@@ -7,78 +7,53 @@ description: Manage work dashboard — view/update tasks, plans, phases, steps. 
 
 Structured task board for Claude Code sessions. All state persists across sessions via SQLite.
 
-## When to Use
+## Current Status
 
-- Starting work: check `lattice dashboard` for current task status
-- Updating progress: `lattice step update <ID> --status in_progress`
-- Completing work: `lattice step update <ID> --status done`
-- Creating tasks: `lattice step new "title" --phase <PHASE-ID>`
-- Checking blockers: `lattice step list --status todo --phase-id <PHASE-ID>`
-- Phase approval: `lattice phase approve <PHASE-ID>`
-
-## Entity Hierarchy
-
+```!
+lattice dashboard --cwd .
 ```
-Project → Plan → Phase → Step
-                          ├── Artifact (deliverables)
-                          ├── Run (execution log)
-                          └── depends_on (dependencies)
-```
+
+## Instructions
+
+If the user provided arguments (`$ARGUMENTS`), execute the corresponding lattice CLI command via Bash:
+- `/lattice dashboard` → run `lattice dashboard --cwd .`
+- `/lattice step list` → run `lattice step list`
+- `/lattice step new "title" --phase PHASE-xxx` → run `lattice step new "title" --phase PHASE-xxx`
+- Any other argument → run `lattice $ARGUMENTS`
+
+If no arguments, show this reference and the dashboard output above.
 
 ## Quick Reference
 
-### Dashboard (compact overview)
+### Dashboard
 ```bash
-lattice dashboard --cwd /path/to/project
+lattice dashboard --cwd .
 ```
 
-### Step Operations (most frequent)
+### Step Operations
 ```bash
-lattice step list --phase-id PHASE-xxx
-lattice step show STEP-xxx
-lattice step update STEP-xxx --status in_progress
-lattice step update STEP-xxx --status done
-lattice step new "Task title" --phase PHASE-xxx --body "description"
-lattice step append-body STEP-xxx --text "additional notes"
+lattice step new "title" --phase <PHASE-ID> --assignee main
+lattice step update <STEP-ID> --status in_progress|done|cancelled
+lattice step list --phase-id <PHASE-ID>
+lattice step show <STEP-ID>
 lattice step search "keyword"
+lattice comment new --step <STEP-ID> --body "comment"
 ```
 
-### Phase Operations
+### Phase / Plan / Bolt
 ```bash
-lattice phase list --plan-id PLAN-xxx
-lattice phase approve PHASE-xxx
-lattice phase wait-approval PHASE-xxx --timeout 600
+lattice phase list --plan-id <PLAN-ID>
+lattice phase approve <PHASE-ID>
+lattice plan list --project-id <PROJ-ID>
+lattice bolt list --project-id <PROJ-ID>
 ```
 
-### Plan Operations
+### Daemon
 ```bash
-lattice plan list --project-id PROJ-xxx
-lattice plan show PLAN-xxx
-lattice plan import plan.md --project myproject
-```
-
-### Run Operations (execution tracking)
-```bash
-lattice run start --step STEP-xxx --agent sub-agent-1
-lattice run finish RUN-xxx --result success --notes "completed migration"
-```
-
-### Question Operations
-```bash
-lattice question new "Should we use X or Y?" --plan PLAN-xxx --kind decision
-lattice question answer Q-xxx --text "Use X because..." --by human
-lattice question list --pending true
+lattice daemon status
+lattice daemon restart
 ```
 
 ## Output Format
 
-All commands return JSON. Parse with standard tools.
-
-## Daemon Management
-
-```bash
-lattice daemon start    # Start background daemon
-lattice daemon stop     # Stop daemon
-lattice daemon status   # Check if running
-lattice daemon restart  # Restart daemon
-```
+All commands return JSON. Use `--format table` for human-readable output.
