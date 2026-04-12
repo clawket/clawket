@@ -1,4 +1,4 @@
-interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {}
+type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>;
 
 function Label({ className, ...props }: LabelProps) {
   return (

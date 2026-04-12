@@ -29,4 +29,4 @@ function Select({ size, className, ...props }: SelectProps) {
   );
 }
 
-export { Select, selectVariants, type SelectProps };
+export { Select, type SelectProps };
