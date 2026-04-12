@@ -25,6 +25,38 @@ export function startServer() {
   const startTime = Date.now();
   const app = new Hono();
 
+  // SSE event bus for real-time updates
+  const sseClients = new Set();
+
+  function broadcastEvent(event, data) {
+    for (const client of sseClients) {
+      try { client({ event, data }); } catch { sseClients.delete(client); }
+    }
+  }
+
+  app.get('/events', (c) => {
+    return streamSSE(c, async (stream) => {
+      const send = ({ event, data }) => {
+        stream.writeSSE({ event, data: JSON.stringify(data) });
+      };
+      sseClients.add(send);
+
+      // Keep alive
+      const keepAlive = setInterval(() => {
+        try { stream.writeSSE({ event: 'ping', data: '' }); }
+        catch { clearInterval(keepAlive); sseClients.delete(send); }
+      }, 30000);
+
+      stream.onAbort(() => {
+        clearInterval(keepAlive);
+        sseClients.delete(send);
+      });
+
+      // Block until client disconnects
+      await new Promise(() => {});
+    });
+  });
+
   app.onError((err, c) => {
     const status = err.status || 500;
     return c.json({ error: err.message, stack: process.env.LATTICE_DEBUG ? err.stack : undefined }, status);
@@ -71,7 +103,7 @@ export function startServer() {
     if (!p) return c.json({ error: 'not found' }, 404);
     return c.json(p);
   });
-  app.patch('/plans/:id', async (c) => c.json(plans.update(c.req.param('id'), await c.req.json())));
+  app.patch('/plans/:id', async (c) => { const r = plans.update(c.req.param('id'), await c.req.json()); broadcastEvent('plan:updated', { id: c.req.param('id') }); return c.json(r); });
   app.delete('/plans/:id', (c) => {
     plans.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
@@ -98,7 +130,7 @@ export function startServer() {
     if (!p) return c.json({ error: 'not found' }, 404);
     return c.json(p);
   });
-  app.patch('/phases/:id', async (c) => c.json(phases.update(c.req.param('id'), await c.req.json())));
+  app.patch('/phases/:id', async (c) => { const r = phases.update(c.req.param('id'), await c.req.json()); broadcastEvent('phase:updated', { id: c.req.param('id') }); return c.json(r); });
   app.delete('/phases/:id', (c) => {
     phases.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
@@ -153,7 +185,11 @@ export function startServer() {
       parent_step_id: q.parent_step_id !== undefined ? (q.parent_step_id || null) : undefined,
     }));
   });
-  app.post('/steps', async (c) => c.json(steps.create(await c.req.json())));
+  app.post('/steps', async (c) => {
+    const result = steps.create(await c.req.json());
+    broadcastEvent('step:created', { id: result.id });
+    return c.json(result);
+  });
   app.get('/steps/search', async (c) => {
     const query = c.req.query('q') || '';
     const limit = Number(c.req.query('limit') || 20);
@@ -188,9 +224,14 @@ export function startServer() {
     if (!s) return c.json({ error: 'not found' }, 404);
     return c.json(s);
   });
-  app.patch('/steps/:id', async (c) => c.json(steps.update(c.req.param('id'), await c.req.json())));
+  app.patch('/steps/:id', async (c) => {
+    const result = steps.update(c.req.param('id'), await c.req.json());
+    broadcastEvent('step:updated', { id: c.req.param('id') });
+    return c.json(result);
+  });
   app.delete('/steps/:id', (c) => {
     steps.delete(c.req.param('id'));
+    broadcastEvent('step:deleted', { id: c.req.param('id') });
     return c.json({ deleted: c.req.param('id') });
   });
   // Bulk update steps
@@ -272,7 +313,7 @@ export function startServer() {
     if (!b) return c.json({ error: 'not found' }, 404);
     return c.json(b);
   });
-  app.patch('/bolts/:id', async (c) => c.json(bolts.update(c.req.param('id'), await c.req.json())));
+  app.patch('/bolts/:id', async (c) => { const r = bolts.update(c.req.param('id'), await c.req.json()); broadcastEvent('bolt:updated', { id: c.req.param('id') }); return c.json(r); });
   app.delete('/bolts/:id', (c) => {
     bolts.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
