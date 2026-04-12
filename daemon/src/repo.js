@@ -130,9 +130,14 @@ export const plans = {
         vals.push(fields[k]);
       }
     }
-    if ('status' in fields && fields.status === 'approved') {
-      sets.push('approved_at = ?');
-      vals.push(now());
+    if ('status' in fields && (fields.status === 'approved' || fields.status === 'active')) {
+      if ('approved_at' in fields) {
+        sets.push('approved_at = ?');
+        vals.push(fields.approved_at);
+      } else if (fields.status === 'approved') {
+        sets.push('approved_at = ?');
+        vals.push(now());
+      }
     }
     if (sets.length === 0) return plans.get(id);
     vals.push(id);
@@ -240,6 +245,22 @@ export const questions = {
 };
 
 // -------- Steps --------
+/** Auto-activate phase & plan when step is created or started under completed/pending ancestors */
+function _autoActivateAncestors(db, phase_id) {
+  const phase = db.prepare('SELECT * FROM phases WHERE id = ?').get(phase_id);
+  if (!phase) return;
+  // Activate phase if not active
+  if (phase.status === 'completed' || phase.status === 'pending') {
+    const ts = now();
+    db.prepare(`UPDATE phases SET status = 'active', started_at = COALESCE(started_at, ?) WHERE id = ?`).run(ts, phase_id);
+  }
+  // Activate plan only if it was completed (re-open). Draft/approved require explicit approval flow.
+  const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(phase.plan_id);
+  if (plan && plan.status === 'completed') {
+    db.prepare(`UPDATE plans SET status = 'active' WHERE id = ?`).run(phase.plan_id);
+  }
+}
+
 export const steps = {
   /** Resolve project key for a step by traversing phase -> plan -> project. */
   _resolveProjectKey(db, phase_id) {
@@ -316,6 +337,10 @@ export const steps = {
       for (const dep of depends_on) insDep.run(id, dep);
     });
     tx();
+
+    // Auto-activate phase & plan when a new step is created under completed/pending phase/plan
+    _autoActivateAncestors(db, phase_id);
+
     return steps.get(id);
   },
   get(id) {
@@ -424,19 +449,36 @@ export const steps = {
       }
     }
 
-    // Auto-complete phase if ALL steps (including children at any depth) are done
+    // Auto-activate phase & plan when step becomes in_progress
+    if ('status' in fields && fields.status === 'in_progress') {
+      const updatedStep = steps.get(id);
+      if (updatedStep) {
+        _autoActivateAncestors(db, updatedStep.phase_id);
+      }
+    }
+
+    // Auto-complete phase & plan if ALL steps are terminal
     if ('status' in fields && ['done', 'cancelled', 'superseded'].includes(fields.status)) {
       const updatedStep = steps.get(id);
       if (updatedStep) {
-        // Get all steps in this phase (flat list includes all depths via phase_id)
         const phaseSteps = steps.list({ phase_id: updatedStep.phase_id });
         const terminalStatuses = new Set(['done', 'cancelled', 'superseded']);
         const allDone = phaseSteps.every(s => terminalStatuses.has(s.status));
-        const hasTodo = phaseSteps.some(s => s.status === 'todo' || s.status === 'in_progress');
-        if (allDone && !hasTodo && phaseSteps.length > 0) {
+        if (allDone && phaseSteps.length > 0) {
           const phase = phases.get(updatedStep.phase_id);
           if (phase && phase.status !== 'completed') {
             phases.update(updatedStep.phase_id, { status: 'completed' });
+          }
+          // Auto-complete plan if ALL phases are completed
+          if (phase) {
+            const planPhases = phases.list({ plan_id: phase.plan_id });
+            const allPhasesCompleted = planPhases.every(p => p.status === 'completed');
+            if (allPhasesCompleted && planPhases.length > 0) {
+              const plan = plans.get(phase.plan_id);
+              if (plan && plan.status !== 'completed') {
+                plans.update(phase.plan_id, { status: 'completed' });
+              }
+            }
           }
         }
       }
