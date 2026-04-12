@@ -196,7 +196,34 @@ export function startServer() {
     }));
   });
   app.post('/steps', async (c) => {
-    const result = steps.create(await c.req.json());
+    const body = await c.req.json();
+
+    // Auto-infer phase_id if not provided (first non-completed phase of active plan)
+    if (!body.phase_id && body.cwd) {
+      const proj = projects.getByCwd(body.cwd);
+      if (proj) {
+        const planList = plans.list({ project_id: proj.id, status: 'active' });
+        const plan = planList[0] || plans.list({ project_id: proj.id })[0];
+        if (plan) {
+          const phaseList = phases.list({ plan_id: plan.id });
+          const phase = phaseList.find(p => p.status !== 'completed') || phaseList[0];
+          if (phase) body.phase_id = phase.id;
+        }
+      }
+    }
+
+    // Auto-infer bolt_id if not provided (first active bolt of project)
+    if (!body.bolt_id && body.cwd) {
+      const proj = projects.getByCwd(body.cwd);
+      if (proj) {
+        const boltList = bolts.list({ project_id: proj.id });
+        const bolt = boltList.find(b => b.status === 'active') || boltList.find(b => b.status !== 'completed');
+        if (bolt) body.bolt_id = bolt.id;
+      }
+    }
+
+    delete body.cwd; // Don't pass cwd to create
+    const result = steps.create(body);
     broadcastEvent('step:created', { id: result.id });
     return c.json(result);
   });
@@ -665,17 +692,21 @@ export function startServer() {
           for (const step of nonDone) {
             const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', review: '[?]', cancelled: '[-]', superseded: '[-]', deferred: '[~]' }[step.status] || '[ ]';
             const assignee = step.assignee ? ` @${step.assignee}` : '';
-            lines.push(`  ${icon} ${step.title} (${step.id})${assignee}`);
+            const ref = step.ticket_number || step.id;
+            lines.push(`  ${icon} ${step.title} (${ref})${assignee}`);
           }
         }
         lines.push('');
         continue;
       }
 
-      for (const step of allSteps) {
-        const icon = { todo: '[ ]', in_progress: '[>]', done: '[x]', blocked: '[!]', review: '[?]', cancelled: '[-]', superseded: '[-]', deferred: '[~]' }[step.status] || '[ ]';
+      // Active phases: show non-done steps only (save tokens), use ticket_number
+      const nonDoneSteps = allSteps.filter(s => s.status !== 'done');
+      for (const step of nonDoneSteps) {
+        const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', review: '[?]', cancelled: '[-]', superseded: '[-]', deferred: '[~]' }[step.status] || '[ ]';
         const assignee = step.assignee ? ` @${step.assignee}` : '';
-        lines.push(`  ${icon} ${step.title} (${step.id})${assignee}`);
+        const ref = step.ticket_number || step.id;
+        lines.push(`  ${icon} ${step.title} (${ref})${assignee}`);
       }
       lines.push('');
     }
@@ -941,7 +972,8 @@ export function startServer() {
     process.stderr.write(`latticed: unix socket listening at ${paths.socket}\n`);
   });
 
-  const tcpServer = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }, (info) => {
+  const LATTICE_PORT = Number(process.env.LATTICE_PORT) || 19400;
+  const tcpServer = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: LATTICE_PORT }, (info) => {
     writeFileSync(paths.portFile, String(info.port));
     process.stderr.write(`latticed: tcp listening at http://127.0.0.1:${info.port}\n`);
   });
