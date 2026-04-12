@@ -638,14 +638,14 @@ export const stepComments = {
 
 // -------- Artifacts --------
 export const artifacts = {
-  create({ step_id = null, phase_id = null, plan_id = null, type, title, content = '', content_format = 'md', parent_id = null }) {
+  create({ step_id = null, phase_id = null, plan_id = null, type, title, content = '', content_format = 'md', parent_id = null, scope = 'reference' }) {
     const db = getDb();
     const id = newId('ART');
     const ts = now();
     db.prepare(
-      `INSERT INTO artifacts (id, step_id, phase_id, plan_id, type, title, content, content_format, created_at, parent_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, step_id, phase_id, plan_id, type, title, content, content_format, ts, parent_id);
+      `INSERT INTO artifacts (id, step_id, phase_id, plan_id, type, title, content, content_format, created_at, parent_id, scope)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, step_id, phase_id, plan_id, type, title, content, content_format, ts, parent_id, scope);
     return artifacts.get(id);
   },
   get(id) {
@@ -661,6 +661,55 @@ export const artifacts = {
     if (type) { where.push('type = ?'); vals.push(type); }
     const sql = `SELECT * FROM artifacts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
     return db.prepare(sql).all(...vals);
+  },
+  storeEmbedding(artifactId, embedding) {
+    const db = getDb();
+    try {
+      db.prepare(`INSERT OR REPLACE INTO vec_artifacts (artifact_id, embedding) VALUES (?, ?)`).run(artifactId, new Float32Array(embedding));
+    } catch { /* vec not available */ }
+  },
+  vectorSearch(queryEmbedding, { limit = 20, scope = 'rag' } = {}) {
+    const db = getDb();
+    try {
+      const rows = db.prepare(
+        `SELECT artifact_id, distance FROM vec_artifacts
+         WHERE embedding MATCH ? ORDER BY distance LIMIT ?`
+      ).all(new Float32Array(queryEmbedding), limit * 2);
+      return rows.map(r => {
+        const art = artifacts.get(r.artifact_id);
+        if (!art || (scope && art.scope !== scope)) return null;
+        return { ...art, _distance: r.distance };
+      }).filter(Boolean).slice(0, limit);
+    } catch {
+      return [];
+    }
+  },
+  update(id, { title, content, content_format, scope, created_by = null }) {
+    const db = getDb();
+    const existing = artifacts.get(id);
+    if (!existing) return null;
+
+    // Auto-snapshot current version before update
+    if (content !== undefined && content !== existing.content) {
+      artifactVersions.create({
+        artifact_id: id,
+        content: existing.content,
+        content_format: existing.content_format,
+        created_by,
+      });
+    }
+
+    const sets = [];
+    const vals = [];
+    if (title !== undefined) { sets.push('title = ?'); vals.push(title); }
+    if (content !== undefined) { sets.push('content = ?'); vals.push(content); }
+    if (content_format !== undefined) { sets.push('content_format = ?'); vals.push(content_format); }
+    if (scope !== undefined) { sets.push('scope = ?'); vals.push(scope); }
+    if (sets.length === 0) return existing;
+
+    vals.push(id);
+    db.prepare(`UPDATE artifacts SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return artifacts.get(id);
   },
   delete(id) {
     getDb().prepare(`DELETE FROM artifacts WHERE id = ?`).run(id);

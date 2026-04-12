@@ -346,11 +346,137 @@ export function startServer() {
       type: q.type || null,
     }));
   });
-  app.post('/artifacts', async (c) => c.json(artifacts.create(await c.req.json())));
+  app.post('/artifacts', async (c) => {
+    const art = artifacts.create(await c.req.json());
+    // Auto-embed if scope=rag
+    if (art.scope === 'rag' && art.content) {
+      import('./embeddings.js').then(({ embed }) =>
+        embed(`${art.title}\n${art.content}`).then(vec => { if (vec) artifacts.storeEmbedding(art.id, Array.from(vec)); })
+      ).catch(() => {});
+    }
+    return c.json(art);
+  });
+  app.get('/artifacts/search', async (c) => {
+    const query = c.req.query('q') || '';
+    const limit = Number(c.req.query('limit') || 20);
+    const mode = c.req.query('mode') || 'hybrid';
+    const scope = c.req.query('scope') || 'rag';
+
+    if (mode === 'semantic' || mode === 'hybrid') {
+      try {
+        const { embed } = await import('./embeddings.js');
+        const queryEmbedding = await embed(query);
+        if (queryEmbedding) {
+          const vecResults = artifacts.vectorSearch(Array.from(queryEmbedding), { limit, scope });
+          if (mode === 'semantic') return c.json(vecResults);
+
+          // Hybrid: FTS on artifacts_fts + vector
+          const ftsResults = (() => {
+            try {
+              return getDb().prepare(
+                `SELECT a.* FROM artifacts a JOIN artifacts_fts f ON a.id = f.rowid
+                 WHERE artifacts_fts MATCH ? AND a.scope = ? ORDER BY rank LIMIT ?`
+              ).all(query, scope, limit);
+            } catch { return []; }
+          })();
+          const seen = new Set();
+          const merged = [];
+          for (const a of [...ftsResults, ...vecResults]) {
+            if (!seen.has(a.id)) { seen.add(a.id); merged.push(a); }
+          }
+          return c.json(merged.slice(0, limit));
+        }
+      } catch {}
+    }
+
+    // Keyword-only fallback
+    try {
+      const results = getDb().prepare(
+        `SELECT a.* FROM artifacts a JOIN artifacts_fts f ON a.id = f.rowid
+         WHERE artifacts_fts MATCH ? AND a.scope = ? ORDER BY rank LIMIT ?`
+      ).all(query, scope, limit);
+      return c.json(results);
+    } catch {
+      return c.json([]);
+    }
+  });
   app.get('/artifacts/:id', (c) => jsonOr404(c, artifacts.get(c.req.param('id'))));
+  app.patch('/artifacts/:id', async (c) => {
+    const body = await c.req.json();
+    const result = artifacts.update(c.req.param('id'), body);
+    // Re-embed if scope=rag and content changed
+    if (result && result.scope === 'rag' && body.content !== undefined) {
+      import('./embeddings.js').then(({ embed }) =>
+        embed(`${result.title}\n${result.content}`).then(vec => { if (vec) artifacts.storeEmbedding(result.id, Array.from(vec)); })
+      ).catch(() => {});
+    }
+    return jsonOr404(c, result);
+  });
   app.delete('/artifacts/:id', (c) => {
     artifacts.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
+  });
+
+  // ========== Artifact Import (docs/ → Artifact) ==========
+  app.post('/artifacts/import', async (c) => {
+    const { cwd, plan_id = null, phase_id = null, scope = 'reference', dry_run = false } = await c.req.json();
+    if (!cwd || !existsSync(cwd)) return c.json({ error: 'cwd required' }, 400);
+
+    const MD_EXTS = new Set(['.md', '.mdx']);
+    const MAX_SIZE = 512 * 1024;
+    const imported = [];
+    const skipped = [];
+
+    // Get existing artifact titles to avoid duplicates
+    const existing = new Set(
+      artifacts.list({ plan_id, phase_id }).map(a => a.title)
+    );
+
+    function scanDir(dir, depth = 0) {
+      if (depth > 3) return;
+      try {
+        for (const entry of readdirSync(dir)) {
+          if (entry.startsWith('.') || entry === 'node_modules') continue;
+          const full = join(dir, entry);
+          try {
+            const stat = statSync(full);
+            if (stat.isDirectory()) {
+              scanDir(full, depth + 1);
+            } else if (MD_EXTS.has(extname(entry).toLowerCase()) && stat.size < MAX_SIZE) {
+              const content = readFileSync(full, 'utf-8');
+              const headingMatch = content.match(/^#\s+(.+)$/m);
+              const title = headingMatch ? headingMatch[1].trim() : basename(entry, extname(entry));
+              const relPath = relative(cwd, full);
+
+              if (existing.has(title)) {
+                skipped.push({ path: relPath, title, reason: 'duplicate' });
+                continue;
+              }
+
+              if (!dry_run) {
+                const art = artifacts.create({
+                  plan_id, phase_id,
+                  type: 'document',
+                  title,
+                  content,
+                  content_format: extname(entry) === '.mdx' ? 'mdx' : 'md',
+                  scope,
+                });
+                imported.push({ id: art.id, path: relPath, title });
+              } else {
+                imported.push({ path: relPath, title });
+              }
+              existing.add(title);
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* dir not readable */ }
+    }
+
+    const docsDir = join(cwd, 'docs');
+    if (existsSync(docsDir)) scanDir(docsDir);
+
+    return c.json({ imported: imported.length, skipped: skipped.length, items: imported, skippedItems: skipped, dry_run });
   });
 
   // ========== Artifact Versions ==========
@@ -630,9 +756,17 @@ export function startServer() {
             if (stat.isDirectory()) {
               scanDir(full, depth + 1);
             } else if (MD_EXTS.has(extname(entry).toLowerCase()) && stat.size < MAX_SIZE) {
+              // Extract first heading as title
+              let title = basename(entry, extname(entry));
+              try {
+                const head = readFileSync(full, 'utf-8').slice(0, 500);
+                const headingMatch = head.match(/^#\s+(.+)$/m);
+                if (headingMatch) title = headingMatch[1].trim();
+              } catch {}
               results.push({
                 path: relative(cwd, full),
                 name: basename(entry, extname(entry)),
+                title,
                 size: stat.size,
                 modified_at: stat.mtimeMs,
               });
@@ -655,9 +789,16 @@ export function startServer() {
           const full = join(cwd, entry);
           const stat = statSync(full);
           if (stat.isFile() && stat.size < MAX_SIZE) {
+            let title = basename(entry, extname(entry));
+            try {
+              const head = readFileSync(full, 'utf-8').slice(0, 500);
+              const headingMatch = head.match(/^#\s+(.+)$/m);
+              if (headingMatch) title = headingMatch[1].trim();
+            } catch {}
             results.push({
               path: entry,
               name: basename(entry, extname(entry)),
+              title,
               size: stat.size,
               modified_at: stat.mtimeMs,
             });

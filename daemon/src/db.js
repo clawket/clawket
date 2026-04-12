@@ -71,6 +71,7 @@ function ensureMigrated(db) {
     { version: 8, file: '008_step_relations.sql' },
     { version: 9, file: '009_vector_search.sql' },
     { version: 10, file: '010_step_type.sql' },
+    { version: 11, file: '011_artifact_scope.sql' },
   ];
   for (const m of migrations) {
     if (m.version > currentVersion) {

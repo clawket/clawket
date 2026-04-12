@@ -353,6 +353,34 @@ enum ArtifactAction {
         r#type: Option<String>,
     },
     Delete { id: String },
+    /// Search wiki artifacts (FTS5 + vector hybrid)
+    Search {
+        query: String,
+        /// Search mode: keyword | semantic | hybrid
+        #[arg(long, default_value = "hybrid")]
+        mode: String,
+        /// Filter by scope: rag | reference | archive
+        #[arg(long, default_value = "rag")]
+        scope: String,
+        #[arg(long, default_value = "20")]
+        limit: u32,
+    },
+    /// Import docs/ files as Artifacts
+    Import {
+        /// Working directory to scan docs/ from
+        #[arg(long)]
+        cwd: String,
+        #[arg(long)]
+        plan_id: Option<String>,
+        #[arg(long)]
+        phase_id: Option<String>,
+        /// Scope for imported artifacts: rag | reference | archive
+        #[arg(long, default_value = "reference")]
+        scope: String,
+        /// Preview without creating
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 // ========== Run ==========
@@ -782,6 +810,15 @@ async fn main() -> Result<()> {
             }
             ArtifactAction::Delete { id } => {
                 output(&client::request(&c, "DELETE", &format!("/artifacts/{id}"), None).await?);
+            }
+            ArtifactAction::Search { query, mode, scope, limit } => {
+                let qs = format!("?q={}&mode={}&scope={}&limit={}", urlenc(&query), mode, scope, limit);
+                output(&client::get(&c, &format!("/artifacts/search{qs}")).await?);
+            }
+            ArtifactAction::Import { cwd, plan_id, phase_id, scope, dry_run } => {
+                output(&client::request(&c, "POST", "/artifacts/import", Some(json!({
+                    "cwd": cwd, "plan_id": plan_id, "phase_id": phase_id, "scope": scope, "dry_run": dry_run,
+                }))).await?);
             }
         },
 
