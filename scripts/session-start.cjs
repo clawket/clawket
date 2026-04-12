@@ -114,7 +114,6 @@ function buildSummary(context) {
 }
 
 // Load rules from plugin prompts directory
-const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || resolve(dirname(__filename), '..');
 let rules = '';
 try {
   rules = readFileSync(resolve(pluginRoot, 'prompts', 'rules.md'), 'utf-8').trim();
