@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import type { Plan, Phase, Step, Bolt, Run } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import type { Project, Plan, Phase, Step, Bolt, Run } from '../types';
 import api from '../api';
 import StatusBadge from './StatusBadge';
+import { ProjectSettings } from './ProjectSettings';
 
 interface SummaryViewProps {
   projectId: string;
@@ -39,6 +40,7 @@ function ProgressBar({ done, inProgress, todo, blocked }: { done: number; inProg
 }
 
 export default function SummaryView({ projectId, onSelectStep }: SummaryViewProps) {
+  const [project, setProject] = useState<Project | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [phases, setPhases] = useState<PhaseWithPlan[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -46,16 +48,25 @@ export default function SummaryView({ projectId, onSelectStep }: SummaryViewProp
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const reloadProject = useCallback(async () => {
+    const p = await api.getProject(projectId);
+    setProject(p);
+    return p;
+  }, [projectId]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
     async function load() {
       try {
-        const [planList, boltList] = await Promise.all([
+        const [proj, planList, boltList] = await Promise.all([
+          api.getProject(projectId),
           api.listPlans({ project_id: projectId }),
           api.listBolts({ project_id: projectId }),
         ]);
+        if (cancelled) return;
+        setProject(proj);
         if (cancelled) return;
         setPlans(planList);
         setBolts(boltList);
@@ -284,6 +295,8 @@ export default function SummaryView({ projectId, onSelectStep }: SummaryViewProp
           </div>
         </div>
       )}
+
+      {project && <ProjectSettings project={project} projectId={projectId} onProjectChange={reloadProject} />}
     </div>
   );
 }
