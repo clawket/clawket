@@ -1,0 +1,126 @@
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+  cwds: string[];
+}
+
+export interface Bolt {
+  id: string;
+  project_id: string;
+  title: string;
+  goal: string | null;
+  idx: number;
+  created_at: number;
+  started_at: number | null;
+  ended_at: number | null;
+  status: 'planning' | 'active' | 'review' | 'completed';
+}
+
+export interface Plan {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  source: string;
+  source_path: string | null;
+  created_at: number;
+  approved_at: number | null;
+  status: 'draft' | 'active' | 'approved' | 'completed' | 'archived';
+}
+
+export interface Phase {
+  id: string;
+  plan_id: string;
+  idx: number;
+  title: string;
+  goal: string | null;
+  created_at: number;
+  started_at: number | null;
+  completed_at: number | null;
+  status: 'pending' | 'active' | 'completed';
+  approval_required: number;
+  approved_by: string | null;
+  approved_at: number | null;
+}
+
+export interface Step {
+  id: string;
+  phase_id: string;
+  idx: number;
+  title: string;
+  body: string;
+  created_at: number;
+  started_at: number | null;
+  completed_at: number | null;
+  status: 'todo' | 'in_progress' | 'done' | 'blocked' | 'review' | 'cancelled' | 'superseded' | 'deferred';
+  assignee: string | null;
+  depends_on: string[];
+  ticket_number: string | null;
+  parent_step_id: string | null;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  complexity: string | null;
+  estimated_edits: number | null;
+  bolt_id: string | null;
+  labels: string[];
+  reporter: string | null;
+  type: 'task' | 'bug' | 'feature' | 'enhancement' | 'refactor' | 'docs' | 'test' | 'chore';
+}
+
+export interface StepComment {
+  id: string;
+  step_id: string;
+  author: string;
+  body: string;
+  created_at: number;
+}
+
+export interface ArtifactVersion {
+  id: string;
+  artifact_id: string;
+  version: number;
+  content: string | null;
+  content_format: string | null;
+  created_at: number;
+  created_by: string | null;
+}
+
+export interface Artifact {
+  id: string;
+  step_id: string | null;
+  phase_id: string | null;
+  plan_id: string | null;
+  type: string;
+  title: string;
+  content: string;
+  content_format: string;
+  created_at: number;
+}
+
+export interface Run {
+  id: string;
+  step_id: string;
+  session_id: string | null;
+  agent: string;
+  started_at: number;
+  ended_at: number | null;
+  result: string | null;
+  notes: string | null;
+}
+
+export interface Question {
+  id: string;
+  plan_id: string | null;
+  phase_id: string | null;
+  step_id: string | null;
+  kind: string;
+  origin: string;
+  body: string;
+  asked_by: string;
+  created_at: number;
+  answer: string | null;
+  answered_by: string | null;
+  answered_at: number | null;
+}

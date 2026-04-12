@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/themes/dark.css";
+@import "./styles/themes/light.css";
+@plugin "@tailwindcss/typography";
+@source "../components";
+
+@theme {
+  /* ─── Semantic → Tailwind mapping ─── */
+  /* Background */
+  --color-background: var(--color-background);
+  --color-surface-low: var(--color-surface-low);
+  --color-surface: var(--color-surface);
+  --color-surface-high: var(--color-surface-high);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-overlay: var(--color-overlay);
+
+  /* Foreground */
+  --color-foreground: var(--color-foreground);
+  --color-muted: var(--color-foreground-muted);
+
+  /* Border */
+  --color-border: var(--color-border);
+
+  /* Primary */
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-foreground: var(--color-primary-foreground);
+
+  /* Success */
+  --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+
+  /* Warning */
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+
+  /* Danger */
+  --color-danger: var(--color-danger);
+  --color-danger-foreground: var(--color-danger-foreground);
+
+  /* Secondary */
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+
+  /* Ring */
+  --color-ring: var(--color-ring);
+
+  /* ─── Legacy aliases (backward compat during migration) ─── */
+  --color-bg: var(--color-background);
+  --color-text: var(--color-foreground);
+  --color-accent: var(--color-primary);
+  --color-ok: var(--color-success);
+  --color-warn: var(--color-warning);
+  --color-purple: var(--color-secondary);
+
+  /* ─── Typography ─── */
+  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100vh;
+}
+
+/* Monospace elements */
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+/* Drawer slide-in animation */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+/* Prose (typography) — use semantic colors for both light and dark themes */
+.prose {
+  --tw-prose-body: var(--color-foreground);
+  --tw-prose-headings: var(--color-foreground);
+  --tw-prose-lead: var(--color-foreground-muted);
+  --tw-prose-links: var(--color-primary);
+  --tw-prose-bold: var(--color-foreground);
+  --tw-prose-counters: var(--color-foreground-muted);
+  --tw-prose-bullets: var(--color-foreground-muted);
+  --tw-prose-hr: var(--color-border);
+  --tw-prose-quotes: var(--color-foreground);
+  --tw-prose-quote-borders: var(--color-border);
+  --tw-prose-captions: var(--color-foreground-muted);
+  --tw-prose-code: var(--color-foreground);
+  --tw-prose-pre-code: var(--color-foreground);
+  --tw-prose-pre-bg: var(--color-surface-high);
+  --tw-prose-th-borders: var(--color-border);
+  --tw-prose-td-borders: var(--color-border);
+}
+
+/* Scrollbar (thin, subtle) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-foreground-muted); }

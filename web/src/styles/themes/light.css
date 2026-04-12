@@ -1,0 +1,42 @@
+/* ─── Light Theme — Semantic Variables ─── */
+:root[data-theme="light"] {
+  /* Backgrounds */
+  --color-background: var(--palette-gray-50);
+  --color-surface-low: var(--palette-white);
+  --color-surface: var(--palette-white);
+  --color-surface-high: var(--palette-gray-100);
+  --color-surface-hover: var(--palette-gray-100);
+  --color-overlay: rgba(0, 0, 0, 0.40);
+
+  /* Foreground */
+  --color-foreground: var(--palette-gray-950);
+  --color-foreground-muted: var(--palette-gray-500);
+
+  /* Border */
+  --color-border: var(--palette-gray-200);
+  --color-border-muted: var(--palette-gray-300);
+
+  /* Primary (accent) */
+  --color-primary: var(--palette-blue-600);
+  --color-primary-hover: var(--palette-blue-500);
+  --color-primary-foreground: var(--palette-white);
+
+  /* Success */
+  --color-success: var(--palette-green-600);
+  --color-success-foreground: var(--palette-white);
+
+  /* Warning */
+  --color-warning: var(--palette-yellow-500);
+  --color-warning-foreground: var(--palette-white);
+
+  /* Danger */
+  --color-danger: var(--palette-red-500);
+  --color-danger-foreground: var(--palette-white);
+
+  /* Secondary (purple) */
+  --color-secondary: var(--palette-purple-500);
+  --color-secondary-foreground: var(--palette-white);
+
+  /* Focus ring */
+  --color-ring: var(--palette-blue-600);
+}

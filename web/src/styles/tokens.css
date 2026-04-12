@@ -1,0 +1,42 @@
+/* ─── Palette Colors (raw values) ─── */
+:root {
+  /* Gray scale — GitHub Dark inspired */
+  --palette-gray-50: #f0f6fc;
+  --palette-gray-100: #e6edf3;
+  --palette-gray-200: #c9d1d9;
+  --palette-gray-300: #b1bac4;
+  --palette-gray-400: #8b949e;
+  --palette-gray-500: #6e7681;
+  --palette-gray-600: #484f58;
+  --palette-gray-700: #30363d;
+  --palette-gray-800: #21262d;
+  --palette-gray-850: #1c2129;
+  --palette-gray-900: #161b22;
+  --palette-gray-950: #0d1117;
+
+  /* Blue */
+  --palette-blue-400: #58a6ff;
+  --palette-blue-500: #388bfd;
+  --palette-blue-600: #1f6feb;
+
+  /* Green */
+  --palette-green-400: #3fb950;
+  --palette-green-500: #2ea043;
+  --palette-green-600: #238636;
+
+  /* Yellow / Orange */
+  --palette-yellow-400: #d29922;
+  --palette-yellow-500: #bb8009;
+
+  /* Red */
+  --palette-red-400: #f85149;
+  --palette-red-500: #da3633;
+
+  /* Purple */
+  --palette-purple-400: #bc8cff;
+  --palette-purple-500: #a371f7;
+
+  /* White / Black */
+  --palette-white: #ffffff;
+  --palette-black: #000000;
+}
