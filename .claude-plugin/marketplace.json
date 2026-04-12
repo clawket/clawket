@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "lattice",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": "./",
       "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions"
     }
