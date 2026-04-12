@@ -12,7 +12,13 @@ import { importPlanFile } from './import-plan.js';
 import { webDashboardHtml } from './web.js';
 import { formatOutput } from './format.js';
 
-const VERSION = '0.1.0';
+const VERSION = (() => {
+  try {
+    const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || join(new URL('.', import.meta.url).pathname, '..', '..');
+    const pkg = JSON.parse(readFileSync(join(pluginRoot, '.claude-plugin', 'plugin.json'), 'utf-8'));
+    return pkg.version || '0.0.0';
+  } catch { return '0.0.0'; }
+})();
 
 export function startServer() {
   ensureDirs();
@@ -592,7 +598,7 @@ export function startServer() {
   // ========== Runs ==========
   app.get('/runs', (c) => {
     const q = c.req.query();
-    return c.json(runs.list({ step_id: q.step_id || null, session_id: q.session_id || null }));
+    return c.json(runs.list({ step_id: q.step_id || null, session_id: q.session_id || null, project_id: q.project_id || null }));
   });
   app.post('/runs', async (c) => c.json(runs.create(await c.req.json())));
   app.get('/runs/:id', (c) => jsonOr404(c, runs.get(c.req.param('id'))));
