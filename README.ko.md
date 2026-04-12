@@ -14,19 +14,24 @@ Lattice는 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + 
 
 - **구조화된 작업 보드** — 프로젝트, 계획, 단계, 작업의 전체 CRUD
 - **볼트 사이클** — 스프린트 형태의 이터레이션 관리 (AIDLC 볼트 사이클 지원)
+- **볼트 자동 완료** — 볼트 내 모든 스텝 완료 시 자동 completed 전환
 - **웹 대시보드** — 요약, 계획, 보드(칸반), 백로그, 타임라인, 위키 6개 뷰
+- **에이전트 Swimlane 타임라인** — 에이전트별 수평 바 차트로 동시 작업 시각화
 - **드래그 앤 드롭** — 칸반 DnD로 상태 변경, 백로그 DnD로 볼트 배정
-- **Artifact 위키** — 마크다운/JSON/YAML 문서 관리 및 버전 이력
-- **티켓 번호** — 내부 ULID와 함께 사람이 읽을 수 있는 ID (LAT-1, LAT-2)
-- **훅 통합** — 모든 Claude Code 세션에 프로젝트 컨텍스트 자동 주입
-- **스텝 등록 강제** — 활성 스텝 없이 작업 불가 (PreToolUse 훅)
-- **벡터 검색** — FTS5 키워드 + sqlite-vec 시맨틱 하이브리드 검색
-- **통합 타임라인** — 상태 변경, 코멘트, 아티팩트, 실행, 질문을 통합한 활동 스트림
 - **인라인 편집** — Plans 뷰에서 Step 제목/상태 더블클릭 직접 편집
 - **프로젝트 설정** — Summary 뷰에서 프로젝트명, 설명, 작업 디렉토리 편집
-- **실행 추적** — 에이전트/세션별 자동 실행 기록
-- **자동 상태 동기화** — Stop 훅에서 Phase/Plan 완료 상태 자동 전환
-- **토큰 최적화** — 완료 Phase는 SessionStart 컨텍스트에서 요약만 주입
+- **위키 파일 트리** — 폴더 기반 트리 내비게이션, heading 자동 추출 제목
+- **로컬 RAG** — Artifact scope (rag/reference/archive), sqlite-vec 임베딩, 하이브리드 검색
+- **Artifact 버전 관리** — content 수정 시 자동 스냅샷, 버전 이력 + 복원
+- **벡터 검색** — FTS5 키워드 + sqlite-vec 시맨틱 하이브리드 검색
+- **티켓 번호** — 내부 ULID와 함께 사람이 읽을 수 있는 ID (LAT-1, LAT-2)
+- **CLI 단축 명령어** — `lattice s` (step), `lattice b` (bolt), `lattice d` (daemon) 등
+- **자동 추론** — `step new` 시 현재 프로젝트에서 phase/bolt 자동 감지
+- **훅 통합** — 모든 Claude Code 세션에 프로젝트 컨텍스트 자동 주입
+- **스텝 등록 강제** — 활성 스텝 없이 작업 불가 (PreToolUse 훅)
+- **자동 상태 동기화** — Stop 훅에서 Phase/Plan/Bolt 완료 상태 자동 전환
+- **토큰 최적화** — done 스텝 숨김, ticket_number 사용 (-32% 토큰)
+- **고정 포트** — 데몬 포트 19400 고정 (LATTICE_PORT로 변경 가능)
 - **라이트/다크 테마** — 영구 저장되는 테마 전환
 
 ## 아키텍처
@@ -105,7 +110,7 @@ Lattice는 다음 Claude Code 훅을 설치합니다:
 | **UserPromptSubmit** | 사용자 메시지마다 | 활성 스텝 컨텍스트 주입, 활성 스텝 없으면 경고 |
 | **PreToolUse** | Agent/Edit/Write/Bash 전 | 활성 스텝 없으면 작업 차단 |
 | **PostToolUse** | Edit/Write 후 | 파일 변경 사항을 활성 실행에 기록 |
-| **Stop** | 세션 종료 | 활성 실행 종료 + Phase/Plan 상태 자동 동기화 |
+| **Stop** | 세션 종료 | 활성 실행 종료 + Phase/Plan/Bolt 상태 자동 동기화 |
 
 ## 빠른 시작
 
@@ -130,7 +135,13 @@ lattice step update STEP-xxx --status in_progress
 lattice step search "migration"
 
 # 새 작업 생성
-lattice step new "인증 버그 수정" --phase PHASE-xxx --assignee main --body "설명"
+lattice step new "인증 버그 수정" --assignee main --body "설명"
+# --phase, --bolt 생략 시 현재 프로젝트에서 자동 추론
+
+# 단축 명령어
+lattice s list --phase-id PHASE-xxx    # s = step
+lattice b list --project-id PROJ-xxx   # b = bolt
+lattice d status                        # d = daemon
 
 # 작업 본문 추가
 lattice step append-body STEP-xxx --text "추가 메모"
@@ -155,10 +166,10 @@ lattice bolt update BOLT-xxx --status active
 | **계획** | 트리 뷰 — 인라인 편집, 일괄 액션, 체크박스 선택 |
 | **보드** | 칸반 보드 — 드래그 앤 드롭 상태 변경 |
 | **백로그** | 볼트별 그룹화 — 드래그 앤 드롭 배정 |
-| **타임라인** | 통합 활동 스트림 — 필터, 날짜 그룹, Run sparkline |
-| **위키** | Artifact 브라우저 — 마크다운/JSON/YAML 렌더링 및 버전 이력 |
+| **타임라인** | 에이전트 Swimlane 뷰 (Run 바 차트) + 활동 스트림 탭 |
+| **위키** | 파일 트리 (heading 자동 추출), Artifact CRUD, GFM 테이블 지원 |
 
-데몬 실행 중 `http://localhost:<port>`에서 접근할 수 있습니다.
+데몬 실행 중 `http://localhost:19400`에서 접근할 수 있습니다.
 
 ### 스크린샷
 
@@ -193,6 +204,65 @@ lattice bolt update BOLT-xxx --status active
 | `~/.local/state/lattice/` | 로그 |
 
 모든 경로는 `LATTICE_{DATA,CACHE,CONFIG,STATE}_DIR` 환경변수로 오버라이드 가능.
+
+## 사용법
+
+CLI를 직접 사용할 필요 없습니다. Claude Code에 자연어로 지시하면 Lattice 훅이 자동으로 처리합니다.
+
+### 새 작업 시작
+
+```
+사용자: "설정 페이지 로그인 버그 수정해줘"
+
+→ Claude가 스텝 등록 → 작업 → 완료 처리
+  (PreToolUse 훅이 스텝 없이 작업하는 것을 차단)
+```
+
+### 작업 계획
+
+```
+사용자: "인증 리팩토링 계획 세워줘"
+
+→ Claude가 Plan Mode 진입 → 플랜 작성 → 종료
+→ ExitPlanMode 훅으로 래티스에 자동 import
+→ 보드에 스텝 표시
+```
+
+### 진행 상황 확인
+
+```
+사용자: "지금 진행 상황 알려줘"
+
+→ Claude가 대시보드 읽고 (SessionStart에서 이미 주입됨) 답변
+→ 활성 스텝, 볼트 진척도, 블로킹 항목 표시
+```
+
+### 볼트(스프린트) 관리
+
+```
+사용자: "API 작업용 새 스프린트 시작해"
+
+→ Claude가 볼트 생성, 스텝 배정, active 설정
+→ 보드 뷰에서 스프린트 칸반 확인
+```
+
+### 웹 대시보드에서 확인
+
+`http://localhost:19400`에서:
+- **보드** — 현재 스프린트의 칸반 뷰
+- **백로그** — 전체 볼트 + 드래그 앤 드롭 배정
+- **타임라인** — 에이전트 Swimlane (누가 언제 뭘 했는지)
+- **위키** — 프로젝트 문서 및 아티팩트
+
+### 프롬프트 팁
+
+| 하고 싶은 것 | 이렇게 말하세요 |
+|-------------|---------------|
+| 작업 생성 | "X에 대한 스텝 등록하고 작업 시작해" |
+| 상태 확인 | "현재 볼트 진행 상황 보여줘" |
+| 작업 리뷰 | "지난 스프린트에서 뭘 했어?" |
+| 문서 검색 | "위키에서 인증 설계 검색해" |
+| 작업 완료 | "현재 스텝 완료 처리해" |
 
 ## 개발
 

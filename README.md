@@ -14,19 +14,25 @@ Lattice is a structured state layer that replaces Jira + Confluence for LLM-driv
 
 - **Structured Task Board** — Projects, Plans, Phases, Steps with full CRUD
 - **Bolt Cycles** — Sprint-like iteration management (AIDLC bolt cycle support)
+- **Bolt Auto-Complete** — Bolts automatically completed when all steps are done
 - **Web Dashboard** — Summary, Plans, Board (Kanban), Backlog, Timeline, and Wiki views
+- **Agent Swimlane Timeline** — Horizontal bar chart per agent showing concurrent work over time
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for bolt assignment
 - **Inline Editing** — Double-click step titles/status in Plans view to edit directly
 - **Project Settings** — Edit project name, description, and working directories from Summary view
-- **Artifact Wiki** — Markdown/JSON/YAML document management with version history
+- **Wiki with File Tree** — Folder-based tree navigation, auto-extracted headings as titles
+- **Local RAG** — Artifact scope (rag/reference/archive), sqlite-vec embeddings, hybrid search
+- **Artifact Versioning** — Auto-snapshot on content update, version history with restore
 - **Vector Search** — FTS5 keyword + sqlite-vec semantic hybrid search
 - **Ticket Numbers** — Human-readable IDs (LAT-1, LAT-2) alongside internal ULIDs
-- **Unified Timeline** — Activity stream aggregating status changes, comments, artifacts, runs, and questions
+- **CLI Shortcuts** — `lattice s` (step), `lattice b` (bolt), `lattice d` (daemon), etc.
+- **Auto-Inference** — `step new` auto-detects phase and bolt from current project
 - **Hook Integration** — Auto-injects project context into every Claude Code session
 - **Step Enforcement** — Blocks work unless a step is registered (PreToolUse hook)
 - **Plan Mode Compatible** — Auto-imports plans on ExitPlanMode
-- **Auto Status Sync** — Stop hook auto-completes Phases/Plans when all steps are done
-- **Token Optimization** — Completed phases show summary only in SessionStart context
+- **Auto Status Sync** — Stop hook auto-completes Phases/Plans/Bolts when all steps are done
+- **Token Optimization** — Done steps hidden, ticket numbers instead of ULIDs (-32% tokens)
+- **Fixed Port** — Daemon runs on port 19400 (configurable via LATTICE_PORT)
 - **Light/Dark Theme** — Theme toggle with persistent preference
 
 ## Installation
@@ -79,7 +85,7 @@ lattice/
 
 ## Web Dashboard
 
-Access at `http://localhost:<port>` when daemon is running. 6 views:
+Access at `http://localhost:19400` when daemon is running. 6 views:
 
 | View | Description |
 |------|-------------|
@@ -87,8 +93,8 @@ Access at `http://localhost:<port>` when daemon is running. 6 views:
 | **Plans** | Tree view with inline editing, bulk actions, checkbox selection |
 | **Board** | Kanban board with drag-and-drop status changes |
 | **Backlog** | Bolt-grouped backlog with drag-and-drop assignment |
-| **Timeline** | Unified activity stream with filters, day grouping, and run sparklines |
-| **Wiki** | Artifact + project docs browser with markdown rendering |
+| **Timeline** | Agent swimlane view (run bars per agent) + activity stream tab |
+| **Wiki** | File tree with auto-extracted headings, artifact CRUD, GFM table support |
 
 ### Screenshots
 
@@ -103,6 +109,65 @@ Access at `http://localhost:<port>` when daemon is running. 6 views:
 | Timeline | Wiki |
 |----------|------|
 | ![Timeline](screenshots/05-timeline.png) | ![Wiki](screenshots/06-wiki.png) |
+
+## Usage
+
+You don't use the CLI directly. Just talk to Claude Code in natural language — Lattice hooks handle everything automatically.
+
+### Starting a new task
+
+```
+You: "Fix the login bug on the settings page"
+
+→ Claude registers a step, works on it, and marks it done.
+  (PreToolUse hook blocks work until a step exists)
+```
+
+### Planning work
+
+```
+You: "Plan out the authentication refactor"
+
+→ Claude enters Plan Mode, writes a plan, exits
+→ Plan auto-imports to Lattice (ExitPlanMode hook)
+→ Steps appear on the Board
+```
+
+### Checking progress
+
+```
+You: "What's the current status?"
+
+→ Claude reads the dashboard (already injected at SessionStart)
+→ Shows active steps, bolt progress, blocked items
+```
+
+### Managing bolts (sprints)
+
+```
+You: "Start a new sprint for the API work"
+
+→ Claude creates a bolt, assigns steps, sets it active
+→ Board view shows the sprint's kanban
+```
+
+### Reviewing in the web dashboard
+
+Open `http://localhost:19400` to see:
+- **Board** — Kanban view of current sprint
+- **Backlog** — All bolts with drag-and-drop assignment
+- **Timeline** — Agent swimlane showing who did what and when
+- **Wiki** — Project documents and artifacts
+
+### Prompt tips
+
+| What you want | What to say |
+|---------------|-------------|
+| Create a task | "Register a step for X and start working" |
+| Check status | "Show me the current bolt progress" |
+| Review work | "What was done in the last sprint?" |
+| Search docs | "Search the wiki for authentication design" |
+| Finish up | "Mark the current step as done" |
 
 ## Development
 
