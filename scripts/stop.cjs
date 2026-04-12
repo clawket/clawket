@@ -100,6 +100,22 @@ async function main() {
       await apiPatch(port, `/plans/${plan.id}`, { status: 'completed' });
     }
   }
+
+  // 3) Auto-complete Bolts — all steps done/deferred/cancelled → completed
+  const bolts = await apiGet(port, `/bolts?project_id=${project.id}`);
+  if (bolts && Array.isArray(bolts)) {
+    for (const bolt of bolts) {
+      if (bolt.status === 'completed') continue;
+
+      const boltSteps = await apiGet(port, `/bolts/${bolt.id}/steps`);
+      if (!boltSteps || !Array.isArray(boltSteps) || boltSteps.length === 0) continue;
+
+      const allDone = boltSteps.every(s => TERMINAL_STATUSES.has(s.status));
+      if (allDone) {
+        await apiPatch(port, `/bolts/${bolt.id}`, { status: 'completed' });
+      }
+    }
+  }
 }
 
 main().catch(() => {});
