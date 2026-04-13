@@ -24,7 +24,29 @@ function exec(cmd) {
   catch { return ''; }
 }
 
+function ensureDeps() {
+  const daemonDir = resolve(pluginRoot, 'daemon');
+  const nodeModules = resolve(daemonDir, 'node_modules');
+  const { existsSync } = require('fs');
+  if (existsSync(resolve(daemonDir, 'package.json')) && !existsSync(nodeModules)) {
+    process.stderr.write(`[lattice] Installing daemon dependencies...\n`);
+    try {
+      execSync('pnpm --version', { stdio: 'pipe' });
+      execSync('pnpm install --prod', { cwd: daemonDir, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
+      process.stderr.write(`[lattice] Dependencies installed (pnpm)\n`);
+    } catch {
+      try {
+        execSync('npm install --production', { cwd: daemonDir, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
+        process.stderr.write(`[lattice] Dependencies installed (npm)\n`);
+      } catch (e) {
+        process.stderr.write(`[lattice] ERROR: Failed to install dependencies: ${e.message}\n`);
+      }
+    }
+  }
+}
+
 function ensureDaemon() {
+  ensureDeps();
   const status = exec(`${LATTICE} daemon status`);
   if (!status.includes('running')) {
     exec(`${LATTICE} daemon start`);
