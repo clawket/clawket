@@ -159,6 +159,10 @@ export function deletePlan(id: string): Promise<void> {
   return del(`/plans/${encodeURIComponent(id)}`);
 }
 
+export function approvePlan(id: string): Promise<Plan> {
+  return post(`/plans/${encodeURIComponent(id)}/approve`);
+}
+
 // ---------------------------------------------------------------------------
 // Bolts (Sprint / AIDLC Bolt cycle)
 // ---------------------------------------------------------------------------
@@ -497,6 +501,7 @@ const api = {
   createPlan,
   updatePlan,
   deletePlan,
+  approvePlan,
   listPhases,
   getPhase,
   createPhase,

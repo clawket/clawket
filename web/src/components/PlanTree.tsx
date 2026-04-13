@@ -254,6 +254,19 @@ export default function PlanTree({ projectId, selectedItem, onSelectItem, onCrea
             >
               <span className="text-sm font-medium text-foreground truncate">{plan.title}</span>
               <StatusBadge status={plan.status} />
+              {plan.status === 'draft' && (
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await api.approvePlan(plan.id);
+                    setRefreshCounter(c => c + 1);
+                  }}
+                  className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer shrink-0"
+                  title="Approve plan (draft → active)"
+                >
+                  Approve
+                </button>
+              )}
             </div>
             {!editMode && (
               <button

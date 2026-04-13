@@ -303,6 +303,19 @@ export const steps = {
     if (!phase_id) {
       throw Object.assign(new Error('phase_id is required'), { status: 400 });
     }
+    // Reject steps under unapproved (draft) plans
+    {
+      const db0 = getDb();
+      const phase = db0.prepare('SELECT * FROM phases WHERE id = ?').get(phase_id);
+      if (phase) {
+        const plan = db0.prepare('SELECT * FROM plans WHERE id = ?').get(phase.plan_id);
+        if (plan && plan.status === 'draft') {
+          throw Object.assign(new Error(
+            `Cannot create steps under draft plan "${plan.title}" (${plan.id}). Approve it first: lattice plan approve ${plan.id}`
+          ), { status: 400 });
+        }
+      }
+    }
     if (!bolt_id) {
       // Auto-resolve: find active bolt for this project via phase → plan → project
       const db0 = getDb();
