@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Plan, Phase, Step, Bolt } from '../types';
+import { CLOSED_STATUSES } from '../types';
 import api from '../api';
 import { useInlineEdit } from '../hooks/useInlineEdit';
 import StatusBadge from './StatusBadge';
@@ -271,7 +272,7 @@ export default function PlanTree({ projectId, selectedItem, onSelectItem, onCrea
           {/* Phases */}
           {expandedPlans.has(plan.id) &&
             plan.phases.map((phase) => {
-              const doneCount = phase.steps.filter((s) => s.status === 'done').length;
+              const doneCount = phase.steps.filter((s) => CLOSED_STATUSES.has(s.status)).length;
               const totalCount = phase.steps.length;
               const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 

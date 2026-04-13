@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Phase, Step, Artifact, Question } from '../types';
+import { CLOSED_STATUSES } from '../types';
 import api from '../api';
 import StatusBadge from './StatusBadge';
 import { Label } from './ui';
@@ -51,7 +52,7 @@ export default function PhaseDetail({ phaseId, onClose }: PhaseDetailProps) {
     );
   }
 
-  const doneCount = steps.filter((s) => s.status === 'done').length;
+  const doneCount = steps.filter((s) => CLOSED_STATUSES.has(s.status)).length;
   const progress = steps.length > 0 ? (doneCount / steps.length) * 100 : 0;
 
   const statusCounts = steps.reduce<Record<string, number>>((acc, s) => {

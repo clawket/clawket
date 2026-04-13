@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Bolt, Step, Run, TimelineEvent, TimelineEventType } from '../types';
+import { CLOSED_STATUSES } from '../types';
 import api from '../api';
 
 interface TimelineViewProps {
@@ -122,7 +123,7 @@ export default function TimelineView({ projectId, onSelectStep }: TimelineViewPr
             setBoltProgress({
               bolt: activeBolt,
               steps: boltSteps,
-              done: boltSteps.filter(s => s.status === 'done').length,
+              done: boltSteps.filter(s => CLOSED_STATUSES.has(s.status)).length,
               inProgress: boltSteps.filter(s => s.status === 'in_progress').length,
               blocked: boltSteps.filter(s => s.status === 'blocked').length,
               total: boltSteps.length,

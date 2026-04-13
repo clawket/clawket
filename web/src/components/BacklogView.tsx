@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import type { Step, Bolt } from '../types';
+import { CLOSED_STATUSES } from '../types';
 import api from '../api';
 import { Button, Select } from './ui';
 import StatusBadge from './StatusBadge';
@@ -180,8 +181,7 @@ export default function BacklogView({ projectId, onSelectStep }: BacklogViewProp
         {activeBolts.map((bolt) => {
           const steps = boltSteps[bolt.id] || [];
           const collapsed = collapsedBolts.has(bolt.id);
-          const CLOSED = new Set(['done', 'cancelled', 'superseded']);
-          const doneCount = steps.filter(s => CLOSED.has(s.status)).length;
+          const doneCount = steps.filter(s => CLOSED_STATUSES.has(s.status)).length;
 
           return (
             <DroppableSection key={bolt.id} id={bolt.id}>

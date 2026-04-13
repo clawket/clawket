@@ -135,6 +135,13 @@ export interface TimelineEvent {
   };
 }
 
+/** Terminal statuses — steps that count as "closed" for progress calculations */
+export const CLOSED_STATUSES: ReadonlySet<Step['status']> = new Set(['done', 'cancelled', 'superseded']);
+
+export function isClosedStep(step: Pick<Step, 'status'>): boolean {
+  return CLOSED_STATUSES.has(step.status);
+}
+
 export interface Question {
   id: string;
   plan_id: string | null;

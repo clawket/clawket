@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Project, Plan, Phase, Step, Bolt, Run } from '../types';
+import { CLOSED_STATUSES } from '../types';
 import api from '../api';
 import StatusBadge from './StatusBadge';
 import { ProjectSettings } from './ProjectSettings';
@@ -115,9 +116,8 @@ export default function SummaryView({ projectId, onSelectStep }: SummaryViewProp
   }
 
   // Step stats
-  const CLOSED = new Set(['done', 'cancelled', 'superseded']);
   const stepsByStatus = {
-    done: steps.filter(s => CLOSED.has(s.status)).length,
+    done: steps.filter(s => CLOSED_STATUSES.has(s.status)).length,
     in_progress: steps.filter(s => s.status === 'in_progress').length,
     todo: steps.filter(s => s.status === 'todo').length,
     blocked: steps.filter(s => s.status === 'blocked').length,
@@ -203,7 +203,7 @@ export default function SummaryView({ projectId, onSelectStep }: SummaryViewProp
             <div className="space-y-2">
               {activeBolts.map(bolt => {
                 const boltSteps = steps.filter(s => s.bolt_id === bolt.id);
-                const boltDone = boltSteps.filter(s => s.status === 'done').length;
+                const boltDone = boltSteps.filter(s => CLOSED_STATUSES.has(s.status)).length;
                 return (
                   <div key={bolt.id} className="flex items-center justify-between">
                     <span className="text-sm text-foreground">{bolt.title}</span>
@@ -224,8 +224,7 @@ export default function SummaryView({ projectId, onSelectStep }: SummaryViewProp
         <div className="space-y-2">
           {phases.map(phase => {
             const phaseSteps = steps.filter(s => s.phase_id === phase.id);
-            const CLOSED = new Set(['done', 'cancelled', 'superseded']);
-            const pDone = phaseSteps.filter(s => CLOSED.has(s.status)).length;
+            const pDone = phaseSteps.filter(s => CLOSED_STATUSES.has(s.status)).length;
             const pDeferred = phaseSteps.filter(s => s.status === 'deferred').length;
             const pTotal = phaseSteps.length;
             return (
