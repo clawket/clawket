@@ -17,6 +17,7 @@ export function ProjectSettings({
   const [nameValue, setNameValue] = useState('');
   const [descValue, setDescValue] = useState('');
   const [newCwd, setNewCwd] = useState('');
+  const [newWikiPath, setNewWikiPath] = useState('');
 
   const saveName = useCallback(async () => {
     if (!nameValue.trim()) return;
@@ -121,6 +122,53 @@ export function ProjectSettings({
               />
               <button onClick={addCwd} className="px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary/80 cursor-pointer">Add</button>
             </div>
+          </div>
+
+          {/* Wiki Paths */}
+          <div>
+            <label className="text-xs text-muted block mb-1">Wiki Paths</label>
+            <div className="space-y-1.5">
+              {(project.wiki_paths || ['docs']).map((wp, i) => (
+                <div key={`${wp}-${i}`} className="flex items-center gap-2 group">
+                  <span className="text-xs font-mono text-foreground bg-surface-high rounded px-2 py-1 flex-1 truncate" title={wp}>{wp}</span>
+                  {(project.wiki_paths || ['docs']).length > 1 && (
+                    <button
+                      onClick={async () => {
+                        const updated = (project.wiki_paths || ['docs']).filter((_, idx) => idx !== i);
+                        await api.updateProject(projectId, { wiki_paths: updated });
+                        await onProjectChange();
+                      }}
+                      className="text-xs text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer px-1"
+                      title="Remove"
+                    >&times;</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <input
+                className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-primary"
+                value={newWikiPath}
+                onChange={e => setNewWikiPath(e.target.value)}
+                placeholder="docs, wiki, or /absolute/path"
+                onKeyDown={e => { if (e.key === 'Enter') {
+                  if (!newWikiPath.trim()) return;
+                  const updated = [...(project.wiki_paths || ['docs']), newWikiPath.trim()];
+                  api.updateProject(projectId, { wiki_paths: updated }).then(() => { setNewWikiPath(''); onProjectChange(); });
+                }}}
+              />
+              <button
+                onClick={async () => {
+                  if (!newWikiPath.trim()) return;
+                  const updated = [...(project.wiki_paths || ['docs']), newWikiPath.trim()];
+                  await api.updateProject(projectId, { wiki_paths: updated });
+                  setNewWikiPath('');
+                  await onProjectChange();
+                }}
+                className="px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary/80 cursor-pointer"
+              >Add</button>
+            </div>
+            <p className="text-[10px] text-muted mt-1">Relative to project cwd, or absolute paths. Each path becomes a root in the wiki tree.</p>
           </div>
 
           {/* Lattice Enabled */}

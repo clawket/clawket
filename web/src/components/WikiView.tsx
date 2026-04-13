@@ -16,6 +16,7 @@ interface FileEntry {
   name: string;
   title?: string;
   modified_at: number;
+  wiki_root?: string;
 }
 
 interface FileTreeNode {
@@ -322,8 +323,8 @@ export default function WikiView({ projectId }: WikiViewProps) {
       // Load project files
       if (cwd) {
         try {
-          const wikiFiles = await api.listWikiFiles(cwd);
-          setFiles(wikiFiles.map(f => ({ type: 'file' as const, path: f.path, name: f.name, modified_at: f.modified_at })));
+          const wikiFiles = await api.listWikiFiles(cwd, projectId);
+          setFiles(wikiFiles.map(f => ({ type: 'file' as const, path: f.path, name: f.name, title: f.title, modified_at: f.modified_at, wiki_root: f.wiki_root })));
         } catch { setFiles([]); }
       }
     } catch (err) {
@@ -366,7 +367,7 @@ export default function WikiView({ projectId }: WikiViewProps) {
     setSelectedFile(path);
     if (projectCwd) {
       try {
-        const file = await api.getWikiFile(projectCwd, path);
+        const file = await api.getWikiFile(projectCwd, path, projectId);
         setFileContent(file);
       } catch (err) {
         console.error('Failed to load file:', err);
@@ -427,19 +428,27 @@ export default function WikiView({ projectId }: WikiViewProps) {
               ))}
             </div>
           )}
-          {/* Project files section (tree) */}
-          {files.length > 0 && (
-            <div>
-              <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted font-medium">
-                Project Files ({files.length})
+          {/* Project files section (grouped by wiki_root) */}
+          {files.length > 0 && (() => {
+            const groups = new Map<string, FileEntry[]>();
+            for (const f of files) {
+              const root = f.wiki_root || 'docs';
+              if (!groups.has(root)) groups.set(root, []);
+              groups.get(root)!.push(f);
+            }
+            return Array.from(groups.entries()).map(([root, groupFiles]) => (
+              <div key={root}>
+                <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted font-medium">
+                  {root === '.' ? 'Root Files' : root} ({groupFiles.length})
+                </div>
+                <FileTreeView
+                  nodes={buildFileTree(groupFiles)}
+                  selectedFile={selectedFile}
+                  onSelect={handleSelectFile}
+                />
               </div>
-              <FileTreeView
-                nodes={buildFileTree(files)}
-                selectedFile={selectedFile}
-                onSelect={handleSelectFile}
-              />
-            </div>
-          )}
+            ));
+          })()}
           {tree.length === 0 && files.length === 0 && (
             <div className="text-center py-6 text-xs text-muted">
               No documents yet

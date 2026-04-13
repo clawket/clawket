@@ -495,9 +495,9 @@ export function startServer() {
     return c.json({ deleted: c.req.param('id') });
   });
 
-  // ========== Artifact Import (docs/ → Artifact) ==========
+  // ========== Artifact Import (wiki paths → Artifact) ==========
   app.post('/artifacts/import', async (c) => {
-    const { cwd, plan_id = null, phase_id = null, scope = 'reference', dry_run = false } = await c.req.json();
+    const { cwd, plan_id = null, phase_id = null, scope = 'reference', dry_run = false, project_id = null } = await c.req.json();
     if (!cwd || !existsSync(cwd)) return c.json({ error: 'cwd required' }, 400);
 
     const MD_EXTS = new Set(['.md', '.mdx']);
@@ -551,18 +551,24 @@ export function startServer() {
       } catch { /* dir not readable */ }
     }
 
-    const docsDir = join(cwd, 'docs');
-    if (existsSync(docsDir)) scanDir(docsDir);
+    const importProject = project_id ? projects.get(project_id) : null;
+    const importWikiPaths = importProject?.wiki_paths || ['docs'];
+    for (const wp of importWikiPaths) {
+      const wikiDir = wp.startsWith('/') ? wp : join(cwd, wp);
+      if (existsSync(wikiDir)) scanDir(wikiDir);
+    }
 
     return c.json({ imported: imported.length, skipped: skipped.length, items: imported, skippedItems: skipped, dry_run });
   });
 
   // ========== Artifact Export (Artifact → docs/) ==========
   app.post('/artifacts/export', async (c) => {
-    const { cwd, plan_id = null, phase_id = null } = await c.req.json();
+    const { cwd, plan_id = null, phase_id = null, project_id = null } = await c.req.json();
     if (!cwd) return c.json({ error: 'cwd required' }, 400);
 
-    const docsDir = join(cwd, 'docs');
+    const exportProject = project_id ? projects.get(project_id) : null;
+    const exportPath = exportProject?.wiki_paths?.[0] || 'docs';
+    const docsDir = exportPath.startsWith('/') ? exportPath : join(cwd, exportPath);
     const { mkdirSync, writeFileSync: writeFS } = require('fs');
     mkdirSync(docsDir, { recursive: true });
 
@@ -860,7 +866,7 @@ export function startServer() {
     const MAX_SIZE = 512 * 1024; // 512KB max per file
     const results = [];
 
-    function scanDir(dir, depth = 0) {
+    function scanDir(dir, wikiRoot, depth = 0) {
       if (depth > 3) return;
       try {
         for (const entry of readdirSync(dir)) {
@@ -870,9 +876,8 @@ export function startServer() {
           try {
             const stat = statSync(full);
             if (stat.isDirectory()) {
-              scanDir(full, depth + 1);
+              scanDir(full, wikiRoot, depth + 1);
             } else if (MD_EXTS.has(extname(entry).toLowerCase()) && stat.size < MAX_SIZE) {
-              // Extract first heading as title
               let title = basename(entry, extname(entry));
               try {
                 const head = readFileSync(full, 'utf-8').slice(0, 500);
@@ -885,6 +890,7 @@ export function startServer() {
                 title,
                 size: stat.size,
                 modified_at: stat.mtimeMs,
+                wiki_root: wikiRoot,
               });
             }
           } catch { /* permission error, skip */ }
@@ -892,10 +898,15 @@ export function startServer() {
       } catch { /* dir not readable */ }
     }
 
-    // Scan docs/ directory (primary wiki source)
-    const docsDir = join(cwd, 'docs');
-    if (existsSync(docsDir)) {
-      scanDir(docsDir);
+    // Scan wiki paths (from project settings, default: ["docs"])
+    const projectId = c.req.query('project_id') || null;
+    const project = projectId ? projects.get(projectId) : null;
+    const wikiPaths = project?.wiki_paths || ['docs'];
+    for (const wp of wikiPaths) {
+      const wikiDir = wp.startsWith('/') ? wp : join(cwd, wp);
+      if (existsSync(wikiDir)) {
+        scanDir(wikiDir, wp);
+      }
     }
 
     // Also include root-level .md files (README, CHANGELOG, etc.)
@@ -917,6 +928,7 @@ export function startServer() {
               title,
               size: stat.size,
               modified_at: stat.mtimeMs,
+              wiki_root: '.',
             });
           }
         }
@@ -929,11 +941,16 @@ export function startServer() {
   app.get('/wiki/file', (c) => {
     const cwd = c.req.query('cwd') || '';
     const filePath = c.req.query('path') || '';
+    const projectId = c.req.query('project_id') || null;
     if (!cwd || !filePath) return c.json({ error: 'cwd and path required' }, 400);
 
-    const full = join(cwd, filePath);
-    // Security: ensure resolved path is within cwd
-    if (!full.startsWith(cwd)) return c.json({ error: 'path outside project' }, 403);
+    const full = require('path').resolve(cwd, filePath);
+    // Security: ensure resolved path is within cwd or any configured wiki_path
+    const project = projectId ? projects.get(projectId) : null;
+    const wikiPaths = project?.wiki_paths || ['docs'];
+    const allowedRoots = [cwd, ...wikiPaths.map(wp => wp.startsWith('/') ? wp : join(cwd, wp))];
+    const isAllowed = allowedRoots.some(root => full.startsWith(require('path').resolve(root)));
+    if (!isAllowed) return c.json({ error: 'path outside allowed wiki roots' }, 403);
     if (!existsSync(full)) return c.json({ error: 'file not found' }, 404);
 
     try {

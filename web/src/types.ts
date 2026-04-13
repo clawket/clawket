@@ -6,6 +6,7 @@ export interface Project {
   updated_at: number;
   cwds: string[];
   enabled: number;
+  wiki_paths: string[];
 }
 
 export interface Bolt {

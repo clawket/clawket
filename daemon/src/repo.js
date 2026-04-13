@@ -45,6 +45,7 @@ export const projects = {
     const row = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(id);
     if (!row) return null;
     row.cwds = db.prepare(`SELECT cwd FROM project_cwds WHERE project_id = ?`).all(id).map(r => r.cwd);
+    try { row.wiki_paths = JSON.parse(row.wiki_paths); } catch { row.wiki_paths = ['docs']; }
     return row;
   },
   getByName(name) {
@@ -66,7 +67,11 @@ export const projects = {
     const allCwds = db.prepare(`SELECT project_id, cwd FROM project_cwds`).all();
     const cwdMap = {};
     for (const c of allCwds) (cwdMap[c.project_id] ||= []).push(c.cwd);
-    return rows.map(r => ({ ...r, cwds: cwdMap[r.id] || [] }));
+    return rows.map(r => {
+      let wp;
+      try { wp = JSON.parse(r.wiki_paths); } catch { wp = ['docs']; }
+      return { ...r, cwds: cwdMap[r.id] || [], wiki_paths: wp };
+    });
   },
   addCwd(id, cwd) {
     const db = getDb();
@@ -80,13 +85,16 @@ export const projects = {
   },
   update(id, fields) {
     const db = getDb();
-    const allowed = ['name', 'description', 'key', 'enabled'];
+    const allowed = ['name', 'description', 'key', 'enabled', 'wiki_paths'];
     const sets = [];
     const vals = [];
     for (const k of allowed) {
       if (k in fields) {
         sets.push(`${k} = ?`);
-        vals.push(k === 'key' && fields[k] ? fields[k].toUpperCase() : fields[k]);
+        let val = fields[k];
+        if (k === 'key' && val) val = val.toUpperCase();
+        if (k === 'wiki_paths' && Array.isArray(val)) val = JSON.stringify(val);
+        vals.push(val);
       }
     }
     if (sets.length === 0) return projects.get(id);

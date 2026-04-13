@@ -326,7 +326,10 @@ export default function PlanTree({ projectId, selectedItem, onSelectItem, onCrea
                   {/* Steps */}
                   {expandedPhases.has(phase.id) &&
                     phase.steps.map((step) => {
-                      const si = stepStatusIcon[step.status] || { icon: '?', color: 'text-muted' };
+                      const si = stepStatusIcon[step.status] ?? (() => {
+                        console.warn(`[PlanTree] Unknown step status: "${step.status}" for step ${step.id}`);
+                        return { icon: '\u25CB', color: 'text-muted' };
+                      })();
                       const isSelected = selectedStepIds.has(step.id);
                       const isInlineTitle = inlineEdit.editId === step.id && inlineEdit.editField === 'title';
                       const isInlineStatus = inlineEdit.editId === step.id && inlineEdit.editField === 'status';

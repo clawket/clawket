@@ -121,6 +121,9 @@ enum ProjectAction {
         name: Option<String>,
         #[arg(long)]
         description: Option<String>,
+        /// JSON array of wiki root paths, e.g. '["docs","wiki"]'
+        #[arg(long)]
+        wiki_paths: Option<String>,
     },
     Delete { id: String },
     AddCwd {
@@ -692,10 +695,15 @@ async fn main() -> Result<()> {
             }
             ProjectAction::Show { id } => output(&client::get(&c, &format!("/projects/{id}")).await?),
             ProjectAction::List => output(&client::get(&c, "/projects").await?),
-            ProjectAction::Update { id, name, description } => {
+            ProjectAction::Update { id, name, description, wiki_paths } => {
                 let mut body = json!({});
                 if let Some(v) = name { body["name"] = json!(v); }
                 if let Some(v) = description { body["description"] = json!(v); }
+                if let Some(v) = wiki_paths {
+                    let parsed: serde_json::Value = serde_json::from_str(&v)
+                        .unwrap_or_else(|_| json!([v]));
+                    body["wiki_paths"] = parsed;
+                }
                 output(&client::request(&c, "PATCH", &format!("/projects/{id}"), Some(body)).await?);
             }
             ProjectAction::Delete { id } => {

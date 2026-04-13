@@ -103,7 +103,7 @@ export function createProject(data: {
 
 export function updateProject(
   id: string,
-  data: Partial<Pick<Project, 'name' | 'description' | 'cwds' | 'enabled'>>,
+  data: Partial<Pick<Project, 'name' | 'description' | 'cwds' | 'enabled' | 'wiki_paths'>>,
 ): Promise<Project> {
   return patch(`/projects/${encodeURIComponent(id)}`, data);
 }
@@ -315,18 +315,20 @@ export function removeStepLabel(id: string, label: string): Promise<Step> {
 export interface WikiFile {
   path: string;
   name: string;
+  title?: string;
   size: number;
   modified_at: number;
   content?: string;
   content_format?: string;
+  wiki_root?: string;
 }
 
-export function listWikiFiles(cwd: string): Promise<WikiFile[]> {
-  return get(`/wiki/files${qs({ cwd })}`);
+export function listWikiFiles(cwd: string, projectId?: string): Promise<WikiFile[]> {
+  return get(`/wiki/files${qs({ cwd, project_id: projectId })}`);
 }
 
-export function getWikiFile(cwd: string, path: string): Promise<WikiFile> {
-  return get(`/wiki/file${qs({ cwd, path })}`);
+export function getWikiFile(cwd: string, path: string, projectId?: string): Promise<WikiFile> {
+  return get(`/wiki/file${qs({ cwd, path, project_id: projectId })}`);
 }
 
 // ---------------------------------------------------------------------------
