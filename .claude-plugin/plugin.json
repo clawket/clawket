@@ -1,6 +1,6 @@
 {
   "name": "lattice",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions",
   "author": {
     "name": "Seungwoo Lee"

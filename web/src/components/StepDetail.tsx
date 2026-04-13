@@ -45,7 +45,7 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
         api.listArtifacts({ step_id: stepId }),
         api.listRuns({ step_id: stepId }),
         api.listQuestions({ step_id: stepId }),
-        api.fetchStepComments(stepId).catch(() => [] as StepComment[]),
+        api.fetchStepComments(stepId).catch((e) => { console.error('Failed to load comments:', e); return [] as StepComment[]; }),
         api.listChildSteps(stepId).catch(() => [] as Step[]),
       ]);
       setStep(s);

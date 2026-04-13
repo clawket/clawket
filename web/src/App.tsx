@@ -256,7 +256,7 @@ function App() {
               className="w-1 hover:w-1.5 cursor-col-resize bg-transparent hover:bg-primary/30 transition-colors shrink-0"
               onMouseDown={startResize}
             />
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 h-full overflow-hidden">
               {selectedItem.type === 'step' && (
                 <StepDetail stepId={selectedItem.id} projectId={selectedProjectId ?? undefined} onClose={() => setSelectedItem(null)} />
               )}
