@@ -112,25 +112,56 @@ Access at `http://localhost:19400` when daemon is running. 6 views:
 
 ## Usage
 
-You don't use the CLI directly. Just talk to Claude Code in natural language — Lattice hooks handle everything automatically.
+Lattice enforces a structured workflow. Claude cannot start working until a project, plan, and step are registered. The PreToolUse hook blocks all mutating operations (Edit, Write, Bash, Agent) until an active step exists.
 
-### Starting a new task
+### First-time setup
+
+Every new directory needs a project registered first:
 
 ```
-You: "Fix the login bug on the settings page"
+You: "Register this as a new project"
 
-→ Claude registers a step, works on it, and marks it done.
-  (PreToolUse hook blocks work until a step exists)
+→ Claude runs: lattice project new "my-project" --cwd "."
+→ Project appears in the web dashboard sidebar
 ```
 
 ### Planning work
 
-```
-You: "Plan out the authentication refactor"
+Lattice is the source of truth for plans — not Claude's Plan Mode files (`~/.claude/plans/`). This is by design: plans live in the Lattice database, not as local files that can become stale or get polluted. Claude proposes plans in the conversation context, and after approval, registers them directly via CLI.
 
-→ Claude enters Plan Mode, writes a plan, exits
-→ Plan auto-imports to Lattice (ExitPlanMode hook)
-→ Steps appear on the Board
+**Normal mode:**
+
+```
+You: "Plan the authentication refactor"
+
+→ Claude analyzes the codebase and proposes a plan in chat
+→ You review and approve
+→ Claude registers via CLI:
+  lattice plan new --project PROJ-xxx "Auth Refactor"
+  lattice phase new --plan PLAN-xxx "Phase 1 — OAuth Setup"
+  lattice bolt new --project PROJ-xxx "Sprint 1"
+  lattice step new "Implement OAuth flow" --phase PHASE-xxx --bolt BOLT-xxx --assignee main
+```
+
+**Plan mode (`/plan`):**
+
+```
+You: /plan
+You: "Plan the authentication refactor"
+
+→ Claude proposes the plan as conversation context (Write is blocked by hooks)
+→ You approve via ExitPlanMode
+→ Claude registers the approved plan in Lattice via CLI
+```
+
+### Working on tasks
+
+```
+You: "Fix the login bug on the settings page"
+
+→ Claude registers a step under an existing plan/phase/bolt
+→ Sets it to in_progress, works on it, marks it done
+  (PreToolUse hook blocks work until a step exists)
 ```
 
 ### Checking progress
@@ -138,7 +169,7 @@ You: "Plan out the authentication refactor"
 ```
 You: "What's the current status?"
 
-→ Claude reads the dashboard (already injected at SessionStart)
+→ Claude reads the dashboard (injected once at SessionStart)
 → Shows active steps, bolt progress, blocked items
 ```
 
@@ -147,7 +178,7 @@ You: "What's the current status?"
 ```
 You: "Start a new sprint for the API work"
 
-→ Claude creates a bolt, assigns steps, sets it active
+→ Claude creates a bolt, assigns steps, activates it
 → Board view shows the sprint's kanban
 ```
 
@@ -159,10 +190,39 @@ Open `http://localhost:19400` to see:
 - **Timeline** — Agent swimlane showing who did what and when
 - **Wiki** — Project documents and artifacts
 
+### Key concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Project** | A working directory registered with Lattice |
+| **Plan** | High-level intent (roadmap). Created via CLI, not Plan Mode files |
+| **Phase** | Epic-level grouping within a plan |
+| **Bolt** | Sprint — time-boxed iteration cycle |
+| **Step** | Atomic task unit. Must exist before any work can start |
+
+### Disabling Lattice for a project
+
+You can temporarily disable Lattice management for a project without losing data. In the web dashboard, go to **Project Settings** and toggle **Lattice Management** off.
+
+When disabled:
+- Hooks treat the directory as if no project is registered — Claude works without constraints
+- All existing data (plans, steps, runs) is preserved
+- Toggle it back on anytime to resume structured workflow
+
+This is useful when you want to use Claude freely for exploration or quick fixes without registering steps.
+
+### Auto state transitions
+
+- **Phase/Plan activate** automatically when a step becomes `in_progress`
+- **Phase/Plan complete** automatically when all steps reach terminal status (`done`, `cancelled`, `superseded`)
+- **Bolt** status is managed manually (`active` / `completed`)
+
 ### Prompt tips
 
 | What you want | What to say |
 |---------------|-------------|
+| Register project | "Register this directory as a new project" |
+| Plan work | "Plan the feature X — propose a plan and register it in Lattice" |
 | Create a task | "Register a step for X and start working" |
 | Check status | "Show me the current bolt progress" |
 | Review work | "What was done in the last sprint?" |
