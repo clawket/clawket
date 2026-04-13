@@ -6,13 +6,27 @@ use crate::DaemonAction;
 use crate::paths;
 
 /// Returns (program, extra_args) for running latticed.
-/// LATTICE_DAEMON_BIN can be "latticed" or "node /path/to/latticed.js"
+/// Priority: LATTICE_DAEMON_BIN env > sibling daemon/bin/latticed.js > PATH "latticed"
 fn latticed_cmd() -> (String, Vec<String>) {
-    let bin = std::env::var("LATTICE_DAEMON_BIN").unwrap_or_else(|_| "latticed".to_string());
-    let parts: Vec<String> = bin.split_whitespace().map(String::from).collect();
-    let program = parts[0].clone();
-    let args = parts[1..].to_vec();
-    (program, args)
+    // 1. Explicit env var
+    if let Ok(bin) = std::env::var("LATTICE_DAEMON_BIN") {
+        let parts: Vec<String> = bin.split_whitespace().map(String::from).collect();
+        return (parts[0].clone(), parts[1..].to_vec());
+    }
+
+    // 2. Auto-discover: CLI binary location → ../daemon/bin/latticed.js
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(bin_dir) = exe.parent() {
+            let latticed_js = bin_dir.join("..").join("daemon").join("bin").join("latticed.js");
+            if latticed_js.exists() {
+                let canonical = latticed_js.canonicalize().unwrap_or(latticed_js);
+                return ("node".to_string(), vec![canonical.to_string_lossy().to_string()]);
+            }
+        }
+    }
+
+    // 3. Fallback: PATH
+    ("latticed".to_string(), vec![])
 }
 
 fn read_pid() -> Option<u32> {
