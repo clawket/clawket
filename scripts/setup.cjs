@@ -28,7 +28,9 @@ for (const dir of [
 if (existsSync(resolve(daemonDir, 'package.json'))) {
   try {
     log('Installing daemon dependencies...');
-    exec('npm install --production', { cwd: daemonDir, timeout: 120000 });
+    // Prefer pnpm, fallback to npm
+    try { exec('pnpm --version'); exec('pnpm install --prod', { cwd: daemonDir, timeout: 120000 }); }
+    catch { exec('npm install --production', { cwd: daemonDir, timeout: 120000 }); }
     log('Dependencies installed');
   } catch (e) {
     log(`WARNING: npm install failed: ${e.message}`);
