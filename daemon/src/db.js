@@ -74,6 +74,7 @@ function ensureMigrated(db) {
     { version: 11, file: '011_artifact_scope.sql' },
     { version: 12, file: '012_project_enabled.sql' },
     { version: 13, file: '013_wiki_paths.sql' },
+    { version: 14, file: '014_cleanup_statuses.sql' },
   ];
   for (const m of migrations) {
     if (m.version > currentVersion) {

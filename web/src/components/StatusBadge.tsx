@@ -12,14 +12,12 @@ const statusConfig: Record<string, { label: string; variant: BadgeProps['variant
   done: { label: 'Done', variant: 'success' },
   blocked: { label: 'Blocked', variant: 'danger' },
   cancelled: { label: 'Cancelled', variant: 'default' },
-  // Plan statuses
+  // Plan/Phase/Bolt statuses
   draft: { label: 'Draft', variant: 'default' },
-  active: { label: 'Active', variant: 'primary' },
-  approved: { label: 'Approved', variant: 'success' },
-  completed: { label: 'Completed', variant: 'success' },
-  archived: { label: 'Archived', variant: 'default' },
-  // Phase statuses
+  planning: { label: 'Planning', variant: 'default' },
   pending: { label: 'Pending', variant: 'default' },
+  active: { label: 'Active', variant: 'primary' },
+  completed: { label: 'Completed', variant: 'success' },
 };
 
 export default function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {

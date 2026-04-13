@@ -30,7 +30,7 @@ export interface Plan {
   source_path: string | null;
   created_at: number;
   approved_at: number | null;
-  status: 'draft' | 'active' | 'approved' | 'completed' | 'archived';
+  status: 'draft' | 'active' | 'completed';
 }
 
 export interface Phase {

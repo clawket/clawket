@@ -130,6 +130,12 @@ export const plans = {
   },
   update(id, fields) {
     const db = getDb();
+    if ('status' in fields) {
+      const VALID = new Set(['draft', 'active', 'completed']);
+      if (!VALID.has(fields.status)) {
+        throw Object.assign(new Error(`Invalid plan status: "${fields.status}". Valid: ${[...VALID].join(', ')}`), { status: 400 });
+      }
+    }
     const allowed = ['title', 'description', 'status'];
     const sets = [];
     const vals = [];
@@ -139,13 +145,10 @@ export const plans = {
         vals.push(fields[k]);
       }
     }
-    if ('status' in fields && (fields.status === 'approved' || fields.status === 'active')) {
+    if ('status' in fields && fields.status === 'active') {
       if ('approved_at' in fields) {
         sets.push('approved_at = ?');
         vals.push(fields.approved_at);
-      } else if (fields.status === 'approved') {
-        sets.push('approved_at = ?');
-        vals.push(now());
       }
     }
     if (sets.length === 0) return plans.get(id);
@@ -188,6 +191,12 @@ export const phases = {
   },
   update(id, fields) {
     const db = getDb();
+    if ('status' in fields) {
+      const VALID = new Set(['pending', 'active', 'completed']);
+      if (!VALID.has(fields.status)) {
+        throw Object.assign(new Error(`Invalid phase status: "${fields.status}". Valid: ${[...VALID].join(', ')}`), { status: 400 });
+      }
+    }
     const allowed = ['title', 'goal', 'status', 'approval_required'];
     const sets = [];
     const vals = [];
@@ -661,6 +670,12 @@ export const bolts = {
   },
   update(id, fields) {
     const db = getDb();
+    if ('status' in fields) {
+      const VALID = new Set(['planning', 'active', 'completed']);
+      if (!VALID.has(fields.status)) {
+        throw Object.assign(new Error(`Invalid bolt status: "${fields.status}". Valid: ${[...VALID].join(', ')}`), { status: 400 });
+      }
+    }
     const allowed = ['title', 'goal', 'status'];
     const sets = [];
     const vals = [];
