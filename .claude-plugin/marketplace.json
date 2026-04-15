@@ -1,16 +1,16 @@
 {
-  "name": "Seungwoo321-lattice",
+  "name": "Seungwoo321-clawket",
   "owner": {
     "name": "Seungwoo Lee"
   },
   "metadata": {
     "description": "LLM-native work management plugin for Claude Code",
-    "homepage": "https://github.com/Seungwoo321/lattice"
+    "homepage": "https://github.com/Seungwoo321/clawket"
   },
   "plugins": [
     {
-      "name": "lattice",
-      "version": "1.0.4",
+      "name": "clawket",
+      "version": "2.0.0",
       "source": "./",
       "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions"
     }

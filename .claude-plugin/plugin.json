@@ -1,6 +1,6 @@
 {
-  "name": "lattice",
-  "version": "1.0.4",
+  "name": "clawket",
+  "version": "2.0.0",
   "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions",
   "author": {
     "name": "Seungwoo Lee"

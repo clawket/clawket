@@ -1,5 +1,5 @@
 {
-  "name": "lattice-mono",
+  "name": "clawket-mono",
   "private": true,
   "scripts": {
     "lint": "cd web && npx eslint .",
