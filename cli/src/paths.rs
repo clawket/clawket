@@ -16,21 +16,21 @@ fn resolve(override_env: &str, xdg_var: &str, xdg_fallback: &str) -> PathBuf {
     if let Ok(v) = std::env::var(override_env) {
         return PathBuf::from(v);
     }
-    xdg(xdg_var, xdg_fallback).join("lattice")
+    xdg(xdg_var, xdg_fallback).join("clawket")
 }
 
 pub fn cache_dir() -> PathBuf {
-    resolve("LATTICE_CACHE_DIR", "XDG_CACHE_HOME", ".cache")
+    resolve("CLAWKET_CACHE_DIR", "XDG_CACHE_HOME", ".cache")
 }
 
 pub fn socket_path() -> PathBuf {
-    if let Ok(v) = std::env::var("LATTICE_SOCKET") {
+    if let Ok(v) = std::env::var("CLAWKET_SOCKET") {
         PathBuf::from(v)
     } else {
-        cache_dir().join("latticed.sock")
+        cache_dir().join("clawketd.sock")
     }
 }
 
 pub fn pid_path() -> PathBuf {
-    cache_dir().join("latticed.pid")
+    cache_dir().join("clawketd.pid")
 }

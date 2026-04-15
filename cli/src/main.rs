@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use serde_json::json;
 
 #[derive(Parser)]
-#[command(name = "lattice", about = "LLM-native work management CLI for Claude Code.\n\nWorkflow: Project → Plan (approve) → Phase → Step (backlog) → Bolt (activate) → Start\n\nPlan must be approved (draft → active) before steps can be started.\nSteps can be created without a bolt (goes to backlog).\nStarting a step (in_progress) requires an assigned active bolt.\nBolt must be activated (planning → active) before steps can be started.\nPhase is a pure grouping entity with no status.\nStep is the only entity managed directly: todo → in_progress → done/cancelled.\nCompleted bolts cannot be restarted — create a new one.\n\nQuick start:\n  lattice project new \"my-app\" --cwd .\n  lattice plan new --project PROJ-my-app \"MVP\"\n  lattice plan approve PLAN-xxx\n  lattice phase new --plan PLAN-xxx \"Phase 1\"\n  lattice step new \"Build login\" --assignee main          # goes to backlog\n  lattice bolt new --project PROJ-my-app \"Sprint 1\"\n  lattice bolt activate BOLT-xxx\n  lattice step update STEP-xxx --bolt BOLT-xxx             # assign to bolt\n  lattice step update STEP-xxx --status in_progress\n  lattice step update STEP-xxx --status done")]
+#[command(name = "clawket", about = "LLM-native work management CLI for Claude Code.\n\nWorkflow: Project → Plan (approve) → Unit → Task (backlog) → Cycle (activate) → Start\n\nPlan must be approved (draft → active) before tasks can be started.\nTasks can be created without a cycle (goes to backlog).\nStarting a task (in_progress) requires an assigned active cycle.\nCycle must be activated (planning → active) before tasks can be started.\nUnit is a pure grouping entity with no status.\nTask is the only entity managed directly: todo → in_progress → done/cancelled.\nCompleted cycles cannot be restarted — create a new one.\n\nQuick start:\n  clawket project create \"my-app\" --cwd .\n  clawket plan create --project PROJ-my-app \"MVP\"\n  clawket plan approve PLAN-xxx\n  clawket unit create --plan PLAN-xxx \"Unit 1\"\n  clawket task create \"Build login\" --assignee main          # goes to backlog\n  clawket cycle create --project PROJ-my-app \"Sprint 1\"\n  clawket cycle activate CYC-xxx\n  clawket task update TASK-xxx --cycle CYC-xxx             # assign to cycle\n  clawket task update TASK-xxx --status in_progress\n  clawket task update TASK-xxx --status done")]
 struct Cli {
     /// Output format: json (default), table, yaml
     #[arg(long, global = true, default_value = "json")]
@@ -30,7 +30,7 @@ enum Command {
         #[arg(long, default_value = "all")]
         show: String,
     },
-    /// Manage latticed daemon
+    /// Manage clawketd daemon
     #[command(alias = "d")]
     Daemon {
         #[command(subcommand)]
@@ -48,23 +48,23 @@ enum Command {
         #[command(subcommand)]
         action: PlanAction,
     },
-    /// Manage phases
-    #[command(alias = "ph")]
-    Phase {
+    /// Manage units
+    #[command(alias = "u")]
+    Unit {
         #[command(subcommand)]
-        action: PhaseAction,
+        action: UnitAction,
     },
-    /// Manage bolts (sprint / AIDLC bolt cycles)
-    #[command(alias = "b")]
-    Bolt {
+    /// Manage cycles (time-boxed iterations)
+    #[command(alias = "cy")]
+    Cycle {
         #[command(subcommand)]
-        action: BoltAction,
+        action: CycleAction,
     },
-    /// Manage steps
-    #[command(alias = "s")]
-    Step {
+    /// Manage tasks
+    #[command(alias = "t")]
+    Task {
         #[command(subcommand)]
-        action: StepAction,
+        action: TaskAction,
     },
     /// Manage artifacts
     #[command(alias = "art")]
@@ -78,7 +78,7 @@ enum Command {
         #[command(subcommand)]
         action: RunAction,
     },
-    /// Manage step comments
+    /// Manage task comments
     #[command(alias = "c")]
     Comment {
         #[command(subcommand)]
@@ -105,7 +105,7 @@ pub enum DaemonAction {
 #[derive(Subcommand)]
 enum ProjectAction {
     /// Create a new project. Each project maps to one or more working directories.
-    New {
+    Create {
         /// Project name (used to generate ID: PROJ-<slugified-name>)
         name: String,
         /// Project description
@@ -118,8 +118,8 @@ enum ProjectAction {
         #[arg(long)]
         key: Option<String>,
     },
-    /// Show project details by ID
-    Show { id: String },
+    /// View project details by ID
+    View { id: String },
     /// List all projects
     List,
     /// Update project properties
@@ -135,21 +135,35 @@ enum ProjectAction {
     },
     /// Delete a project and all associated data
     Delete { id: String },
+    /// Manage working directories for a project
+    Cwd {
+        #[command(subcommand)]
+        action: ProjectCwdAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ProjectCwdAction {
     /// Add a working directory to the project
-    #[command(name = "add-cwd")]
-    AddCwd {
+    Add {
+        /// Project ID
         id: String,
-        /// Directory path to add
+        /// Directory path to add (defaults to current dir)
         #[arg(long)]
-        cwd: Option<String>,
+        path: Option<String>,
     },
     /// Remove a working directory from the project
-    #[command(name = "remove-cwd")]
-    RemoveCwd {
+    Remove {
+        /// Project ID
         id: String,
         /// Directory path to remove
         #[arg(long)]
-        cwd: String,
+        path: String,
+    },
+    /// List working directories for a project
+    List {
+        /// Project ID
+        id: String,
     },
 }
 
@@ -157,8 +171,8 @@ enum ProjectAction {
 #[derive(Subcommand)]
 enum PlanAction {
     /// Create a new plan. Plans start as 'draft' and must be approved before work can begin.
-    /// Steps can be created under draft plans (as todo) but cannot be started (in_progress).
-    New {
+    /// Tasks can be created under draft plans (as todo) but cannot be started (in_progress).
+    Create {
         /// Plan title
         title: String,
         /// Project ID this plan belongs to
@@ -174,8 +188,8 @@ enum PlanAction {
         #[arg(long)]
         source_path: Option<String>,
     },
-    /// Show plan details
-    Show { id: String },
+    /// View plan details
+    View { id: String },
     /// List plans with optional filters
     List {
         /// Filter by project ID
@@ -198,7 +212,7 @@ enum PlanAction {
     },
     /// Delete a plan
     Delete { id: String },
-    /// Approve a draft plan (draft → active). Required before steps can be started.
+    /// Approve a draft plan (draft → active). Required before tasks can be started.
     Approve { id: String },
     /// Import a plan from a markdown file
     Import {
@@ -215,54 +229,60 @@ enum PlanAction {
     },
 }
 
-// ========== Phase ==========
+// ========== Unit ==========
 #[derive(Subcommand)]
-enum PhaseAction {
-    /// Create a new phase. Phase is a pure grouping entity (no status).
-    /// Organize steps into logical groups within a plan.
-    New {
-        /// Phase title
+enum UnitAction {
+    /// Create a new unit (grouping entity within a plan).
+    /// Tasks in a parallel unit can be executed by multiple agents simultaneously.
+    Create {
+        /// Unit title
         title: String,
-        /// Plan ID this phase belongs to
+        /// Plan ID this unit belongs to
         #[arg(long)]
         plan: String,
-        /// Phase goal description
+        /// Unit goal description
         #[arg(long)]
         goal: Option<String>,
         /// Sort order within plan
         #[arg(long)]
         idx: Option<i64>,
+        /// Execution mode: sequential (default) or parallel (multi-agent)
+        #[arg(long, default_value = "sequential")]
+        mode: String,
     },
-    /// Show phase details
-    Show { id: String },
-    /// List phases with optional filters
+    /// View unit details
+    View { id: String },
+    /// List units with optional filters
     List {
         /// Filter by plan ID
         #[arg(long)]
         plan_id: Option<String>,
     },
-    /// Update phase title or goal
+    /// Update unit properties
     Update {
         id: String,
         #[arg(long)]
         title: Option<String>,
         #[arg(long)]
         goal: Option<String>,
+        /// Execution mode: sequential or parallel (multi-agent)
+        #[arg(long)]
+        mode: Option<String>,
     },
-    /// Delete a phase
+    /// Delete a unit
     Delete { id: String },
 }
 
-// ========== Bolt ==========
+// ========== Cycle ==========
 #[derive(Subcommand)]
-enum BoltAction {
-    /// Create a new bolt (sprint). Starts in 'planning' status.
-    /// Bolts are time-boxed iterations that pull steps from any phase/plan.
-    /// Multiple active bolts per project are supported (parallel bolts).
-    New {
-        /// Bolt title (e.g. "Sprint 1", "v2.0 Bolt")
+enum CycleAction {
+    /// Create a new cycle (sprint). Starts in 'planning' status.
+    /// Cycles are time-boxed iterations that pull tasks from any unit/plan.
+    /// Multiple active cycles per project are supported (parallel cycles).
+    Create {
+        /// Cycle title (e.g. "Sprint 1", "v2.0 Cycle")
         title: String,
-        /// Project ID this bolt belongs to
+        /// Project ID this cycle belongs to
         #[arg(long)]
         project: String,
         /// Sprint goal
@@ -272,9 +292,9 @@ enum BoltAction {
         #[arg(long)]
         idx: Option<i64>,
     },
-    /// Show bolt details
-    Show { id: String },
-    /// List bolts with optional filters
+    /// View cycle details
+    View { id: String },
+    /// List cycles with optional filters
     List {
         /// Filter by project ID
         #[arg(long)]
@@ -283,8 +303,8 @@ enum BoltAction {
         #[arg(long)]
         status: Option<String>,
     },
-    /// Update bolt properties. Status: planning, active, completed.
-    /// Completed bolts cannot be restarted — create a new bolt instead.
+    /// Update cycle properties. Status: planning, active, completed.
+    /// Completed cycles cannot be restarted — create a new cycle instead.
     Update {
         id: String,
         #[arg(long)]
@@ -295,13 +315,13 @@ enum BoltAction {
         #[arg(long)]
         status: Option<String>,
     },
-    /// Delete a bolt (unassigns all steps)
+    /// Delete a cycle (unassigns all tasks)
     Delete { id: String },
-    /// Activate a planning bolt (planning → active). Required before steps can be started.
+    /// Activate a planning cycle (planning → active). Required before tasks can be started.
     Activate { id: String },
-    /// List steps assigned to this bolt
-    Steps { id: String },
-    /// List backlog steps (not assigned to any bolt) for a project
+    /// List tasks assigned to this cycle
+    Tasks { id: String },
+    /// List backlog tasks (not assigned to any cycle) for a project
     Backlog {
         /// Project ID
         #[arg(long)]
@@ -309,32 +329,32 @@ enum BoltAction {
     },
 }
 
-// ========== Step ==========
+// ========== Task ==========
 #[derive(Subcommand)]
-enum StepAction {
-    /// Create a new step (atomic work unit). Requires phase and bolt.
+enum TaskAction {
+    /// Create a new task (atomic work unit). Requires unit and cycle.
     /// Status: todo → in_progress → done/cancelled. Blocked for external dependencies.
-    New {
-        /// Step title describing the work
+    Create {
+        /// Task title describing the work
         title: String,
-        /// Phase ID (auto-inferred from active plan if omitted)
+        /// Unit ID (auto-inferred from active plan if omitted)
         #[arg(long)]
-        phase: Option<String>,
+        unit: Option<String>,
         /// Detailed description (markdown supported)
         #[arg(long, allow_hyphen_values = true)]
         body: Option<String>,
         /// Agent or person responsible (e.g. "main", "sub-agent-1")
         #[arg(long)]
         assignee: Option<String>,
-        /// Sort order within phase
+        /// Sort order within unit
         #[arg(long)]
         idx: Option<i64>,
-        /// Comma-separated step IDs this step depends on
+        /// Comma-separated task IDs this task depends on
         #[arg(long, value_delimiter = ',')]
         depends_on: Vec<String>,
-        /// Parent step ID for sub-tasks
+        /// Parent task ID for sub-tasks
         #[arg(long)]
-        parent_step: Option<String>,
+        parent_task: Option<String>,
         /// Priority: critical, high, medium, low
         #[arg(long, default_value = "medium")]
         priority: String,
@@ -344,28 +364,31 @@ enum StepAction {
         /// Estimated number of file edits
         #[arg(long)]
         estimated_edits: Option<i64>,
-        /// Bolt ID. Auto-inferred from active bolt if omitted. Steps without a bolt go to backlog.
+        /// Cycle ID. Auto-inferred from active cycle if omitted. Tasks without a cycle go to backlog.
         #[arg(long)]
-        bolt: Option<String>,
-        /// Step type: task, bug, feature, enhancement, refactor, docs, test, chore
+        cycle: Option<String>,
+        /// Task type: task, bug, feature, enhancement, refactor, docs, test, chore
         #[arg(long, default_value = "task")]
         r#type: String,
     },
-    /// Show step details by ID
-    Show { id: String },
-    /// List steps with optional filters
+    /// View task details by ID
+    View { id: String },
+    /// List tasks with optional filters
     List {
-        /// Filter by phase ID
+        /// Filter by unit ID
         #[arg(long)]
-        phase_id: Option<String>,
+        unit_id: Option<String>,
         /// Filter by plan ID
         #[arg(long)]
         plan_id: Option<String>,
         /// Filter by status: todo, in_progress, blocked, done, cancelled
         #[arg(long)]
         status: Option<String>,
+        /// Filter by Claude Code agent_id (from SubagentStart hook)
+        #[arg(long)]
+        agent_id: Option<String>,
     },
-    /// Update step fields. Status values: todo, in_progress, blocked, done, cancelled
+    /// Update task fields. Status values: todo, in_progress, blocked, done, cancelled
     Update {
         id: String,
         #[arg(long)]
@@ -388,9 +411,15 @@ enum StepAction {
         #[arg(long)]
         estimated_edits: Option<i64>,
         #[arg(long)]
-        parent_step: Option<String>,
+        parent_task: Option<String>,
         #[arg(long)]
-        bolt: Option<String>,
+        cycle: Option<String>,
+        /// Claude Code agent_id (from SubagentStart hook)
+        #[arg(long)]
+        agent_id: Option<String>,
+        /// Add a comment along with the update
+        #[arg(long, allow_hyphen_values = true)]
+        comment: Option<String>,
     },
     Delete { id: String },
     AppendBody {
@@ -408,14 +437,14 @@ enum StepAction {
 // ========== Artifact ==========
 #[derive(Subcommand)]
 enum ArtifactAction {
-    New {
+    Create {
         title: String,
         #[arg(long)]
         r#type: String,
         #[arg(long)]
-        step: Option<String>,
+        task: Option<String>,
         #[arg(long)]
-        phase: Option<String>,
+        unit: Option<String>,
         #[arg(long)]
         plan: Option<String>,
         #[arg(long, allow_hyphen_values = true)]
@@ -425,12 +454,12 @@ enum ArtifactAction {
         #[arg(long)]
         parent: Option<String>,
     },
-    Show { id: String },
+    View { id: String },
     List {
         #[arg(long)]
-        step_id: Option<String>,
+        task_id: Option<String>,
         #[arg(long)]
-        phase_id: Option<String>,
+        unit_id: Option<String>,
         #[arg(long)]
         plan_id: Option<String>,
         #[arg(long)]
@@ -457,7 +486,7 @@ enum ArtifactAction {
         #[arg(long)]
         plan_id: Option<String>,
         #[arg(long)]
-        phase_id: Option<String>,
+        unit_id: Option<String>,
         /// Scope for imported artifacts: rag | reference | archive
         #[arg(long, default_value = "reference")]
         scope: String,
@@ -472,7 +501,7 @@ enum ArtifactAction {
         #[arg(long)]
         plan_id: Option<String>,
         #[arg(long)]
-        phase_id: Option<String>,
+        unit_id: Option<String>,
     },
 }
 
@@ -481,7 +510,7 @@ enum ArtifactAction {
 enum RunAction {
     Start {
         #[arg(long)]
-        step: String,
+        task: String,
         #[arg(long)]
         session_id: Option<String>,
         #[arg(long, default_value = "main")]
@@ -494,10 +523,10 @@ enum RunAction {
         #[arg(long, allow_hyphen_values = true)]
         notes: Option<String>,
     },
-    Show { id: String },
+    View { id: String },
     List {
         #[arg(long)]
-        step_id: Option<String>,
+        task_id: Option<String>,
         #[arg(long)]
         session_id: Option<String>,
     },
@@ -506,14 +535,14 @@ enum RunAction {
 // ========== Question ==========
 #[derive(Subcommand)]
 enum QuestionAction {
-    New {
+    Create {
         body: String,
         #[arg(long)]
         plan: Option<String>,
         #[arg(long)]
-        phase: Option<String>,
+        unit: Option<String>,
         #[arg(long)]
-        step: Option<String>,
+        task: Option<String>,
         #[arg(long, default_value = "clarification")]
         kind: String,
         #[arg(long, default_value = "prompt")]
@@ -528,14 +557,14 @@ enum QuestionAction {
         #[arg(long, default_value = "human")]
         by: String,
     },
-    Show { id: String },
+    View { id: String },
     List {
         #[arg(long)]
         plan_id: Option<String>,
         #[arg(long)]
-        phase_id: Option<String>,
+        unit_id: Option<String>,
         #[arg(long)]
-        step_id: Option<String>,
+        task_id: Option<String>,
         #[arg(long)]
         pending: Option<bool>,
     },
@@ -544,9 +573,9 @@ enum QuestionAction {
 // ========== Comment ==========
 #[derive(Subcommand)]
 enum CommentAction {
-    New {
+    Create {
         #[arg(long)]
-        step: String,
+        task: String,
         #[arg(long, allow_hyphen_values = true)]
         body: String,
         #[arg(long, default_value = "main")]
@@ -554,7 +583,7 @@ enum CommentAction {
     },
     List {
         #[arg(long)]
-        step_id: String,
+        task_id: String,
     },
     Delete { id: String },
 }
@@ -748,14 +777,14 @@ async fn main() -> Result<()> {
 
         // ===== Project =====
         Command::Project { action } => match action {
-            ProjectAction::New { name, description, cwd, key } => {
+            ProjectAction::Create { name, description, cwd, key } => {
                 let cwd = cwd.or_else(|| Some(std::env::current_dir().unwrap().to_string_lossy().to_string()));
                 let val = client::request(&c, "POST", "/projects", Some(json!({
                     "name": name, "description": description, "cwd": cwd, "key": key
                 }))).await?;
                 output(&val);
             }
-            ProjectAction::Show { id } => output(&client::get(&c, &format!("/projects/{id}")).await?),
+            ProjectAction::View { id } => output(&client::get(&c, &format!("/projects/{id}")).await?),
             ProjectAction::List => output(&client::get(&c, "/projects").await?),
             ProjectAction::Update { id, name, description, wiki_paths } => {
                 let mut body = json!({});
@@ -771,24 +800,34 @@ async fn main() -> Result<()> {
             ProjectAction::Delete { id } => {
                 output(&client::request(&c, "DELETE", &format!("/projects/{id}"), None).await?);
             }
-            ProjectAction::AddCwd { id, cwd } => {
-                let cwd = cwd.unwrap_or_else(|| std::env::current_dir().unwrap().to_string_lossy().to_string());
-                output(&client::request(&c, "POST", &format!("/projects/{id}/cwds"), Some(json!({"cwd": cwd}))).await?);
-            }
-            ProjectAction::RemoveCwd { id, cwd } => {
-                output(&client::request(&c, "DELETE", &format!("/projects/{id}/cwds"), Some(json!({"cwd": cwd}))).await?);
-            }
+            ProjectAction::Cwd { action } => match action {
+                ProjectCwdAction::Add { id, path } => {
+                    let cwd = path.unwrap_or_else(|| std::env::current_dir().unwrap().to_string_lossy().to_string());
+                    output(&client::request(&c, "POST", &format!("/projects/{id}/cwds"), Some(json!({"cwd": cwd}))).await?);
+                }
+                ProjectCwdAction::Remove { id, path } => {
+                    output(&client::request(&c, "DELETE", &format!("/projects/{id}/cwds"), Some(json!({"cwd": path}))).await?);
+                }
+                ProjectCwdAction::List { id } => {
+                    let proj = client::get(&c, &format!("/projects/{id}")).await?;
+                    if let Some(cwds) = proj.get("cwds") {
+                        output(cwds);
+                    } else {
+                        output(&json!([]));
+                    }
+                }
+            },
         },
 
         // ===== Plan =====
         Command::Plan { action } => match action {
-            PlanAction::New { title, project, description, source, source_path } => {
+            PlanAction::Create { title, project, description, source, source_path } => {
                 output(&client::request(&c, "POST", "/plans", Some(json!({
                     "project_id": project, "title": title, "description": description,
                     "source": source, "source_path": source_path,
                 }))).await?);
             }
-            PlanAction::Show { id } => output(&client::get(&c, &format!("/plans/{id}")).await?),
+            PlanAction::View { id } => output(&client::get(&c, &format!("/plans/{id}")).await?),
             PlanAction::List { project_id, status } => {
                 let qs = query_string(&[("project_id", &project_id), ("status", &status)]);
                 output(&client::get(&c, &format!("/plans{qs}")).await?);
@@ -813,121 +852,144 @@ async fn main() -> Result<()> {
             }
         },
 
-        // ===== Phase =====
-        Command::Phase { action } => match action {
-            PhaseAction::New { title, plan, goal, idx } => {
-                output(&client::request(&c, "POST", "/phases", Some(json!({
+        // ===== Unit =====
+        Command::Unit { action } => match action {
+            UnitAction::Create { title, plan, goal, idx, mode } => {
+                if mode != "sequential" && mode != "parallel" {
+                    eprintln!("Error: invalid value '{}' for '--mode'\n", mode);
+                    eprintln!("  Valid values: sequential, parallel\n");
+                    eprintln!("  sequential  Tasks execute one at a time (default)");
+                    eprintln!("  parallel    Tasks can be executed by multiple agents simultaneously");
+                    std::process::exit(1);
+                }
+                output(&client::request(&c, "POST", "/units", Some(json!({
                     "plan_id": plan, "title": title, "goal": goal, "idx": idx,
+                    "execution_mode": mode,
                 }))).await?);
             }
-            PhaseAction::Show { id } => output(&client::get(&c, &format!("/phases/{id}")).await?),
-            PhaseAction::List { plan_id } => {
+            UnitAction::View { id } => output(&client::get(&c, &format!("/units/{id}")).await?),
+            UnitAction::List { plan_id } => {
                 let qs = query_string(&[("plan_id", &plan_id)]);
-                output(&client::get(&c, &format!("/phases{qs}")).await?);
+                output(&client::get(&c, &format!("/units{qs}")).await?);
             }
-            PhaseAction::Update { id, title, goal } => {
+            UnitAction::Update { id, title, goal, mode } => {
                 let mut body = json!({});
                 if let Some(v) = title { body["title"] = json!(v); }
                 if let Some(v) = goal { body["goal"] = json!(v); }
-                output(&client::request(&c, "PATCH", &format!("/phases/{id}"), Some(body)).await?);
+                if let Some(ref v) = mode {
+                    if v != "sequential" && v != "parallel" {
+                        eprintln!("Error: invalid value '{}' for '--mode'\n", v);
+                        eprintln!("  Valid values: sequential, parallel\n");
+                        eprintln!("  sequential  Tasks execute one at a time");
+                        eprintln!("  parallel    Tasks can be executed by multiple agents simultaneously");
+                        std::process::exit(1);
+                    }
+                    body["execution_mode"] = json!(v);
+                }
+                output(&client::request(&c, "PATCH", &format!("/units/{id}"), Some(body)).await?);
             }
-            PhaseAction::Delete { id } => {
-                output(&client::request(&c, "DELETE", &format!("/phases/{id}"), None).await?);
+            UnitAction::Delete { id } => {
+                output(&client::request(&c, "DELETE", &format!("/units/{id}"), None).await?);
             }
         },
 
-        // ===== Bolt =====
-        Command::Bolt { action } => match action {
-            BoltAction::New { title, project, goal, idx } => {
-                output(&client::request(&c, "POST", "/bolts", Some(json!({
+        // ===== Cycle =====
+        Command::Cycle { action } => match action {
+            CycleAction::Create { title, project, goal, idx } => {
+                output(&client::request(&c, "POST", "/cycles", Some(json!({
                     "project_id": project, "title": title, "goal": goal, "idx": idx,
                 }))).await?);
             }
-            BoltAction::Show { id } => output(&client::get(&c, &format!("/bolts/{id}")).await?),
-            BoltAction::List { project_id, status } => {
+            CycleAction::View { id } => output(&client::get(&c, &format!("/cycles/{id}")).await?),
+            CycleAction::List { project_id, status } => {
                 let qs = query_string(&[("project_id", &project_id), ("status", &status)]);
-                output(&client::get(&c, &format!("/bolts{qs}")).await?);
+                output(&client::get(&c, &format!("/cycles{qs}")).await?);
             }
-            BoltAction::Update { id, title, goal, status } => {
+            CycleAction::Update { id, title, goal, status } => {
                 let mut body = json!({});
                 if let Some(v) = title { body["title"] = json!(v); }
                 if let Some(v) = goal { body["goal"] = json!(v); }
                 if let Some(v) = status { body["status"] = json!(v); }
-                output(&client::request(&c, "PATCH", &format!("/bolts/{id}"), Some(body)).await?);
+                output(&client::request(&c, "PATCH", &format!("/cycles/{id}"), Some(body)).await?);
             }
-            BoltAction::Delete { id } => {
-                output(&client::request(&c, "DELETE", &format!("/bolts/{id}"), None).await?);
+            CycleAction::Delete { id } => {
+                output(&client::request(&c, "DELETE", &format!("/cycles/{id}"), None).await?);
             }
-            BoltAction::Activate { id } => {
-                output(&client::request(&c, "POST", &format!("/bolts/{id}/activate"), None).await?);
+            CycleAction::Activate { id } => {
+                output(&client::request(&c, "POST", &format!("/cycles/{id}/activate"), None).await?);
             }
-            BoltAction::Steps { id } => {
-                output(&client::get(&c, &format!("/bolts/{id}/steps")).await?);
+            CycleAction::Tasks { id } => {
+                output(&client::get(&c, &format!("/cycles/{id}/tasks")).await?);
             }
-            BoltAction::Backlog { project } => {
+            CycleAction::Backlog { project } => {
                 let qs = format!("?project_id={}", urlenc(&project));
                 output(&client::get(&c, &format!("/backlog{qs}")).await?);
             }
         },
 
-        // ===== Step =====
-        Command::Step { action } => match action {
-            StepAction::New { title, phase, body, assignee, idx, depends_on, parent_step, priority, complexity, estimated_edits, bolt, r#type } => {
+        // ===== Task =====
+        Command::Task { action } => match action {
+            TaskAction::Create { title, unit, body, assignee, idx, depends_on, parent_task, priority, complexity, estimated_edits, cycle, r#type } => {
                 let cwd = std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string());
                 let type_val = r#type;
-                output(&client::request(&c, "POST", "/steps", Some(json!({
-                    "phase_id": phase, "title": title, "body": body.unwrap_or_default(),
+                output(&client::request(&c, "POST", "/tasks", Some(json!({
+                    "unit_id": unit, "title": title, "body": body.unwrap_or_default(),
                     "assignee": assignee, "idx": idx, "depends_on": depends_on,
-                    "parent_step_id": parent_step, "priority": priority,
+                    "parent_task_id": parent_task, "priority": priority,
                     "complexity": complexity, "estimated_edits": estimated_edits,
-                    "bolt_id": bolt, "cwd": cwd, "type": type_val,
+                    "cycle_id": cycle, "cwd": cwd, "type": type_val,
                 }))).await?);
             }
-            StepAction::Show { id } => output(&client::get(&c, &format!("/steps/{id}")).await?),
-            StepAction::List { phase_id, plan_id, status } => {
-                let qs = query_string(&[("phase_id", &phase_id), ("plan_id", &plan_id), ("status", &status)]);
-                output(&client::get(&c, &format!("/steps{qs}")).await?);
+            TaskAction::View { id } => output(&client::get(&c, &format!("/tasks/{id}")).await?),
+            TaskAction::List { unit_id, plan_id, status, agent_id } => {
+                let qs = query_string(&[("unit_id", &unit_id), ("plan_id", &plan_id), ("status", &status), ("agent_id", &agent_id)]);
+                output(&client::get(&c, &format!("/tasks{qs}")).await?);
             }
-            StepAction::Update { id, title, status, assignee, session_id, agent, priority, complexity, estimated_edits, parent_step, bolt } => {
+            TaskAction::Update { id, title, status, assignee, session_id, agent, priority, complexity, estimated_edits, parent_task, cycle, agent_id, comment } => {
                 let mut body = json!({});
                 if let Some(v) = title { body["title"] = json!(v); }
                 if let Some(v) = status { body["status"] = json!(v); }
-                if let Some(v) = assignee { body["assignee"] = json!(v); }
+                if let Some(ref v) = assignee { body["assignee"] = json!(v); }
                 if let Some(v) = session_id { body["_session_id"] = json!(v); }
                 body["_agent"] = json!(agent);
                 if let Some(v) = priority { body["priority"] = json!(v); }
                 if let Some(v) = complexity { body["complexity"] = json!(v); }
                 if let Some(v) = estimated_edits { body["estimated_edits"] = json!(v); }
-                if let Some(v) = parent_step { body["parent_step_id"] = json!(v); }
-                if let Some(v) = bolt { body["bolt_id"] = json!(v); }
-                output(&client::request(&c, "PATCH", &format!("/steps/{id}"), Some(body)).await?);
+                if let Some(v) = parent_task { body["parent_task_id"] = json!(v); }
+                if let Some(v) = cycle { body["cycle_id"] = json!(v); }
+                if let Some(v) = agent_id { body["agent_id"] = json!(v); }
+                output(&client::request(&c, "PATCH", &format!("/tasks/{id}"), Some(body)).await?);
+                if let Some(text) = comment {
+                    let author = assignee.as_deref().unwrap_or(&agent);
+                    client::request(&c, "POST", &format!("/tasks/{id}/comments"), Some(json!({"task_id": id, "author": author, "body": text}))).await?;
+                }
             }
-            StepAction::Delete { id } => {
-                output(&client::request(&c, "DELETE", &format!("/steps/{id}"), None).await?);
+            TaskAction::Delete { id } => {
+                output(&client::request(&c, "DELETE", &format!("/tasks/{id}"), None).await?);
             }
-            StepAction::AppendBody { id, text } => {
-                output(&client::request(&c, "POST", &format!("/steps/{id}/body"), Some(json!({"text": text}))).await?);
+            TaskAction::AppendBody { id, text } => {
+                output(&client::request(&c, "POST", &format!("/tasks/{id}/body"), Some(json!({"text": text}))).await?);
             }
-            StepAction::Search { query, limit } => {
+            TaskAction::Search { query, limit } => {
                 let qs = format!("?q={}&limit={limit}", urlenc(&query));
-                output(&client::get(&c, &format!("/steps/search{qs}")).await?);
+                output(&client::get(&c, &format!("/tasks/search{qs}")).await?);
             }
         },
 
         // ===== Artifact =====
         Command::Artifact { action } => match action {
-            ArtifactAction::New { title, r#type, step, phase, plan, content, content_format, parent } => {
+            ArtifactAction::Create { title, r#type, task, unit, plan, content, content_format, parent } => {
                 output(&client::request(&c, "POST", "/artifacts", Some(json!({
-                    "type": r#type, "title": title, "step_id": step, "phase_id": phase,
+                    "type": r#type, "title": title, "task_id": task, "unit_id": unit,
                     "plan_id": plan, "content": content.unwrap_or_default(), "content_format": content_format,
                     "parent_id": parent,
                 }))).await?);
             }
-            ArtifactAction::Show { id } => output(&client::get(&c, &format!("/artifacts/{id}")).await?),
-            ArtifactAction::List { step_id, phase_id, plan_id, r#type } => {
+            ArtifactAction::View { id } => output(&client::get(&c, &format!("/artifacts/{id}")).await?),
+            ArtifactAction::List { task_id, unit_id, plan_id, r#type } => {
                 let type_opt = r#type;
                 let qs = query_string(&[
-                    ("step_id", &step_id), ("phase_id", &phase_id), ("plan_id", &plan_id), ("type", &type_opt)
+                    ("task_id", &task_id), ("unit_id", &unit_id), ("plan_id", &plan_id), ("type", &type_opt)
                 ]);
                 output(&client::get(&c, &format!("/artifacts{qs}")).await?);
             }
@@ -938,23 +1000,23 @@ async fn main() -> Result<()> {
                 let qs = format!("?q={}&mode={}&scope={}&limit={}", urlenc(&query), mode, scope, limit);
                 output(&client::get(&c, &format!("/artifacts/search{qs}")).await?);
             }
-            ArtifactAction::Import { cwd, plan_id, phase_id, scope, dry_run } => {
+            ArtifactAction::Import { cwd, plan_id, unit_id, scope, dry_run } => {
                 output(&client::request(&c, "POST", "/artifacts/import", Some(json!({
-                    "cwd": cwd, "plan_id": plan_id, "phase_id": phase_id, "scope": scope, "dry_run": dry_run,
+                    "cwd": cwd, "plan_id": plan_id, "unit_id": unit_id, "scope": scope, "dry_run": dry_run,
                 }))).await?);
             }
-            ArtifactAction::Export { cwd, plan_id, phase_id } => {
+            ArtifactAction::Export { cwd, plan_id, unit_id } => {
                 output(&client::request(&c, "POST", "/artifacts/export", Some(json!({
-                    "cwd": cwd, "plan_id": plan_id, "phase_id": phase_id,
+                    "cwd": cwd, "plan_id": plan_id, "unit_id": unit_id,
                 }))).await?);
             }
         },
 
         // ===== Run =====
         Command::Run { action } => match action {
-            RunAction::Start { step, session_id, agent } => {
+            RunAction::Start { task, session_id, agent } => {
                 output(&client::request(&c, "POST", "/runs", Some(json!({
-                    "step_id": step, "session_id": session_id, "agent": agent,
+                    "task_id": task, "session_id": session_id, "agent": agent,
                 }))).await?);
             }
             RunAction::Finish { id, result, notes } => {
@@ -962,22 +1024,22 @@ async fn main() -> Result<()> {
                     "result": result, "notes": notes,
                 }))).await?);
             }
-            RunAction::Show { id } => output(&client::get(&c, &format!("/runs/{id}")).await?),
-            RunAction::List { step_id, session_id } => {
-                let qs = query_string(&[("step_id", &step_id), ("session_id", &session_id)]);
+            RunAction::View { id } => output(&client::get(&c, &format!("/runs/{id}")).await?),
+            RunAction::List { task_id, session_id } => {
+                let qs = query_string(&[("task_id", &task_id), ("session_id", &session_id)]);
                 output(&client::get(&c, &format!("/runs{qs}")).await?);
             }
         },
 
         // ===== Comment =====
         Command::Comment { action } => match action {
-            CommentAction::New { step, body, author } => {
-                output(&client::request(&c, "POST", &format!("/steps/{step}/comments"), Some(json!({
+            CommentAction::Create { task, body, author } => {
+                output(&client::request(&c, "POST", &format!("/tasks/{task}/comments"), Some(json!({
                     "author": author, "body": body,
                 }))).await?);
             }
-            CommentAction::List { step_id } => {
-                output(&client::get(&c, &format!("/steps/{step_id}/comments")).await?);
+            CommentAction::List { task_id } => {
+                output(&client::get(&c, &format!("/tasks/{task_id}/comments")).await?);
             }
             CommentAction::Delete { id } => {
                 output(&client::request(&c, "DELETE", &format!("/comments/{id}"), None).await?);
@@ -986,9 +1048,9 @@ async fn main() -> Result<()> {
 
         // ===== Question =====
         Command::Question { action } => match action {
-            QuestionAction::New { body, plan, phase, step, kind, origin, asked_by } => {
+            QuestionAction::Create { body, plan, unit, task, kind, origin, asked_by } => {
                 output(&client::request(&c, "POST", "/questions", Some(json!({
-                    "plan_id": plan, "phase_id": phase, "step_id": step,
+                    "plan_id": plan, "unit_id": unit, "task_id": task,
                     "kind": kind, "origin": origin, "body": body, "asked_by": asked_by,
                 }))).await?);
             }
@@ -997,11 +1059,11 @@ async fn main() -> Result<()> {
                     "answer": text, "answered_by": by,
                 }))).await?);
             }
-            QuestionAction::Show { id } => output(&client::get(&c, &format!("/questions/{id}")).await?),
-            QuestionAction::List { plan_id, phase_id, step_id, pending } => {
+            QuestionAction::View { id } => output(&client::get(&c, &format!("/questions/{id}")).await?),
+            QuestionAction::List { plan_id, unit_id, task_id, pending } => {
                 let pending_str = pending.map(|b| b.to_string());
                 let qs = query_string(&[
-                    ("plan_id", &plan_id), ("phase_id", &phase_id), ("step_id", &step_id), ("pending", &pending_str)
+                    ("plan_id", &plan_id), ("unit_id", &unit_id), ("task_id", &task_id), ("pending", &pending_str)
                 ]);
                 output(&client::get(&c, &format!("/questions{qs}")).await?);
             }

@@ -48,7 +48,7 @@ pub async fn get(client: &HttpClient, path: &str) -> Result<serde_json::Value> {
     let resp = client
         .get(uri.parse().context("invalid URI")?)
         .await
-        .context("failed to connect to latticed — is it running? (`lattice daemon start`)")?;
+        .context("failed to connect to clawketd — is it running? (`clawket daemon start`)")?;
     let status = resp.status();
     let body = resp.into_body().collect().await?.to_bytes();
     let val: serde_json::Value = serde_json::from_slice(&body)?;
@@ -78,7 +78,7 @@ pub async fn request(
     let resp = client
         .request(req)
         .await
-        .context("failed to connect to latticed — is it running? (`lattice daemon start`)")?;
+        .context("failed to connect to clawketd — is it running? (`clawket daemon start`)")?;
     let status = resp.status();
     let body_bytes = resp.into_body().collect().await?.to_bytes();
 
@@ -92,18 +92,18 @@ pub async fn request(
     Ok(val)
 }
 
-/// SSE wait-approval: connects to /phases/:id/events and blocks until approved/timeout.
+/// SSE wait-approval: connects to /units/:id/events and blocks until approved/timeout.
 pub async fn sse_wait_approval(
     client: &HttpClient,
-    phase_id: &str,
+    unit_id: &str,
     timeout: u64,
 ) -> Result<serde_json::Value> {
-    let path = format!("/phases/{phase_id}/events?timeout={timeout}");
+    let path = format!("/units/{unit_id}/events?timeout={timeout}");
     let uri: hyper::Uri = format!("http://localhost{path}").parse().context("invalid URI")?;
     let resp = client
         .get(uri)
         .await
-        .context("failed to connect to latticed — is it running? (`lattice daemon start`)")?;
+        .context("failed to connect to clawketd — is it running? (`clawket daemon start`)")?;
 
     if !resp.status().is_success() {
         let body = resp.into_body().collect().await?.to_bytes();
@@ -139,11 +139,11 @@ pub async fn sse_wait_approval(
                                         bail!("SSE error: {dat}");
                                     }
                                     "timeout" => {
-                                        bail!("timeout waiting for approval of {phase_id}");
+                                        bail!("timeout waiting for approval of {unit_id}");
                                     }
                                     _ => {
                                         // "waiting" 등 — 계속 대기
-                                        eprintln!("lattice: waiting for approval of {phase_id}...");
+                                        eprintln!("clawket: waiting for approval of {unit_id}...");
                                     }
                                 }
                             }
