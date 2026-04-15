@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ticket -->
+  <rect x="6" y="12" width="18" height="10" rx="2" fill="#FACC15"/>
+  <circle cx="6" cy="17" r="2" fill="white"/>
+  
+  <!-- Punch hole -->
+  <circle cx="15" cy="17" r="1.5" fill="#111827"/>
+
+  <!-- Claw -->
+  <path d="M20 6 C24 4, 28 8, 24 12" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/>
+  <path d="M20 6 C22 10, 18 12, 16 10" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/>
+</svg>
