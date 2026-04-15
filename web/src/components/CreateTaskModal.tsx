@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Step } from '../types';
+import type { Task } from '../types';
 import api from '../api';
 import { Modal, Input, Textarea, Select, Label, Button } from './ui';
 
-interface CreateStepModalProps {
-  phaseId: string;
+interface CreateTaskModalProps {
+  unitId: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateStepModalProps) {
+export default function CreateTaskModal({ unitId, onClose, onCreated }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [assignee, setAssignee] = useState('');
   const [idx, setIdx] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [agents, setAgents] = useState<string[]>([]);
-  const [duplicates, setDuplicates] = useState<Step[]>([]);
+  const [duplicates, setDuplicates] = useState<Task[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
     if (trimmed.length < 3) { setDuplicates([]); return; }
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await api.searchSteps(trimmed, 5);
+        const results = await api.searchTasks(trimmed, 5);
         setDuplicates(results.filter(s => s.title.toLowerCase().includes(trimmed.toLowerCase())));
       } catch { setDuplicates([]); }
     }, 400);
@@ -42,8 +42,8 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
     if (!title.trim()) return;
     setSubmitting(true);
     try {
-      await api.createStep({
-        phase_id: phaseId,
+      await api.createTask({
+        unit_id: unitId,
         title: title.trim(),
         body: body.trim(),
         idx,
@@ -52,7 +52,7 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
       onCreated();
       onClose();
     } catch (err) {
-      console.error('Failed to create step:', err);
+      console.error('Failed to create task:', err);
     } finally {
       setSubmitting(false);
     }
@@ -61,7 +61,7 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
   return (
     <Modal.Overlay onClose={onClose}>
       <Modal.Content>
-        <Modal.Header>New Step</Modal.Header>
+        <Modal.Header>New Task</Modal.Header>
         <Modal.Body>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -71,12 +71,12 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full"
-                placeholder="Step title"
+                placeholder="Task title"
                 autoFocus
               />
               {duplicates.length > 0 && (
                 <div className="mt-1.5 p-2 rounded border border-warning/30 bg-warning/5 text-xs">
-                  <span className="text-warning font-medium">Similar steps found:</span>
+                  <span className="text-warning font-medium">Similar tasks found:</span>
                   {duplicates.map(d => (
                     <div key={d.id} className="text-muted mt-0.5 truncate">
                       {d.ticket_number && <span className="font-mono mr-1">{d.ticket_number}</span>}
@@ -92,7 +92,7 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 className="w-full resize-none font-mono"
-                placeholder="Step details..."
+                placeholder="Task details..."
                 rows={4}
               />
             </div>
@@ -141,7 +141,7 @@ export default function CreateStepModal({ phaseId, onClose, onCreated }: CreateS
                 size="md"
                 disabled={!title.trim() || submitting}
               >
-                {submitting ? 'Creating...' : 'Create Step'}
+                {submitting ? 'Creating...' : 'Create Task'}
               </Button>
             </div>
           </form>

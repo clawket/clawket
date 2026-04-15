@@ -1,98 +1,98 @@
 import { useState, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Step, Artifact, Run, Question, StepComment, Bolt } from '../types';
+import type { Task, Artifact, Run, Question, TaskComment, Cycle } from '../types';
 import api from '../api';
 import { Label, Input, Select, Button } from './ui';
-import { StepComments } from './step-detail/StepComments';
-import { StepSubSteps } from './step-detail/StepSubSteps';
-import { ArtifactsSection, RunsSection, QuestionsSection } from './step-detail/StepSections';
+import { TaskComments } from './task-detail/TaskComments';
+import { TaskSubTasks } from './task-detail/TaskSubTasks';
+import { ArtifactsSection, RunsSection, QuestionsSection } from './task-detail/TaskSections';
 
-const PRIORITY_COLORS: Record<Step['priority'], string> = {
+const PRIORITY_COLORS: Record<Task['priority'], string> = {
   critical: 'bg-danger/20 text-danger',
   high: 'bg-warning/20 text-warning',
   medium: 'bg-primary/20 text-primary',
   low: 'bg-muted/20 text-muted',
 };
 
-interface StepDetailProps {
-  stepId: string;
+interface TaskDetailProps {
+  taskId: string;
   projectId?: string;
   onClose: () => void;
 }
 
-const STATUS_OPTIONS: Step['status'][] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
+const STATUS_OPTIONS: Task['status'][] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
 
-export default function StepDetail({ stepId, projectId, onClose }: StepDetailProps) {
-  const [step, setStep] = useState<Step | null>(null);
+export default function TaskDetail({ taskId, projectId, onClose }: TaskDetailProps) {
+  const [task, setTask] = useState<Task | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [bolts, setBolts] = useState<Bolt[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [editingAssignee, setEditingAssignee] = useState(false);
   const [assigneeDraft, setAssigneeDraft] = useState('');
-  const [comments, setComments] = useState<StepComment[]>([]);
-  const [childSteps, setChildSteps] = useState<Step[]>([]);
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [childTasks, setChildTasks] = useState<Task[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [s, a, r, q, c, ch] = await Promise.all([
-        api.getStep(stepId),
-        api.listArtifacts({ step_id: stepId }),
-        api.listRuns({ step_id: stepId }),
-        api.listQuestions({ step_id: stepId }),
-        api.fetchStepComments(stepId).catch((e) => { console.error('Failed to load comments:', e); return [] as StepComment[]; }),
-        api.listChildSteps(stepId).catch(() => [] as Step[]),
+        api.getTask(taskId),
+        api.listArtifacts({ task_id: taskId }),
+        api.listRuns({ task_id: taskId }),
+        api.listQuestions({ task_id: taskId }),
+        api.fetchTaskComments(taskId).catch((e) => { console.error('Failed to load comments:', e); return [] as TaskComment[]; }),
+        api.listChildTasks(taskId).catch(() => [] as Task[]),
       ]);
-      setStep(s);
+      setTask(s);
       setArtifacts(a);
       setRuns(r);
       setQuestions(q);
       setComments(c);
-      setChildSteps(ch);
+      setChildTasks(ch);
     } catch (err) {
-      console.error('Failed to load step:', err);
+      console.error('Failed to load task:', err);
     } finally {
       setLoading(false);
     }
-  }, [stepId]);
+  }, [taskId]);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!projectId) return;
-    api.listBolts({ project_id: projectId }).then(setBolts).catch(() => setBolts([]));
+    api.listCycles({ project_id: projectId }).then(setCycles).catch(() => setCycles([]));
   }, [projectId]);
 
-  async function handleBoltChange(boltId: string) {
-    if (!step) return;
+  async function handleCycleChange(cycleId: string) {
+    if (!task) return;
     try {
-      const updated = await api.updateStep(step.id, { bolt_id: boltId || null });
-      setStep(updated);
+      const updated = await api.updateTask(task.id, { cycle_id: cycleId || null });
+      setTask(updated);
     } catch (err) {
-      console.error('Failed to update bolt assignment:', err);
+      console.error('Failed to update cycle assignment:', err);
     }
   }
 
-  async function handleStatusChange(status: Step['status']) {
-    if (!step) return;
+  async function handleStatusChange(status: Task['status']) {
+    if (!task) return;
     try {
-      const updated = await api.updateStep(step.id, { status });
-      setStep(updated);
+      const updated = await api.updateTask(task.id, { status });
+      setTask(updated);
     } catch (err) {
       console.error('Failed to update status:', err);
     }
   }
 
   async function handleTitleSave() {
-    if (!step || !titleDraft.trim()) return;
+    if (!task || !titleDraft.trim()) return;
     try {
-      const updated = await api.updateStep(step.id, { title: titleDraft.trim() });
-      setStep(updated);
+      const updated = await api.updateTask(task.id, { title: titleDraft.trim() });
+      setTask(updated);
       setEditingTitle(false);
     } catch (err) {
       console.error('Failed to update title:', err);
@@ -100,23 +100,23 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
   }
 
   async function handleAssigneeSave() {
-    if (!step) return;
+    if (!task) return;
     try {
-      const updated = await api.updateStep(step.id, { assignee: assigneeDraft.trim() || undefined });
-      setStep(updated);
+      const updated = await api.updateTask(task.id, { assignee: assigneeDraft.trim() || undefined });
+      setTask(updated);
       setEditingAssignee(false);
     } catch (err) {
       console.error('Failed to update assignee:', err);
     }
   }
 
-  async function handleDeleteStep() {
-    if (!window.confirm('Are you sure you want to delete this step?')) return;
+  async function handleDeleteTask() {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
     try {
-      await api.deleteStep(stepId);
+      await api.deleteTask(taskId);
       onClose();
     } catch (err) {
-      console.error('Failed to delete step:', err);
+      console.error('Failed to delete task:', err);
     }
   }
 
@@ -125,7 +125,7 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
     return new Date(ts).toLocaleString();
   }
 
-  if (loading || !step) {
+  if (loading || !task) {
     return (
       <div className="w-full bg-surface flex items-center justify-center text-muted text-sm">
         Loading...
@@ -137,9 +137,9 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
     <div className="w-full bg-surface flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <span className="text-xs text-muted font-mono" title={step.id}>...{step.id.slice(-6)}</span>
+        <span className="text-xs text-muted font-mono" title={task.id}>...{task.id.slice(-6)}</span>
         <div className="flex items-center gap-2">
-          <Button variant="danger" size="sm" onClick={handleDeleteStep}>Delete</Button>
+          <Button variant="danger" size="sm" onClick={handleDeleteTask}>Delete</Button>
           <button onClick={onClose} className="text-muted hover:text-foreground text-lg leading-none">&times;</button>
         </div>
       </div>
@@ -158,44 +158,44 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
             />
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
-              {step.ticket_number && (
+              {task.ticket_number && (
                 <span className="text-xs font-mono bg-primary/20 text-primary px-1.5 py-0.5 rounded shrink-0">
-                  {step.ticket_number}
+                  {task.ticket_number}
                 </span>
               )}
               <h2
                 className="text-lg font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
-                onClick={() => { setTitleDraft(step.title); setEditingTitle(true); }}
+                onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
               >
-                {step.title}
+                {task.title}
               </h2>
             </div>
           )}
           {/* Priority + Complexity badges */}
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PRIORITY_COLORS[step.priority]}`}>
-              {step.priority}
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PRIORITY_COLORS[task.priority]}`}>
+              {task.priority}
             </span>
-            {step.complexity && (
+            {task.complexity && (
               <span className="text-xs bg-secondary/20 text-secondary px-1.5 py-0.5 rounded font-medium">
-                {step.complexity}
+                {task.complexity}
               </span>
             )}
-            {step.estimated_edits != null && (
+            {task.estimated_edits != null && (
               <span className="text-xs text-muted">
-                ~{step.estimated_edits} edits
+                ~{task.estimated_edits} edits
               </span>
             )}
           </div>
         </div>
 
-        {/* Status + Assignee + Bolt row */}
+        {/* Status + Assignee + Cycle row */}
         <div className="flex gap-4">
           <div className="flex-1">
             <Label>Status</Label>
             <Select
-              value={step.status}
-              onChange={(e) => handleStatusChange(e.target.value as Step['status'])}
+              value={task.status}
+              onChange={(e) => handleStatusChange(e.target.value as Task['status'])}
               size="sm"
             >
               {STATUS_OPTIONS.map((s) => (
@@ -219,11 +219,11 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
               />
             ) : (
               <div
-                onClick={() => { setAssigneeDraft(step.assignee ?? ''); setEditingAssignee(true); }}
+                onClick={() => { setAssigneeDraft(task.assignee ?? ''); setEditingAssignee(true); }}
                 className="w-full bg-background border border-border rounded px-2 py-1.5 text-sm cursor-pointer hover:border-primary transition-colors min-h-[34px]"
               >
-                {step.assignee ? (
-                  <span className="text-foreground">{step.assignee}</span>
+                {task.assignee ? (
+                  <span className="text-foreground">{task.assignee}</span>
                 ) : (
                   <span className="text-muted">Unassigned</span>
                 )}
@@ -231,15 +231,15 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
             )}
           </div>
           <div className="flex-1">
-            <Label>Bolt</Label>
-            {bolts.length > 0 ? (
+            <Label>Cycle</Label>
+            {cycles.length > 0 ? (
               <Select
-                value={step.bolt_id ?? ''}
-                onChange={(e) => handleBoltChange(e.target.value)}
+                value={task.cycle_id ?? ''}
+                onChange={(e) => handleCycleChange(e.target.value)}
                 size="sm"
               >
                 <option value="">Unassigned</option>
-                {bolts.map((b) => (
+                {cycles.map((b) => (
                   <option key={b.id} value={b.id}>
                     #{b.idx} {b.title}
                   </option>
@@ -247,8 +247,8 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
               </Select>
             ) : (
               <div className="w-full bg-background border border-border rounded px-2 py-1.5 text-sm text-muted min-h-[34px]">
-                {step.bolt_id ? (
-                  <span className="text-foreground font-mono text-xs">...{step.bolt_id.slice(-6)}</span>
+                {task.cycle_id ? (
+                  <span className="text-foreground font-mono text-xs">...{task.cycle_id.slice(-6)}</span>
                 ) : (
                   <span>Unassigned</span>
                 )}
@@ -259,17 +259,17 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
 
         {/* Timestamps */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div><span className="text-muted">Created:</span> <span className="text-foreground">{formatTime(step.created_at)}</span></div>
-          <div><span className="text-muted">Started:</span> <span className="text-foreground">{formatTime(step.started_at)}</span></div>
-          <div><span className="text-muted">Completed:</span> <span className="text-foreground">{formatTime(step.completed_at)}</span></div>
+          <div><span className="text-muted">Created:</span> <span className="text-foreground">{formatTime(task.created_at)}</span></div>
+          <div><span className="text-muted">Started:</span> <span className="text-foreground">{formatTime(task.started_at)}</span></div>
+          <div><span className="text-muted">Completed:</span> <span className="text-foreground">{formatTime(task.completed_at)}</span></div>
         </div>
 
         {/* Dependencies */}
-        {(step.depends_on || []).length > 0 && (
+        {(task.depends_on || []).length > 0 && (
           <div>
             <Label>Dependencies</Label>
             <div className="flex flex-wrap gap-1.5">
-              {(step.depends_on || []).map((dep) => (
+              {(task.depends_on || []).map((dep) => (
                 <span key={dep} className="text-xs font-mono bg-border/50 text-muted px-2 py-0.5 rounded" title={dep}>
                   ...{dep.slice(-6)}
                 </span>
@@ -282,19 +282,19 @@ export default function StepDetail({ stepId, projectId, onClose }: StepDetailPro
         <div>
           <Label>Body</Label>
           <div className="bg-background border border-border rounded p-3 text-sm leading-relaxed max-h-80 overflow-y-auto prose prose-sm max-w-none">
-            {step.body ? (
-              <Markdown remarkPlugins={[remarkGfm]}>{step.body}</Markdown>
+            {task.body ? (
+              <Markdown remarkPlugins={[remarkGfm]}>{task.body}</Markdown>
             ) : (
               <span className="text-muted italic">No content</span>
             )}
           </div>
         </div>
 
-        <StepSubSteps step={step} childSteps={childSteps} onChildCreated={(child) => setChildSteps(prev => [...prev, child])} />
+        <TaskSubTasks task={task} childTasks={childTasks} onChildCreated={(child) => setChildTasks(prev => [...prev, child])} />
         <ArtifactsSection artifacts={artifacts} />
         <RunsSection runs={runs} />
         <QuestionsSection questions={questions} />
-        <StepComments stepId={stepId} comments={comments} onCommentsChange={setComments} />
+        <TaskComments taskId={taskId} comments={comments} onCommentsChange={setComments} />
       </div>
     </div>
   );

@@ -2,13 +2,13 @@ import { useState } from 'react';
 import api from '../api';
 import { Modal, Input, Textarea, Label, Button } from './ui';
 
-interface CreatePhaseModalProps {
+interface CreateUnitModalProps {
   planId: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreatePhaseModal({ planId, onClose, onCreated }: CreatePhaseModalProps) {
+export default function CreateUnitModal({ planId, onClose, onCreated }: CreateUnitModalProps) {
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [idx, setIdx] = useState(0);
@@ -19,7 +19,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
     if (!title.trim()) return;
     setSubmitting(true);
     try {
-      await api.createPhase({
+      await api.createUnit({
         plan_id: planId,
         title: title.trim(),
         goal: goal.trim() || undefined,
@@ -28,7 +28,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
       onCreated();
       onClose();
     } catch (err) {
-      console.error('Failed to create phase:', err);
+      console.error('Failed to create unit:', err);
     } finally {
       setSubmitting(false);
     }
@@ -37,7 +37,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
   return (
     <Modal.Overlay onClose={onClose}>
       <Modal.Content>
-        <Modal.Header>New Phase</Modal.Header>
+        <Modal.Header>New Unit</Modal.Header>
         <Modal.Body>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -47,7 +47,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full"
-                placeholder="Phase title"
+                placeholder="Unit title"
                 autoFocus
               />
             </div>
@@ -57,7 +57,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 className="w-full resize-none"
-                placeholder="Phase goal"
+                placeholder="Unit goal"
                 rows={3}
               />
             </div>
@@ -81,7 +81,7 @@ export default function CreatePhaseModal({ planId, onClose, onCreated }: CreateP
                 size="md"
                 disabled={!title.trim() || submitting}
               >
-                {submitting ? 'Creating...' : 'Create Phase'}
+                {submitting ? 'Creating...' : 'Create Unit'}
               </Button>
             </div>
           </form>

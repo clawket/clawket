@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Step } from '../../types';
+import type { Task } from '../../types';
 import api from '../../api';
 import { Label, Input, Button } from '../ui';
 
-const STEP_STATUS_ICON: Record<Step['status'], { icon: string; color: string }> = {
+const TASK_STATUS_ICON: Record<Task['status'], { icon: string; color: string }> = {
   todo: { icon: '\u25CB', color: 'text-muted' },
   in_progress: { icon: '\u25D0', color: 'text-warning' },
   done: { icon: '\u25CF', color: 'text-success' },
@@ -11,27 +11,27 @@ const STEP_STATUS_ICON: Record<Step['status'], { icon: string; color: string }> 
   cancelled: { icon: '\u2715', color: 'text-muted' },
 };
 
-function SubStepTree({ steps, depth = 0 }: { steps: Step[]; depth?: number }) {
-  const [childMap, setChildMap] = useState<Record<string, Step[]>>({});
+function SubTaskTree({ tasks, depth = 0 }: { tasks: Task[]; depth?: number }) {
+  const [childMap, setChildMap] = useState<Record<string, Task[]>>({});
 
   useEffect(() => {
     if (depth >= 3) return;
-    const ids = steps.map((s) => s.id);
-    Promise.all(ids.map((id) => api.listChildSteps(id).catch(() => [] as Step[]))).then(
+    const ids = tasks.map((s) => s.id);
+    Promise.all(ids.map((id) => api.listChildTasks(id).catch(() => [] as Task[]))).then(
       (results) => {
-        const map: Record<string, Step[]> = {};
+        const map: Record<string, Task[]> = {};
         ids.forEach((id, i) => {
           if (results[i].length > 0) map[id] = results[i];
         });
         setChildMap(map);
       },
     );
-  }, [steps, depth]);
+  }, [tasks, depth]);
 
   return (
     <>
-      {steps.map((s) => {
-        const si = STEP_STATUS_ICON[s.status];
+      {tasks.map((s) => {
+        const si = TASK_STATUS_ICON[s.status];
         const children = childMap[s.id];
         return (
           <div key={s.id}>
@@ -41,7 +41,7 @@ function SubStepTree({ steps, depth = 0 }: { steps: Step[]; depth?: number }) {
               <span className="text-sm text-foreground truncate flex-1">{s.title}</span>
               {s.assignee && <span className="text-xs text-muted">@{s.assignee}</span>}
             </div>
-            {children && <SubStepTree steps={children} depth={depth + 1} />}
+            {children && <SubTaskTree tasks={children} depth={depth + 1} />}
           </div>
         );
       })}
@@ -49,14 +49,14 @@ function SubStepTree({ steps, depth = 0 }: { steps: Step[]; depth?: number }) {
   );
 }
 
-export function StepSubSteps({
-  step,
-  childSteps,
+export function TaskSubTasks({
+  task,
+  childTasks,
   onChildCreated,
 }: {
-  step: Step;
-  childSteps: Step[];
-  onChildCreated: (child: Step) => void;
+  task: Task;
+  childTasks: Task[];
+  onChildCreated: (child: Task) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -67,38 +67,38 @@ export function StepSubSteps({
     if (!titleDraft.trim()) return;
     setCreating(true);
     try {
-      const child = await api.createStep({
-        phase_id: step.phase_id,
-        idx: childSteps.length,
+      const child = await api.createTask({
+        unit_id: task.unit_id,
+        idx: childTasks.length,
         title: titleDraft.trim(),
         body: '',
         assignee: assigneeDraft.trim() || undefined,
-        parent_step_id: step.id,
+        parent_task_id: task.id,
       });
       onChildCreated(child);
       setTitleDraft('');
       setAssigneeDraft('');
       setShowForm(false);
     } catch (err) {
-      console.error('Failed to create sub-step:', err);
+      console.error('Failed to create sub-task:', err);
     } finally {
       setCreating(false);
     }
-  }, [step, titleDraft, assigneeDraft, onChildCreated]);
+  }, [task, titleDraft, assigneeDraft, onChildCreated]);
 
   return (
     <div>
-      <Label>Sub-Steps ({childSteps.length})</Label>
-      {childSteps.length === 0 && !showForm ? (
-        <div className="text-sm text-muted italic">No sub-steps</div>
+      <Label>Sub-Tasks ({childTasks.length})</Label>
+      {childTasks.length === 0 && !showForm ? (
+        <div className="text-sm text-muted italic">No sub-tasks</div>
       ) : (
         <div className="bg-background border border-border rounded overflow-hidden divide-y divide-border">
-          <SubStepTree steps={childSteps} />
+          <SubTaskTree tasks={childTasks} />
         </div>
       )}
       {showForm ? (
         <div className="mt-2 bg-background border border-border rounded p-3 space-y-2">
-          <Input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} placeholder="Sub-step title" size="sm" autoFocus
+          <Input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} placeholder="Sub-task title" size="sm" autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowForm(false); }} />
           <Input value={assigneeDraft} onChange={(e) => setAssigneeDraft(e.target.value)} placeholder="Assignee (optional)" size="sm"
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowForm(false); }} />
@@ -111,7 +111,7 @@ export function StepSubSteps({
         </div>
       ) : (
         <button className="mt-2 flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors" onClick={() => setShowForm(true)}>
-          <span className="text-base leading-none">+</span> Add sub-step
+          <span className="text-base leading-none">+</span> Add sub-task
         </button>
       )}
     </div>
