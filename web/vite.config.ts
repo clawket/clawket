@@ -8,7 +8,7 @@ import { homedir } from 'os'
 function getDaemonUrl() {
   try {
     const port = readFileSync(
-      join(homedir(), '.cache', 'lattice', 'latticed.port'), 'utf-8'
+      join(homedir(), '.cache', 'clawket', 'clawketd.port'), 'utf-8'
     ).trim()
     return `http://127.0.0.1:${port}`
   } catch {
@@ -23,15 +23,15 @@ export default defineConfig({
     proxy: {
       '/projects': getDaemonUrl(),
       '/plans': getDaemonUrl(),
-      '/phases': getDaemonUrl(),
-      '/steps': getDaemonUrl(),
+      '/units': getDaemonUrl(),
+      '/tasks': getDaemonUrl(),
       '/artifacts': getDaemonUrl(),
       '/runs': getDaemonUrl(),
       '/questions': getDaemonUrl(),
       '/health': getDaemonUrl(),
       '/dashboard': getDaemonUrl(),
       '/agents': getDaemonUrl(),
-      '/bolts': getDaemonUrl(),
+      '/cycles': getDaemonUrl(),
       '/backlog': getDaemonUrl(),
       '/labels': getDaemonUrl(),
       '/activity': getDaemonUrl(),
