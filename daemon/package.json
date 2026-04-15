@@ -1,10 +1,10 @@
 {
-  "name": "lattice",
-  "version": "1.0.4",
+  "name": "clawket",
+  "version": "2.0.0",
   "description": "LLM-native work management state layer",
   "type": "module",
   "bin": {
-    "latticed": "./bin/latticed.js"
+    "clawketd": "./bin/clawketd.js"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

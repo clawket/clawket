@@ -7,7 +7,7 @@ import { getRequestListener, serve } from '@hono/node-server';
 
 import { paths, ensureDirs } from './paths.js';
 import { getDb, closeDb } from './db.js';
-import { projects, plans, phases, steps, bolts, artifacts, runs, questions, stepComments, artifactVersions, activityLog, stepRelations, timeline } from './repo.js';
+import { projects, plans, units, tasks, cycles, artifacts, runs, questions, taskComments, artifactVersions, activityLog, taskRelations, timeline } from './repo.js';
 import { importPlanFile } from './import-plan.js';
 import { webDashboardHtml } from './web.js';
 import { formatOutput } from './format.js';
@@ -70,7 +70,7 @@ export function startServer() {
 
   app.onError((err, c) => {
     const status = err.status || 500;
-    return c.json({ error: err.message, stack: process.env.LATTICE_DEBUG ? err.stack : undefined }, status);
+    return c.json({ error: err.message, stack: process.env.CLAWKET_DEBUG ? err.stack : undefined }, status);
   });
 
   // ========== Health ==========
@@ -159,30 +159,30 @@ export function startServer() {
     return c.json(result);
   });
 
-  // ========== Phases ==========
-  app.get('/phases', (c) => {
+  // ========== Units ==========
+  app.get('/units', (c) => {
     const q = c.req.query();
-    return c.json(phases.list({ plan_id: q.plan_id || null, status: q.status || null }));
+    return c.json(units.list({ plan_id: q.plan_id || null, status: q.status || null }));
   });
-  app.post('/phases', async (c) => c.json(phases.create(await c.req.json())));
-  app.get('/phases/:id', (c) => jsonOr404(c, phases.get(c.req.param('id'))));
-  app.patch('/phases/:id', async (c) => { const r = phases.update(c.req.param('id'), await c.req.json()); broadcastEvent('phase:updated', { id: c.req.param('id') }); return c.json(r); });
-  app.delete('/phases/:id', (c) => {
-    phases.delete(c.req.param('id'));
+  app.post('/units', async (c) => c.json(units.create(await c.req.json())));
+  app.get('/units/:id', (c) => jsonOr404(c, units.get(c.req.param('id'))));
+  app.patch('/units/:id', async (c) => { const r = units.update(c.req.param('id'), await c.req.json()); broadcastEvent('unit:updated', { id: c.req.param('id') }); return c.json(r); });
+  app.delete('/units/:id', (c) => {
+    units.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
   });
-  app.post('/phases/:id/approve', async (c) => {
+  app.post('/units/:id/approve', async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    return c.json(phases.approve(c.req.param('id'), { by: body.by || 'human' }));
+    return c.json(units.approve(c.req.param('id'), { by: body.by || 'human' }));
   });
-  app.get('/phases/:id/events', (c) => {
+  app.get('/units/:id/events', (c) => {
     const id = c.req.param('id');
     const timeoutSec = Number(c.req.query('timeout') || 600);
     const intervalMs = Number(c.req.query('interval') || 1000);
     const deadline = Date.now() + timeoutSec * 1000;
 
     return streamSSE(c, async (stream) => {
-      const initial = phases.get(id);
+      const initial = units.get(id);
       if (!initial) {
         await stream.writeSSE({ event: 'error', data: JSON.stringify({ error: 'not found', id }) });
         return;
@@ -197,7 +197,7 @@ export function startServer() {
       await stream.writeSSE({ event: 'waiting', data: JSON.stringify({ id, timeout_sec: timeoutSec }) });
       while (Date.now() < deadline) {
         if (stream.aborted) return;
-        const p = phases.get(id);
+        const p = units.get(id);
         if (p?.approved_at) {
           await stream.writeSSE({
             event: 'approved',
@@ -211,49 +211,52 @@ export function startServer() {
     });
   });
 
-  // ========== Steps ==========
-  app.get('/steps', (c) => {
+  // ========== Tasks ==========
+  app.get('/tasks', (c) => {
     const q = c.req.query();
-    return c.json(steps.list({
-      phase_id: q.phase_id || null,
+    return c.json(tasks.list({
+      unit_id: q.unit_id || null,
       plan_id: q.plan_id || null,
       status: q.status || null,
-      parent_step_id: q.parent_step_id !== undefined ? (q.parent_step_id || null) : undefined,
+      assignee: q.assignee || null,
+      agent_id: q.agent_id || null,
+      cycle_id: q.cycle_id || null,
+      parent_task_id: q.parent_task_id !== undefined ? (q.parent_task_id || null) : undefined,
     }));
   });
-  app.post('/steps', async (c) => {
+  app.post('/tasks', async (c) => {
     const body = await c.req.json();
 
-    // Auto-infer phase_id if not provided (first non-completed phase of active plan)
-    if (!body.phase_id && body.cwd) {
+    // Auto-infer unit_id if not provided (first non-completed unit of active plan)
+    if (!body.unit_id && body.cwd) {
       const proj = projects.getByCwd(body.cwd);
       if (proj) {
         const planList = plans.list({ project_id: proj.id, status: 'active' });
         const plan = planList[0] || plans.list({ project_id: proj.id })[0];
         if (plan) {
-          const phaseList = phases.list({ plan_id: plan.id });
-          const phase = phaseList.find(p => p.status !== 'completed') || phaseList[0];
-          if (phase) body.phase_id = phase.id;
+          const unitList = units.list({ plan_id: plan.id });
+          const unit = unitList.find(p => p.status !== 'completed') || unitList[0];
+          if (unit) body.unit_id = unit.id;
         }
       }
     }
 
-    // Auto-infer bolt_id if not provided (first active bolt of project)
-    if (!body.bolt_id && body.cwd) {
+    // Auto-infer cycle_id if not provided (first active cycle of project)
+    if (!body.cycle_id && body.cwd) {
       const proj = projects.getByCwd(body.cwd);
       if (proj) {
-        const boltList = bolts.list({ project_id: proj.id });
-        const bolt = boltList.find(b => b.status === 'active') || boltList.find(b => b.status !== 'completed');
-        if (bolt) body.bolt_id = bolt.id;
+        const cycleList = cycles.list({ project_id: proj.id });
+        const cycle = cycleList.find(b => b.status === 'active') || cycleList.find(b => b.status !== 'completed');
+        if (cycle) body.cycle_id = cycle.id;
       }
     }
 
     delete body.cwd; // Don't pass cwd to create
-    const result = steps.create(body);
-    broadcastEvent('step:created', { id: result.id });
+    const result = tasks.create(body);
+    broadcastEvent('task:created', { id: result.id });
     return c.json(result);
   });
-  app.get('/steps/search', async (c) => {
+  app.get('/tasks/search', async (c) => {
     const query = c.req.query('q') || '';
     const limit = Number(c.req.query('limit') || 20);
     const mode = c.req.query('mode') || 'keyword'; // keyword | semantic | hybrid
@@ -263,11 +266,11 @@ export function startServer() {
         const { embed } = await import('./embeddings.js');
         const queryEmbedding = await embed(query);
         if (queryEmbedding) {
-          const vecResults = steps.vectorSearch(Array.from(queryEmbedding), { limit });
+          const vecResults = tasks.vectorSearch(Array.from(queryEmbedding), { limit });
           if (mode === 'semantic') return c.json(vecResults);
 
           // Hybrid: merge FTS + vector, deduplicate by ID
-          const ftsResults = steps.search(query, { limit, mode: 'keyword' });
+          const ftsResults = tasks.search(query, { limit, mode: 'keyword' });
           const seen = new Set();
           const merged = [];
           for (const s of [...ftsResults, ...vecResults]) {
@@ -280,26 +283,26 @@ export function startServer() {
       }
     }
 
-    return c.json(steps.search(query, { limit, mode: 'keyword' }));
+    return c.json(tasks.search(query, { limit, mode: 'keyword' }));
   });
-  app.get('/steps/:id', (c) => jsonOr404(c, steps.get(c.req.param('id'))));
-  app.patch('/steps/:id', async (c) => {
-    const result = steps.update(c.req.param('id'), await c.req.json());
-    broadcastEvent('step:updated', { id: c.req.param('id') });
+  app.get('/tasks/:id', (c) => jsonOr404(c, tasks.get(c.req.param('id'))));
+  app.patch('/tasks/:id', async (c) => {
+    const result = tasks.update(c.req.param('id'), await c.req.json());
+    broadcastEvent('task:updated', { id: c.req.param('id') });
     return c.json(result);
   });
-  app.delete('/steps/:id', async (c) => {
+  app.delete('/tasks/:id', async (c) => {
     const id = c.req.param('id');
-    const step = steps.get(id);
-    if (!step) return c.json({ error: 'Step not found' }, 404);
+    const task = tasks.get(id);
+    if (!task) return c.json({ error: 'Task not found' }, 404);
 
-    // Only todo steps under draft plans can be hard-deleted
-    if (step.status === 'todo') {
-      const phase = phases.get(step.phase_id);
-      const plan = phase ? plans.get(phase.plan_id) : null;
+    // Only todo tasks under draft plans can be hard-deleted
+    if (task.status === 'todo') {
+      const unit = units.get(task.unit_id);
+      const plan = unit ? plans.get(unit.plan_id) : null;
       if (plan && plan.status === 'draft') {
-        steps.delete(id);
-        broadcastEvent('step:deleted', { id });
+        tasks.delete(id);
+        broadcastEvent('task:deleted', { id });
         return c.json({ deleted: id });
       }
     }
@@ -307,50 +310,50 @@ export function startServer() {
     // Otherwise: soft delete (cancelled + comment)
     const body = await c.req.json().catch(() => ({}));
     const reason = body.reason || 'Cancelled via delete';
-    const result = steps.update(id, { status: 'cancelled' });
-    stepComments.create({ step_id: id, author: 'system', body: `[Cancelled] ${reason}` });
-    broadcastEvent('step:updated', { id });
+    const result = tasks.update(id, { status: 'cancelled' });
+    taskComments.create({ task_id: id, author: 'system', body: `[Cancelled] ${reason}` });
+    broadcastEvent('task:updated', { id });
     return c.json(result);
   });
-  // Bulk update steps
-  app.post('/steps/bulk-update', async (c) => {
+  // Bulk update tasks
+  app.post('/tasks/bulk-update', async (c) => {
     const { ids, fields } = await c.req.json();
     if (!ids || !Array.isArray(ids)) return c.json({ error: 'ids array required' }, 400);
-    return c.json(steps.bulkUpdate(ids, fields));
+    return c.json(tasks.bulkUpdate(ids, fields));
   });
 
-  app.post('/steps/:id/body', async (c) => {
+  app.post('/tasks/:id/body', async (c) => {
     const { text } = await c.req.json();
-    return c.json(steps.appendBody(c.req.param('id'), '\n' + text));
+    return c.json(tasks.appendBody(c.req.param('id'), '\n' + text));
   });
 
-  // ========== Step Comments ==========
-  app.get('/steps/:id/comments', (c) => {
-    return c.json(stepComments.list({ step_id: c.req.param('id') }));
+  // ========== Task Comments ==========
+  app.get('/tasks/:id/comments', (c) => {
+    return c.json(taskComments.list({ task_id: c.req.param('id') }));
   });
-  app.post('/steps/:id/comments', async (c) => {
+  app.post('/tasks/:id/comments', async (c) => {
     const body = await c.req.json();
-    return c.json(stepComments.create({
-      step_id: c.req.param('id'),
+    return c.json(taskComments.create({
+      task_id: c.req.param('id'),
       author: body.author,
       body: body.body,
     }));
   });
   app.delete('/comments/:id', (c) => {
-    stepComments.delete(c.req.param('id'));
+    taskComments.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
   });
 
-  // ========== Step Labels ==========
-  app.post('/steps/:id/labels', async (c) => {
+  // ========== Task Labels ==========
+  app.post('/tasks/:id/labels', async (c) => {
     const body = await c.req.json();
-    return c.json(steps.addLabel(c.req.param('id'), body.label));
+    return c.json(tasks.addLabel(c.req.param('id'), body.label));
   });
-  app.delete('/steps/:id/labels/:label', (c) => {
-    return c.json(steps.removeLabel(c.req.param('id'), c.req.param('label')));
+  app.delete('/tasks/:id/labels/:label', (c) => {
+    return c.json(tasks.removeLabel(c.req.param('id'), c.req.param('label')));
   });
-  app.get('/labels/:label/steps', (c) => {
-    return c.json(steps.listByLabel(c.req.param('label')));
+  app.get('/labels/:label/tasks', (c) => {
+    return c.json(tasks.listByLabel(c.req.param('label')));
   });
 
   // ========== Activity Log ==========
@@ -368,72 +371,72 @@ export function startServer() {
     return c.json(activityLog.record(body));
   });
 
-  // ========== Step Relations ==========
-  app.get('/steps/:id/relations', (c) => {
-    return c.json(stepRelations.list({ step_id: c.req.param('id') }));
+  // ========== Task Relations ==========
+  app.get('/tasks/:id/relations', (c) => {
+    return c.json(taskRelations.list({ task_id: c.req.param('id') }));
   });
-  app.post('/steps/:id/relations', async (c) => {
+  app.post('/tasks/:id/relations', async (c) => {
     const body = await c.req.json();
-    return c.json(stepRelations.create({
-      source_step_id: c.req.param('id'),
-      target_step_id: body.target_step_id,
+    return c.json(taskRelations.create({
+      source_task_id: c.req.param('id'),
+      target_task_id: body.target_task_id,
       relation_type: body.relation_type,
     }));
   });
   app.delete('/relations/:id', (c) => {
-    stepRelations.delete(c.req.param('id'));
+    taskRelations.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
   });
 
-  // ========== Bolts ==========
-  app.get('/bolts', (c) => {
+  // ========== Cycles ==========
+  app.get('/cycles', (c) => {
     const q = c.req.query();
-    return c.json(bolts.list({ project_id: q.project_id || null, status: q.status || null }));
+    return c.json(cycles.list({ project_id: q.project_id || null, status: q.status || null }));
   });
-  app.post('/bolts', async (c) => c.json(bolts.create(await c.req.json())));
-  app.get('/bolts/:id', (c) => jsonOr404(c, bolts.get(c.req.param('id'))));
-  app.patch('/bolts/:id', async (c) => {
+  app.post('/cycles', async (c) => c.json(cycles.create(await c.req.json())));
+  app.get('/cycles/:id', (c) => jsonOr404(c, cycles.get(c.req.param('id'))));
+  app.patch('/cycles/:id', async (c) => {
     const body = await c.req.json();
     // Block planning→active without approval
     if (body.status === 'active') {
-      const existing = bolts.get(c.req.param('id'));
+      const existing = cycles.get(c.req.param('id'));
       if (existing && existing.status === 'planning') {
-        return c.json({ error: 'Use POST /bolts/:id/activate to start a planning bolt' }, 400);
+        return c.json({ error: 'Use POST /cycles/:id/activate to start a planning cycle' }, 400);
       }
     }
-    const r = bolts.update(c.req.param('id'), body);
-    broadcastEvent('bolt:updated', { id: c.req.param('id') });
+    const r = cycles.update(c.req.param('id'), body);
+    broadcastEvent('cycle:updated', { id: c.req.param('id') });
     return c.json(r);
   });
-  app.post('/bolts/:id/activate', async (c) => {
-    const bolt = bolts.get(c.req.param('id'));
-    if (!bolt) return c.json({ error: 'not found' }, 404);
-    if (bolt.status !== 'planning') return c.json({ error: 'Only planning bolts can be activated' }, 400);
-    const r = bolts.update(c.req.param('id'), { status: 'active', started_at: Date.now() });
-    broadcastEvent('bolt:updated', { id: c.req.param('id') });
+  app.post('/cycles/:id/activate', async (c) => {
+    const cycle = cycles.get(c.req.param('id'));
+    if (!cycle) return c.json({ error: 'not found' }, 404);
+    if (cycle.status !== 'planning') return c.json({ error: 'Only planning cycles can be activated' }, 400);
+    const r = cycles.update(c.req.param('id'), { status: 'active', started_at: Date.now() });
+    broadcastEvent('cycle:updated', { id: c.req.param('id') });
     return c.json(r);
   });
-  app.delete('/bolts/:id', (c) => {
-    bolts.delete(c.req.param('id'));
+  app.delete('/cycles/:id', (c) => {
+    cycles.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
   });
-  app.get('/bolts/:id/steps', (c) => {
-    return c.json(bolts.steps(c.req.param('id')));
+  app.get('/cycles/:id/tasks', (c) => {
+    return c.json(cycles.tasks(c.req.param('id')));
   });
 
-  // ========== Backlog (steps with no bolt) ==========
+  // ========== Backlog (tasks with no cycle) ==========
   app.get('/backlog', (c) => {
     const projectId = c.req.query('project_id');
     if (!projectId) return c.json({ error: 'project_id query param required' }, 400);
-    return c.json(bolts.backlog(projectId));
+    return c.json(cycles.backlog(projectId));
   });
 
   // ========== Artifacts ==========
   app.get('/artifacts', (c) => {
     const q = c.req.query();
     return c.json(artifacts.list({
-      step_id: q.step_id || null,
-      phase_id: q.phase_id || null,
+      task_id: q.task_id || null,
+      unit_id: q.unit_id || null,
       plan_id: q.plan_id || null,
       type: q.type || null,
     }));
@@ -511,7 +514,7 @@ export function startServer() {
 
   // ========== Artifact Import (wiki paths → Artifact) ==========
   app.post('/artifacts/import', async (c) => {
-    const { cwd, plan_id = null, phase_id = null, scope = 'reference', dry_run = false, project_id = null } = await c.req.json();
+    const { cwd, plan_id = null, unit_id = null, scope = 'reference', dry_run = false, project_id = null } = await c.req.json();
     if (!cwd || !existsSync(cwd)) return c.json({ error: 'cwd required' }, 400);
 
     const MD_EXTS = new Set(['.md', '.mdx']);
@@ -521,7 +524,7 @@ export function startServer() {
 
     // Get existing artifact titles to avoid duplicates
     const existing = new Set(
-      artifacts.list({ plan_id, phase_id }).map(a => a.title)
+      artifacts.list({ plan_id, unit_id }).map(a => a.title)
     );
 
     function scanDir(dir, depth = 0) {
@@ -547,7 +550,7 @@ export function startServer() {
 
               if (!dry_run) {
                 const art = artifacts.create({
-                  plan_id, phase_id,
+                  plan_id, unit_id,
                   type: 'document',
                   title,
                   content,
@@ -577,7 +580,7 @@ export function startServer() {
 
   // ========== Artifact Export (Artifact → docs/) ==========
   app.post('/artifacts/export', async (c) => {
-    const { cwd, plan_id = null, phase_id = null, project_id = null } = await c.req.json();
+    const { cwd, plan_id = null, unit_id = null, project_id = null } = await c.req.json();
     if (!cwd) return c.json({ error: 'cwd required' }, 400);
 
     const exportProject = project_id ? projects.get(project_id) : null;
@@ -586,7 +589,7 @@ export function startServer() {
     const { mkdirSync, writeFileSync: writeFS } = require('fs');
     mkdirSync(docsDir, { recursive: true });
 
-    const allArtifacts = artifacts.list({ plan_id, phase_id });
+    const allArtifacts = artifacts.list({ plan_id, unit_id });
     const exported = [];
 
     for (const art of allArtifacts) {
@@ -618,7 +621,7 @@ export function startServer() {
   // ========== Runs ==========
   app.get('/runs', (c) => {
     const q = c.req.query();
-    return c.json(runs.list({ step_id: q.step_id || null, session_id: q.session_id || null, project_id: q.project_id || null }));
+    return c.json(runs.list({ task_id: q.task_id || null, session_id: q.session_id || null, project_id: q.project_id || null }));
   });
   app.post('/runs', async (c) => c.json(runs.create(await c.req.json())));
   app.get('/runs/:id', (c) => jsonOr404(c, runs.get(c.req.param('id'))));
@@ -633,8 +636,8 @@ export function startServer() {
     const pending = q.pending === 'true' ? true : q.pending === 'false' ? false : null;
     return c.json(questions.list({
       plan_id: q.plan_id || null,
-      phase_id: q.phase_id || null,
-      step_id: q.step_id || null,
+      unit_id: q.unit_id || null,
+      task_id: q.task_id || null,
       pending,
     }));
   });
@@ -671,7 +674,7 @@ export function startServer() {
   // Resolve web directory: prefer web/dist (dev build), fallback to daemon/web (plugin bundle)
   const DAEMON_ROOT = join(import.meta.dirname, '..');
   const WEB_DIR_CANDIDATES = [
-    join(DAEMON_ROOT, '..', 'web', 'dist'),      // dev: lattice/web/dist/
+    join(DAEMON_ROOT, '..', 'web', 'dist'),      // dev: clawket/web/dist/
     join(DAEMON_ROOT, 'web'),                    // plugin bundle: daemon/web/
   ];
   const WEB_DIR = WEB_DIR_CANDIDATES.find(d => existsSync(join(d, 'index.html'))) || WEB_DIR_CANDIDATES[0];
@@ -734,29 +737,29 @@ export function startServer() {
       return c.json({ context: '', project: null });
     }
 
-    // Find visible plans: non-completed + any completed plan that has in_progress steps
+    // Find visible plans: non-completed + any completed plan that has in_progress tasks
     const allPlans = plans.list({ project_id: project.id });
     const visiblePlans = allPlans.filter(p => {
       if (['active', 'approved', 'draft'].includes(p.status)) return true;
-      // Include completed plans that still have in_progress steps (defensive)
+      // Include completed plans that still have in_progress tasks (defensive)
       if (p.status === 'completed') {
-        const planPhases = phases.list({ plan_id: p.id });
-        return planPhases.some(ph =>
-          steps.list({ phase_id: ph.id }).some(s => s.status === 'in_progress')
+        const planUnits = units.list({ plan_id: p.id });
+        return planUnits.some(ph =>
+          tasks.list({ unit_id: ph.id }).some(s => s.status === 'in_progress')
         );
       }
       return false;
     });
     if (visiblePlans.length === 0) {
       return c.json({
-        context: `# Lattice: ${project.name}\nNo active plan.`,
+        context: `# Clawket: ${project.name}\nNo active plan.`,
         project: project.id,
       });
     }
 
     // Build compact index — show all non-completed plans
     const lines = [];
-    lines.push(`# Lattice: ${project.name} (${visiblePlans.length} plan${visiblePlans.length > 1 ? 's' : ''})`);
+    lines.push(`# Clawket: ${project.name} (${visiblePlans.length} plan${visiblePlans.length > 1 ? 's' : ''})`);
     lines.push('');
 
     // Use first active plan as primary (for backward compat)
@@ -766,60 +769,60 @@ export function startServer() {
       const isActive = plan.id === activePlan.id;
       lines.push(`## Plan: ${plan.title} (${plan.id}) [${plan.status}]${isActive ? ' ← active' : ''}`);
 
-      const allPhases = phases.list({ plan_id: plan.id });
-      let visiblePhases;
+      const allUnits = units.list({ plan_id: plan.id });
+      let visibleUnits;
       if (show === 'active') {
-        visiblePhases = allPhases.filter(p => p.status === 'active');
+        visibleUnits = allUnits.filter(p => p.status === 'active');
       } else if (show === 'next') {
-        const activeIdx = allPhases.findIndex(p => p.status === 'active');
-        const nextPending = allPhases.find((p, i) => i > activeIdx && p.status === 'pending');
-        visiblePhases = allPhases.filter(p =>
+        const activeIdx = allUnits.findIndex(p => p.status === 'active');
+        const nextPending = allUnits.find((p, i) => i > activeIdx && p.status === 'pending');
+        visibleUnits = allUnits.filter(p =>
           p.status === 'active' || (nextPending && p.id === nextPending.id)
         );
       } else {
-        visiblePhases = allPhases;
+        visibleUnits = allUnits;
       }
 
-    for (const phase of visiblePhases) {
-      const approval = (phase.approval_required && !phase.approved_at) ? ' [needs approval]' : '';
-      lines.push(`## ${phase.title} (${phase.id}) — ${phase.status}${approval}`);
+    for (const unit of visibleUnits) {
+      const approval = (unit.approval_required && !unit.approved_at) ? ' [needs approval]' : '';
+      lines.push(`## ${unit.title} (${unit.id}) — ${unit.status}${approval}`);
 
-      const allSteps = steps.list({ phase_id: phase.id });
-      const done = allSteps.filter(s => s.status === 'done').length;
-      if (allSteps.length > 0) {
-        lines.push(`  Progress: ${done}/${allSteps.length}`);
+      const allTasks = tasks.list({ unit_id: unit.id });
+      const done = allTasks.filter(s => s.status === 'done').length;
+      if (allTasks.length > 0) {
+        lines.push(`  Progress: ${done}/${allTasks.length}`);
       }
 
-      // Completed phases: summary only (save tokens)
-      if (phase.status === 'completed') {
-        const nonDone = allSteps.filter(s => s.status !== 'done');
+      // Completed units: summary only (save tokens)
+      if (unit.status === 'completed') {
+        const nonDone = allTasks.filter(s => s.status !== 'done');
         if (nonDone.length > 0) {
-          for (const step of nonDone) {
-            const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', cancelled: '[-]', done: '[x]' }[step.status] || '[ ]';
-            const assignee = step.assignee ? ` @${step.assignee}` : '';
-            const ref = step.ticket_number || step.id;
-            lines.push(`  ${icon} ${step.title} (${ref})${assignee}`);
+          for (const task of nonDone) {
+            const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', cancelled: '[-]', done: '[x]' }[task.status] || '[ ]';
+            const assignee = task.assignee ? ` @${task.assignee}` : '';
+            const ref = task.ticket_number || task.id;
+            lines.push(`  ${icon} ${task.title} (${ref})${assignee}`);
           }
         }
         lines.push('');
         continue;
       }
 
-      // Active phases: show non-done steps only (save tokens), use ticket_number
-      const nonDoneSteps = allSteps.filter(s => s.status !== 'done');
-      for (const step of nonDoneSteps) {
-        const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', cancelled: '[-]', done: '[x]' }[step.status] || '[ ]';
-        const assignee = step.assignee ? ` @${step.assignee}` : '';
-        const ref = step.ticket_number || step.id;
-        lines.push(`  ${icon} ${step.title} (${ref})${assignee}`);
+      // Active units: show non-done tasks only (save tokens), use ticket_number
+      const nonDoneTasks = allTasks.filter(s => s.status !== 'done');
+      for (const task of nonDoneTasks) {
+        const icon = { todo: '[ ]', in_progress: '[>]', blocked: '[!]', cancelled: '[-]', done: '[x]' }[task.status] || '[ ]';
+        const assignee = task.assignee ? ` @${task.assignee}` : '';
+        const ref = task.ticket_number || task.id;
+        lines.push(`  ${icon} ${task.title} (${ref})${assignee}`);
       }
       lines.push('');
     }
 
-      // Show summary of filtered-out phases
-      if (visiblePhases.length < allPhases.length) {
-        const hidden = allPhases.length - visiblePhases.length;
-        lines.push(`(${hidden} more phases hidden — use show=all to see all)`);
+      // Show summary of filtered-out units
+      if (visibleUnits.length < allUnits.length) {
+        const hidden = allUnits.length - visibleUnits.length;
+        lines.push(`(${hidden} more units hidden — use show=all to see all)`);
         lines.push('');
       }
     } // end plan loop
@@ -830,18 +833,18 @@ export function startServer() {
       lines.push('## Recent Activity');
       for (const r of recentRuns) {
         const status = r.ended_at ? `done (${r.result || 'ok'})` : 'running';
-        const step = steps.get(r.step_id);
-        const stepTitle = step ? step.title : r.step_id;
-        const ticket = step?.ticket_number ? `${step.ticket_number} ` : '';
+        const task = tasks.get(r.task_id);
+        const taskTitle = task ? task.title : r.task_id;
+        const ticket = task?.ticket_number ? `${task.ticket_number} ` : '';
         const notes = r.notes ? ` — ${r.notes.slice(0, 60)}` : '';
-        lines.push(`  @${r.agent} → ${ticket}${stepTitle} [${status}]${notes}`);
+        lines.push(`  @${r.agent} → ${ticket}${taskTitle} [${status}]${notes}`);
       }
       lines.push('');
     }
 
-    // In-progress steps (carry-over from last session)
-    const allPhasesFlat = visiblePlans.flatMap(p => phases.list({ plan_id: p.id }));
-    const inProgress = allPhasesFlat.flatMap(ph => steps.list({ phase_id: ph.id }))
+    // In-progress tasks (carry-over from last session)
+    const allUnitsFlat = visiblePlans.flatMap(p => units.list({ plan_id: p.id }));
+    const inProgress = allUnitsFlat.flatMap(ph => tasks.list({ unit_id: ph.id }))
       .filter(s => s.status === 'in_progress');
     if (inProgress.length > 0) {
       lines.push('## In Progress (carry-over)');
@@ -862,7 +865,7 @@ export function startServer() {
       lines.push('');
     }
 
-    lines.push('Commands: lattice step show <ID> | lattice step update <ID> --status <s> | lattice phase approve <ID>');
+    lines.push('Commands: clawket task view <ID> | clawket task update <ID> --status <s> | clawket unit approve <ID>');
 
     return c.json({
       context: lines.join('\n'),
@@ -1008,26 +1011,26 @@ export function startServer() {
     }
 
     // Project status
-    const allPhases = phases.list({ plan_id: activePlan.id });
-    const allSteps = allPhases.flatMap(ph => steps.list({ phase_id: ph.id }));
-    const done = allSteps.filter(s => s.status === 'done').length;
-    const total = allSteps.length;
+    const allUnits = units.list({ plan_id: activePlan.id });
+    const allTasks = allUnits.flatMap(ph => tasks.list({ unit_id: ph.id }));
+    const done = allTasks.filter(s => s.status === 'done').length;
+    const total = allTasks.length;
 
-    lines.push(`## Status: ${done}/${total} steps complete (${total > 0 ? Math.round(done/total*100) : 0}%)`);
+    lines.push(`## Status: ${done}/${total} tasks complete (${total > 0 ? Math.round(done/total*100) : 0}%)`);
     lines.push('');
 
-    // Completed phases
-    const completedPhases = allPhases.filter(p => p.status === 'completed');
-    if (completedPhases.length > 0) {
+    // Completed units
+    const completedUnits = allUnits.filter(p => p.status === 'completed');
+    if (completedUnits.length > 0) {
       lines.push('## Completed');
-      for (const ph of completedPhases) {
+      for (const ph of completedUnits) {
         lines.push(`- [x] ${ph.title}`);
       }
       lines.push('');
     }
 
     // In progress
-    const inProgress = allSteps.filter(s => s.status === 'in_progress');
+    const inProgress = allTasks.filter(s => s.status === 'in_progress');
     if (inProgress.length > 0) {
       lines.push('## In Progress');
       for (const s of inProgress) {
@@ -1038,7 +1041,7 @@ export function startServer() {
     }
 
     // Blocked
-    const blocked = allSteps.filter(s => s.status === 'blocked');
+    const blocked = allTasks.filter(s => s.status === 'blocked');
     if (blocked.length > 0) {
       lines.push('## Blocked');
       for (const s of blocked) {
@@ -1047,9 +1050,9 @@ export function startServer() {
       lines.push('');
     }
 
-    // Next up (todo from active/next phase)
-    const activePhases = allPhases.filter(p => p.status === 'active' || p.status === 'pending');
-    const nextTodo = activePhases.flatMap(ph => steps.list({ phase_id: ph.id }))
+    // Next up (todo from active/next unit)
+    const activeUnits = allUnits.filter(p => p.status === 'active' || p.status === 'pending');
+    const nextTodo = activeUnits.flatMap(ph => tasks.list({ unit_id: ph.id }))
       .filter(s => s.status === 'todo').slice(0, 10);
     if (nextTodo.length > 0) {
       lines.push('## Next Up');
@@ -1085,13 +1088,13 @@ export function startServer() {
   // ========== Dual listener ==========
   const sockServer = createServer(getRequestListener(app.fetch));
   sockServer.listen(paths.socket, () => {
-    process.stderr.write(`latticed: unix socket listening at ${paths.socket}\n`);
+    process.stderr.write(`clawketd: unix socket listening at ${paths.socket}\n`);
   });
 
-  const LATTICE_PORT = Number(process.env.LATTICE_PORT) || 19400;
-  const tcpServer = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: LATTICE_PORT }, (info) => {
+  const CLAWKET_PORT = Number(process.env.CLAWKET_PORT) || 19400;
+  const tcpServer = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: CLAWKET_PORT }, (info) => {
     writeFileSync(paths.portFile, String(info.port));
-    process.stderr.write(`latticed: tcp listening at http://127.0.0.1:${info.port}\n`);
+    process.stderr.write(`clawketd: tcp listening at http://127.0.0.1:${info.port}\n`);
   });
 
   writeFileSync(paths.pidFile, String(process.pid));
@@ -1100,7 +1103,7 @@ export function startServer() {
   function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
-    process.stderr.write(`latticed: ${signal} received, shutting down\n`);
+    process.stderr.write(`clawketd: ${signal} received, shutting down\n`);
     sockServer.close();
     tcpServer.close();
     closeDb();

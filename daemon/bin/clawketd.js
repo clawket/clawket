@@ -58,19 +58,19 @@ function ensureDeps() {
   const daemonRoot = join(__dirname, '..');
   const nodeModules = join(daemonRoot, 'node_modules');
   if (existsSync(join(daemonRoot, 'package.json')) && !existsSync(nodeModules)) {
-    process.stderr.write(`[latticed] Installing daemon dependencies...\n`);
+    process.stderr.write(`[clawketd] Installing daemon dependencies...\n`);
     const npmrc = join(daemonRoot, '.npmrc');
     if (!existsSync(npmrc)) writeFileSync(npmrc, 'node-linker=hoisted\n');
     try {
       execSync('pnpm --version', { stdio: 'pipe' });
       execSync('pnpm install --prod', { cwd: daemonRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
-      process.stderr.write(`[latticed] Dependencies installed (pnpm)\n`);
+      process.stderr.write(`[clawketd] Dependencies installed (pnpm)\n`);
     } catch {
       try {
         execSync('npm install --production', { cwd: daemonRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
-        process.stderr.write(`[latticed] Dependencies installed (npm)\n`);
+        process.stderr.write(`[clawketd] Dependencies installed (npm)\n`);
       } catch (e) {
-        process.stderr.write(`[latticed] ERROR: Failed to install dependencies: ${e.message}\n`);
+        process.stderr.write(`[clawketd] ERROR: Failed to install dependencies: ${e.message}\n`);
       }
     }
   }
@@ -83,7 +83,7 @@ async function cmdStart() {
   if (pid && isRunning(pid)) {
     const health = await httpHealthCheck();
     if (health?.ok) {
-      process.stdout.write(`latticed: already running (pid=${pid})\n`);
+      process.stdout.write(`clawketd: already running (pid=${pid})\n`);
       process.exit(0);
     }
   }
@@ -101,9 +101,9 @@ async function cmdStart() {
 
   const health = await waitForReady();
   if (health) {
-    process.stdout.write(`latticed: started (pid=${child.pid})\n`);
+    process.stdout.write(`clawketd: started (pid=${child.pid})\n`);
   } else {
-    process.stderr.write(`latticed: failed to start (check ${paths.logFile})\n`);
+    process.stderr.write(`clawketd: failed to start (check ${paths.logFile})\n`);
     process.exit(1);
   }
 }
@@ -111,7 +111,7 @@ async function cmdStart() {
 async function cmdStop() {
   const pid = readPid();
   if (!pid || !isRunning(pid)) {
-    process.stdout.write('latticed: not running\n');
+    process.stdout.write('clawketd: not running\n');
     return;
   }
   process.kill(pid, 'SIGTERM');
@@ -121,28 +121,28 @@ async function cmdStop() {
     await new Promise((r) => setTimeout(r, 100));
   }
   if (isRunning(pid)) {
-    process.stderr.write(`latticed: pid=${pid} did not stop, sending SIGKILL\n`);
+    process.stderr.write(`clawketd: pid=${pid} did not stop, sending SIGKILL\n`);
     process.kill(pid, 'SIGKILL');
   } else {
-    process.stdout.write(`latticed: stopped (pid=${pid})\n`);
+    process.stdout.write(`clawketd: stopped (pid=${pid})\n`);
   }
 }
 
 async function cmdStatus() {
   const pid = readPid();
   if (!pid) {
-    process.stdout.write('latticed: not running (no pid file)\n');
+    process.stdout.write('clawketd: not running (no pid file)\n');
     process.exit(1);
   }
   if (!isRunning(pid)) {
-    process.stdout.write(`latticed: not running (stale pid=${pid})\n`);
+    process.stdout.write(`clawketd: not running (stale pid=${pid})\n`);
     process.exit(1);
   }
   const health = await httpHealthCheck();
   if (health?.ok) {
-    process.stdout.write(`latticed: running (pid=${pid}, uptime=${Math.round(health.uptime_ms / 1000)}s, version=${health.version})\n`);
+    process.stdout.write(`clawketd: running (pid=${pid}, uptime=${Math.round(health.uptime_ms / 1000)}s, version=${health.version})\n`);
   } else {
-    process.stdout.write(`latticed: process alive (pid=${pid}) but not responding\n`);
+    process.stdout.write(`clawketd: process alive (pid=${pid}) but not responding\n`);
     process.exit(1);
   }
 }
@@ -166,7 +166,7 @@ switch (cmd) {
     startServer();
     break;
   default:
-    process.stdout.write(`Usage: latticed <start|stop|status|restart|serve>
+    process.stdout.write(`Usage: clawketd <start|stop|status|restart|serve>
 
   start    Start daemon in background
   stop     Stop running daemon

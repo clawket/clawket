@@ -2,10 +2,10 @@
 // All runtime paths flow through this module. Source paths are fs-based and handled separately.
 //
 // Env overrides (highest precedence):
-//   LATTICE_DATA_DIR    — persistent data (db, attachments)
-//   LATTICE_CACHE_DIR   — regenerable state (socket, pid, tmp)
-//   LATTICE_CONFIG_DIR  — user config (toml/json)
-//   LATTICE_STATE_DIR   — logs, history (XDG state)
+//   CLAWKET_DATA_DIR    — persistent data (db, attachments)
+//   CLAWKET_CACHE_DIR   — regenerable state (socket, pid, tmp)
+//   CLAWKET_CONFIG_DIR  — user config (toml/json)
+//   CLAWKET_STATE_DIR   — logs, history (XDG state)
 //
 // Defaults (XDG):
 //   data    ← $XDG_DATA_HOME   or ~/.local/share
@@ -15,10 +15,10 @@
 
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync, copyFileSync, renameSync } from 'node:fs';
 
 const HOME = homedir();
-const APP = 'lattice';
+const APP = 'clawket';
 
 function xdg(envName, fallback) {
   return process.env[envName] || join(HOME, fallback);
@@ -30,23 +30,44 @@ function resolve(override, xdgVar, xdgFallback) {
 }
 
 export const paths = {
-  data:   resolve('LATTICE_DATA_DIR',   'XDG_DATA_HOME',   '.local/share'),
-  cache:  resolve('LATTICE_CACHE_DIR',  'XDG_CACHE_HOME',  '.cache'),
-  config: resolve('LATTICE_CONFIG_DIR', 'XDG_CONFIG_HOME', '.config'),
-  state:  resolve('LATTICE_STATE_DIR',  'XDG_STATE_HOME',  '.local/state'),
+  data:   resolve('CLAWKET_DATA_DIR',   'XDG_DATA_HOME',   '.local/share'),
+  cache:  resolve('CLAWKET_CACHE_DIR',  'XDG_CACHE_HOME',  '.cache'),
+  config: resolve('CLAWKET_CONFIG_DIR', 'XDG_CONFIG_HOME', '.config'),
+  state:  resolve('CLAWKET_STATE_DIR',  'XDG_STATE_HOME',  '.local/state'),
 };
 
 // Derived file/subpaths
-paths.db          = process.env.LATTICE_DB || join(paths.data, 'db.sqlite');
-paths.socket      = process.env.LATTICE_SOCKET || join(paths.cache, 'latticed.sock');
-paths.pidFile     = join(paths.cache, 'latticed.pid');
-paths.portFile    = join(paths.cache, 'latticed.port');
-paths.logFile     = join(paths.state, 'latticed.log');
+paths.db          = process.env.CLAWKET_DB || join(paths.data, 'db.sqlite');
+paths.socket      = process.env.CLAWKET_SOCKET || join(paths.cache, 'clawketd.sock');
+paths.pidFile     = join(paths.cache, 'clawketd.pid');
+paths.portFile    = join(paths.cache, 'clawketd.port');
+paths.logFile     = join(paths.state, 'clawketd.log');
 paths.configFile  = join(paths.config, 'config.toml');
+
+// Migrate data from legacy Lattice paths to Clawket paths
+function migrateLegacyData() {
+  const LEGACY_APP = 'lattice';
+  const legacyData = join(xdg('XDG_DATA_HOME', '.local/share'), LEGACY_APP);
+  const legacyDb = join(legacyData, 'db.sqlite');
+
+  // Only migrate if legacy DB exists and new DB doesn't
+  if (existsSync(legacyDb) && !existsSync(paths.db)) {
+    try {
+      mkdirSync(paths.data, { recursive: true });
+      copyFileSync(legacyDb, paths.db);
+      // Rename legacy DB to mark as migrated (prevent duplicate migration)
+      renameSync(legacyDb, legacyDb + '.migrated-to-clawket');
+      process.stderr.write(`[clawket] Migrated database from ${legacyDb} → ${paths.db}\n`);
+    } catch (err) {
+      process.stderr.write(`[clawket] WARNING: Failed to migrate legacy database: ${err.message}\n`);
+    }
+  }
+}
 
 export function ensureDirs() {
   mkdirSync(paths.data, { recursive: true });
   mkdirSync(paths.cache, { recursive: true });
   mkdirSync(paths.config, { recursive: true });
   mkdirSync(paths.state, { recursive: true });
+  migrateLegacyData();
 }

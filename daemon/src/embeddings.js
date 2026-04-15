@@ -1,4 +1,4 @@
-// Lattice embeddings module — local embedding generation using @xenova/transformers
+// Clawket embeddings module — local embedding generation using @xenova/transformers
 // Model: all-MiniLM-L6-v2 (384 dimensions, ~23MB download on first use)
 
 let pipeline = null;
@@ -38,7 +38,7 @@ export async function embed(text) {
     const output = await embedder(truncated, { pooling: 'mean', normalize: true });
     return output.data;
   } catch (err) {
-    process.stderr.write(`[lattice-embeddings] Error: ${err.message}\n`);
+    process.stderr.write(`[clawket-embeddings] Error: ${err.message}\n`);
     return null;
   }
 }

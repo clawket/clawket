@@ -7,7 +7,7 @@ export function webDashboardHtml(baseUrl) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lattice Dashboard</title>
+<title>Clawket Dashboard</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d;
@@ -114,7 +114,7 @@ export function webDashboardHtml(baseUrl) {
 <body>
 
 <div class="header">
-  <h1>Lattice</h1>
+  <h1>Clawket</h1>
   <div style="display:flex;gap:8px;align-items:center">
     <span id="daemon-status" class="status-badge online">connected</span>
     <button class="refresh-btn" onclick="loadAll()">Refresh</button>

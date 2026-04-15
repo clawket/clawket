@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
-import { projects, plans, phases, steps } from './repo.js';
+import { projects, plans, units, tasks } from './repo.js';
 
-// Parse a Claude Code plan markdown file into Lattice entities.
+// Parse a Claude Code plan markdown file into Clawket entities.
 // Rules (deterministic, no LLM):
 //   - First `# <title>` line is the Plan title.
 //   - `## Phase N: <title>` (or `## Phase: <title>`) sections become Phase rows.
@@ -141,9 +141,9 @@ export function importPlanFile(filePath, { projectName = null, cwd = null, sourc
       dryRun: true,
       project: project,
       plan_title: parsed.title,
-      phase_count: parsed.phases.length,
-      step_count: parsed.phases.reduce((n, ph) => n + ph.steps.length, 0),
-      phases: parsed.phases.map(p => ({ title: p.title, steps: p.steps.map(s => s.title) })),
+      unit_count: parsed.phases.length,
+      task_count: parsed.phases.reduce((n, ph) => n + ph.steps.length, 0),
+      units: parsed.phases.map(p => ({ title: p.title, tasks: p.steps.map(s => s.title) })),
     };
   }
 
@@ -156,36 +156,36 @@ export function importPlanFile(filePath, { projectName = null, cwd = null, sourc
     source_path: filePath,
   });
 
-  // Create phases + steps
-  const createdPhases = [];
+  // Create units + tasks
+  const createdUnits = [];
   for (const ph of parsed.phases) {
-    const phaseRow = phases.create({
+    const unitRow = units.create({
       plan_id: plan.id,
       title: ph.title,
       goal: null,
       idx: ph.idx,
       approval_required: false,
     });
-    const createdSteps = [];
+    const createdTasks = [];
     for (const st of ph.steps) {
-      const stepRow = steps.create({
-        phase_id: phaseRow.id,
+      const taskRow = tasks.create({
+        unit_id: unitRow.id,
         title: st.title,
         body: st.body,
         idx: st.idx,
       });
-      createdSteps.push(stepRow);
+      createdTasks.push(taskRow);
     }
-    createdPhases.push({ phase: phaseRow, steps: createdSteps });
+    createdUnits.push({ unit: unitRow, tasks: createdTasks });
   }
 
   return {
     project,
     plan,
-    phases: createdPhases,
+    units: createdUnits,
     summary: {
-      phase_count: createdPhases.length,
-      step_count: createdPhases.reduce((n, p) => n + p.steps.length, 0),
+      unit_count: createdUnits.length,
+      task_count: createdUnits.reduce((n, u) => n + u.tasks.length, 0),
     },
   };
 }

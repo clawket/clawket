@@ -1,6 +1,9 @@
 import { getDb } from './db.js';
 import { newId, now, slugify } from './id.js';
 
+// -------- Constants --------
+const TERMINAL_TASK_STATUSES = new Set(['done', 'cancelled']);
+
 // -------- Shared helpers --------
 
 function buildWhere(filters) {
@@ -55,11 +58,18 @@ export const projects = {
   },
   getByCwd(cwd, { enabledOnly = false } = {}) {
     const db = getDb();
-    const sql = enabledOnly
+    // Exact match first
+    const exactSql = enabledOnly
       ? `SELECT p.* FROM projects p JOIN project_cwds c ON c.project_id = p.id WHERE c.cwd = ? AND p.enabled = 1 LIMIT 1`
       : `SELECT p.* FROM projects p JOIN project_cwds c ON c.project_id = p.id WHERE c.cwd = ? LIMIT 1`;
-    const row = db.prepare(sql).get(cwd);
-    return row ? projects.get(row.id) : null;
+    const exact = db.prepare(exactSql).get(cwd);
+    if (exact) return projects.get(exact.id);
+    // Subdirectory match: cwd starts with a registered project cwd + '/'
+    const prefixSql = enabledOnly
+      ? `SELECT p.* FROM projects p JOIN project_cwds c ON c.project_id = p.id WHERE ? LIKE c.cwd || '/%' AND p.enabled = 1 ORDER BY LENGTH(c.cwd) DESC LIMIT 1`
+      : `SELECT p.* FROM projects p JOIN project_cwds c ON c.project_id = p.id WHERE ? LIKE c.cwd || '/%' ORDER BY LENGTH(c.cwd) DESC LIMIT 1`;
+    const prefix = db.prepare(prefixSql).get(cwd);
+    return prefix ? projects.get(prefix.id) : null;
   },
   list() {
     const db = getDb();
@@ -161,38 +171,37 @@ export const plans = {
   },
 };
 
-// -------- Phases --------
-export const phases = {
-  create({ plan_id, title, goal = null, idx = null, approval_required = false }) {
+// -------- Units --------
+export const units = {
+  create({ plan_id, title, goal = null, idx = null, approval_required = false, execution_mode = 'sequential' }) {
     const db = getDb();
-    const id = newId('PHASE');
+    const id = newId('UNIT');
     const ts = now();
-    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM phases WHERE plan_id = ?`).get(plan_id).next);
+    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM units WHERE plan_id = ?`).get(plan_id).next);
     db.prepare(
-      `INSERT INTO phases (id, plan_id, idx, title, goal, created_at, status, approval_required)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`
-    ).run(id, plan_id, finalIdx, title, goal, ts, approval_required ? 1 : 0);
-    return phases.get(id);
+      `INSERT INTO units (id, plan_id, idx, title, goal, created_at, status, approval_required, execution_mode)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    ).run(id, plan_id, finalIdx, title, goal, ts, approval_required ? 1 : 0, execution_mode);
+    return units.get(id);
   },
   approve(id, { by = 'human' } = {}) {
     const db = getDb();
     db.prepare(
-      `UPDATE phases SET status = 'active', approved_by = ?, approved_at = ?, started_at = COALESCE(started_at, ?) WHERE id = ?`
+      `UPDATE units SET status = 'active', approved_by = ?, approved_at = ?, started_at = COALESCE(started_at, ?) WHERE id = ?`
     ).run(by, now(), now(), id);
-    return phases.get(id);
+    return units.get(id);
   },
   get(id) {
-    return getDb().prepare(`SELECT * FROM phases WHERE id = ?`).get(id) ?? null;
+    return getDb().prepare(`SELECT * FROM units WHERE id = ?`).get(id) ?? null;
   },
   list({ plan_id = null, status = null } = {}) {
     const db = getDb();
     const { clause, vals } = buildWhere({ plan_id, status });
-    return db.prepare(`SELECT * FROM phases ${clause} ORDER BY plan_id, idx`).all(...vals);
+    return db.prepare(`SELECT * FROM units ${clause} ORDER BY plan_id, idx`).all(...vals);
   },
   update(id, fields) {
     const db = getDb();
-    // Phase has no status — it's a pure grouping entity. Only title/goal are editable.
-    const allowed = ['title', 'goal'];
+    const allowed = ['title', 'goal', 'status', 'execution_mode'];
     const sets = [];
     const vals = [];
     for (const k of allowed) {
@@ -201,37 +210,37 @@ export const phases = {
         vals.push(fields[k]);
       }
     }
-    if (sets.length === 0) return phases.get(id);
+    if (sets.length === 0) return units.get(id);
     vals.push(id);
-    db.prepare(`UPDATE phases SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-    return phases.get(id);
+    db.prepare(`UPDATE units SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return units.get(id);
   },
   delete(id) {
-    getDb().prepare(`DELETE FROM phases WHERE id = ?`).run(id);
+    getDb().prepare(`DELETE FROM units WHERE id = ?`).run(id);
   },
 };
 
 // -------- Questions --------
 export const questions = {
-  create({ plan_id = null, phase_id = null, step_id = null, kind = 'clarification', origin = 'prompt', body, asked_by = 'main' }) {
+  create({ plan_id = null, unit_id = null, task_id = null, kind = 'clarification', origin = 'prompt', body, asked_by = 'main' }) {
     const db = getDb();
     const id = newId('Q');
     db.prepare(
-      `INSERT INTO questions (id, plan_id, phase_id, step_id, kind, origin, body, asked_by, created_at)
+      `INSERT INTO questions (id, plan_id, unit_id, task_id, kind, origin, body, asked_by, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, plan_id, phase_id, step_id, kind, origin, body, asked_by, now());
+    ).run(id, plan_id, unit_id, task_id, kind, origin, body, asked_by, now());
     return questions.get(id);
   },
   get(id) {
     return getDb().prepare(`SELECT * FROM questions WHERE id = ?`).get(id) ?? null;
   },
-  list({ plan_id = null, phase_id = null, step_id = null, pending = null } = {}) {
+  list({ plan_id = null, unit_id = null, task_id = null, pending = null } = {}) {
     const db = getDb();
     const where = [];
     const vals = [];
     if (plan_id) { where.push('plan_id = ?'); vals.push(plan_id); }
-    if (phase_id) { where.push('phase_id = ?'); vals.push(phase_id); }
-    if (step_id) { where.push('step_id = ?'); vals.push(step_id); }
+    if (unit_id) { where.push('unit_id = ?'); vals.push(unit_id); }
+    if (task_id) { where.push('task_id = ?'); vals.push(task_id); }
     if (pending === true) where.push('answered_at IS NULL');
     if (pending === false) where.push('answered_at IS NOT NULL');
     const sql = `SELECT * FROM questions ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
@@ -245,16 +254,16 @@ export const questions = {
   },
 };
 
-// -------- Steps --------
-export const steps = {
-  /** Resolve project key for a step by traversing phase -> plan -> project. */
-  _resolveProjectKey(db, phase_id) {
+// -------- Tasks --------
+export const tasks = {
+  /** Resolve project key for a task by traversing unit -> plan -> project. */
+  _resolveProjectKey(db, unit_id) {
     const row = db.prepare(
       `SELECT p.key FROM projects p
        JOIN plans pl ON pl.project_id = p.id
-       JOIN phases ph ON ph.plan_id = pl.id
+       JOIN units ph ON ph.plan_id = pl.id
        WHERE ph.id = ?`
-    ).get(phase_id);
+    ).get(unit_id);
     return row?.key ?? null;
   },
 
@@ -263,7 +272,7 @@ export const steps = {
     if (!projectKey) return null;
     const prefix = projectKey + '-';
     const row = db.prepare(
-      `SELECT ticket_number FROM steps
+      `SELECT ticket_number FROM tasks
        WHERE ticket_number LIKE ? || '%'
        ORDER BY CAST(SUBSTR(ticket_number, LENGTH(?) + 1) AS INTEGER) DESC
        LIMIT 1`
@@ -273,117 +282,119 @@ export const steps = {
     return `${projectKey}-${num + 1}`;
   },
 
-  create({ phase_id, title, body = '', assignee = null, idx = null, depends_on = [],
-           parent_step_id = null, priority = 'medium', complexity = null, estimated_edits = null,
-           bolt_id = null, reporter = null, type = 'task' }) {
-    if (!phase_id) {
-      throw Object.assign(new Error('phase_id is required'), { status: 400 });
+  create({ unit_id, title, body = '', assignee = null, idx = null, depends_on = [],
+           parent_task_id = null, priority = 'medium', complexity = null, estimated_edits = null,
+           cycle_id = null, reporter = null, type = 'task' }) {
+    if (!unit_id) {
+      throw Object.assign(new Error('unit_id is required'), { status: 400 });
     }
-    // Reject steps under unapproved (draft) plans
+    // Reject tasks under unapproved (draft) plans
     {
       const db0 = getDb();
-      const phase = db0.prepare('SELECT * FROM phases WHERE id = ?').get(phase_id);
-      if (phase) {
-        const plan = db0.prepare('SELECT * FROM plans WHERE id = ?').get(phase.plan_id);
+      const unit = db0.prepare('SELECT * FROM units WHERE id = ?').get(unit_id);
+      if (unit) {
+        const plan = db0.prepare('SELECT * FROM plans WHERE id = ?').get(unit.plan_id);
         if (plan && plan.status === 'draft') {
           throw Object.assign(new Error(
-            `Cannot create steps under draft plan "${plan.title}" (${plan.id}). Approve it first: lattice plan approve ${plan.id}`
+            `Cannot create tasks under draft plan "${plan.title}" (${plan.id}). Approve it first: clawket plan approve ${plan.id}`
           ), { status: 400 });
         }
       }
     }
-    if (!bolt_id) {
-      // Auto-resolve: find active bolt for this project via phase → plan → project
+    if (!cycle_id) {
+      // Auto-resolve: find active cycle for this project via unit → plan → project
       const db0 = getDb();
-      const phase = db0.prepare('SELECT * FROM phases WHERE id = ?').get(phase_id);
-      if (phase) {
-        const plan = db0.prepare('SELECT * FROM plans WHERE id = ?').get(phase.plan_id);
+      const unit = db0.prepare('SELECT * FROM units WHERE id = ?').get(unit_id);
+      if (unit) {
+        const plan = db0.prepare('SELECT * FROM plans WHERE id = ?').get(unit.plan_id);
         if (plan) {
-          const activeBolts = db0.prepare(
-            "SELECT * FROM bolts WHERE project_id = ? AND status = 'active' ORDER BY created_at DESC"
+          const activeCycles = db0.prepare(
+            "SELECT * FROM cycles WHERE project_id = ? AND status = 'active' ORDER BY created_at DESC"
           ).all(plan.project_id);
-          if (activeBolts.length === 1) {
-            bolt_id = activeBolts[0].id;
-          } else if (activeBolts.length > 1) {
+          if (activeCycles.length === 1) {
+            cycle_id = activeCycles[0].id;
+          } else if (activeCycles.length > 1) {
             throw Object.assign(new Error(
-              `Multiple active bolts found. Specify --bolt: ${activeBolts.map(b => b.id).join(', ')}`
+              `Multiple active cycles found. Specify --cycle: ${activeCycles.map(b => b.id).join(', ')}`
             ), { status: 400 });
           }
         }
       }
-      // bolt_id is optional — steps without a bolt go to backlog
+      // cycle_id is optional — tasks without a cycle go to backlog
     }
     const db = getDb();
-    const id = newId('STEP');
+    const id = newId('TASK');
     const ts = now();
-    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM steps WHERE phase_id = ?`).get(phase_id).next);
+    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM tasks WHERE unit_id = ?`).get(unit_id).next);
 
     // Auto-generate ticket_number from project key
-    const projectKey = steps._resolveProjectKey(db, phase_id);
-    const ticketNumber = steps._nextTicketNumber(db, projectKey);
+    const projectKey = tasks._resolveProjectKey(db, unit_id);
+    const ticketNumber = tasks._nextTicketNumber(db, projectKey);
 
     const tx = db.transaction(() => {
       db.prepare(
-        `INSERT INTO steps (id, phase_id, idx, title, body, created_at, status, assignee,
-         ticket_number, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter, type)
+        `INSERT INTO tasks (id, unit_id, idx, title, body, created_at, status, assignee,
+         ticket_number, parent_task_id, priority, complexity, estimated_edits, cycle_id, reporter, type)
          VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(id, phase_id, finalIdx, title, body, ts, assignee,
-            ticketNumber, parent_step_id, priority, complexity, estimated_edits, bolt_id, reporter, type);
-      const insDep = db.prepare(`INSERT INTO step_depends_on (step_id, depends_on_id) VALUES (?, ?)`);
+      ).run(id, unit_id, finalIdx, title, body, ts, assignee,
+            ticketNumber, parent_task_id, priority, complexity, estimated_edits, cycle_id, reporter, type);
+      const insDep = db.prepare(`INSERT INTO task_depends_on (task_id, depends_on_task_id) VALUES (?, ?)`);
       for (const dep of depends_on) insDep.run(id, dep);
     });
     tx();
 
-    return steps.get(id);
+    return tasks.get(id);
   },
   get(id) {
     const db = getDb();
-    const row = db.prepare(`SELECT * FROM steps WHERE id = ?`).get(id);
+    const row = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(id);
     if (!row) return null;
-    row.depends_on = db.prepare(`SELECT depends_on_id FROM step_depends_on WHERE step_id = ?`).all(id).map(r => r.depends_on_id);
+    row.depends_on = db.prepare(`SELECT depends_on_task_id FROM task_depends_on WHERE task_id = ?`).all(id).map(r => r.depends_on_task_id);
     try {
-      row.labels = db.prepare(`SELECT label FROM step_labels WHERE step_id = ?`).all(id).map(r => r.label);
+      row.labels = db.prepare(`SELECT label FROM task_labels WHERE task_id = ?`).all(id).map(r => r.label);
     } catch { row.labels = []; }
     return row;
   },
-  list({ phase_id = null, plan_id = null, status = null, bolt_id = null, parent_step_id = undefined } = {}) {
+  list({ unit_id = null, plan_id = null, status = null, cycle_id = null, assignee = null, agent_id = null, parent_task_id = undefined } = {}) {
     const db = getDb();
     const where = [];
     const vals = [];
-    let sql = `SELECT s.* FROM steps s`;
+    let sql = `SELECT s.* FROM tasks s`;
     if (plan_id) {
-      sql += ` JOIN phases p ON p.id = s.phase_id`;
+      sql += ` JOIN units p ON p.id = s.unit_id`;
       where.push('p.plan_id = ?');
       vals.push(plan_id);
     }
-    if (phase_id) { where.push('s.phase_id = ?'); vals.push(phase_id); }
+    if (unit_id) { where.push('s.unit_id = ?'); vals.push(unit_id); }
     if (status) { where.push('s.status = ?'); vals.push(status); }
-    if (bolt_id) { where.push('s.bolt_id = ?'); vals.push(bolt_id); }
-    if (parent_step_id !== undefined) {
-      if (parent_step_id === null) {
-        where.push('s.parent_step_id IS NULL');
+    if (cycle_id) { where.push('s.cycle_id = ?'); vals.push(cycle_id); }
+    if (assignee) { where.push('s.assignee = ?'); vals.push(assignee); }
+    if (agent_id) { where.push('s.agent_id = ?'); vals.push(agent_id); }
+    if (parent_task_id !== undefined) {
+      if (parent_task_id === null) {
+        where.push('s.parent_task_id IS NULL');
       } else {
-        where.push('s.parent_step_id = ?');
-        vals.push(parent_step_id);
+        where.push('s.parent_task_id = ?');
+        vals.push(parent_task_id);
       }
     }
     if (where.length) sql += ' WHERE ' + where.join(' AND ');
-    sql += ' ORDER BY s.phase_id, s.idx';
+    sql += ' ORDER BY s.unit_id, s.idx';
     return db.prepare(sql).all(...vals);
   },
   appendBody(id, text) {
     const db = getDb();
-    db.prepare(`UPDATE steps SET body = body || ? WHERE id = ?`).run(text, id);
-    return steps.get(id);
+    db.prepare(`UPDATE tasks SET body = body || ? WHERE id = ?`).run(text, id);
+    return tasks.get(id);
   },
   update(id, fields) {
     const db = getDb();
-    const allowed = ['title', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_step_id', 'bolt_id', 'phase_id', 'reporter', 'type'];
+    const allowed = ['title', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_task_id', 'cycle_id', 'unit_id', 'reporter', 'type', 'agent_id'];
     const sets = [];
     const vals = [];
 
     // Capture old values for activity log
-    const oldStep = steps.get(id);
+    const oldTask = tasks.get(id);
 
     for (const k of allowed) {
       if (k in fields) {
@@ -394,14 +405,14 @@ export const steps = {
     if ('status' in fields) {
       const VALID_STATUSES = new Set(['todo', 'in_progress', 'done', 'blocked', 'cancelled']);
       if (!VALID_STATUSES.has(fields.status)) {
-        throw Object.assign(new Error(`Invalid step status: "${fields.status}". Valid: ${[...VALID_STATUSES].join(', ')}`), { status: 400 });
+        throw Object.assign(new Error(`Invalid task status: "${fields.status}". Valid: ${[...VALID_STATUSES].join(', ')}`), { status: 400 });
       }
       if (fields.status === 'in_progress') { sets.push('started_at = COALESCE(started_at, ?)'); vals.push(now()); }
       if (['done', 'cancelled'].includes(fields.status)) { sets.push('completed_at = ?'); vals.push(now()); }
     }
-    if (sets.length === 0) return steps.get(id);
+    if (sets.length === 0) return tasks.get(id);
     vals.push(id);
-    db.prepare(`UPDATE steps SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
 
     // Auto run management
     if ('status' in fields) {
@@ -409,16 +420,16 @@ export const steps = {
       const agent = fields._agent || fields.assignee || 'main';
 
       if (fields.status === 'in_progress') {
-        // Start a new run if none active for this step
-        const existing = runs.list({ step_id: id }).find(r => !r.ended_at);
+        // Start a new run if none active for this task
+        const existing = runs.list({ task_id: id }).find(r => !r.ended_at);
         if (!existing) {
-          runs.create({ step_id: id, session_id: sessionId, agent });
+          runs.create({ task_id: id, session_id: sessionId, agent });
         }
       }
       if (['done', 'cancelled'].includes(fields.status)) {
-        // Finish all active runs for this step
+        // Finish all active runs for this task
         const result = fields.status === 'done' ? 'success' : fields.status;
-        for (const r of runs.list({ step_id: id })) {
+        for (const r of runs.list({ task_id: id })) {
           if (!r.ended_at) {
             runs.finish(r.id, { result, notes: null });
           }
@@ -427,17 +438,17 @@ export const steps = {
     }
 
     // Record activity log for tracked fields
-    if (oldStep) {
-      const actor = fields._agent || fields.assignee || oldStep.assignee || 'system';
-      for (const k of ['status', 'assignee', 'priority', 'bolt_id', 'phase_id']) {
-        if (k in fields && String(fields[k]) !== String(oldStep[k])) {
+    if (oldTask) {
+      const actor = fields._agent || fields.assignee || oldTask.assignee || 'system';
+      for (const k of ['status', 'assignee', 'priority', 'cycle_id', 'unit_id']) {
+        if (k in fields && String(fields[k]) !== String(oldTask[k])) {
           try {
             activityLog.record({
-              entity_type: 'step',
+              entity_type: 'task',
               entity_id: id,
               action: k === 'status' ? 'status_change' : 'updated',
               field: k,
-              old_value: oldStep[k] != null ? String(oldStep[k]) : null,
+              old_value: oldTask[k] != null ? String(oldTask[k]) : null,
               new_value: fields[k] != null ? String(fields[k]) : null,
               actor,
             });
@@ -446,43 +457,84 @@ export const steps = {
       }
     }
 
-    // Enforce: in_progress requires active plan + active bolt
+    // Enforce: in_progress requires active plan + active cycle
     if ('status' in fields && fields.status === 'in_progress') {
-      const updatedStep = steps.get(id);
-      if (updatedStep) {
+      const updatedTask = tasks.get(id);
+      if (updatedTask) {
         // Check plan is active
-        const phase = phases.get(updatedStep.phase_id);
-        if (phase) {
-          const plan = plans.get(phase.plan_id);
+        const unit = units.get(updatedTask.unit_id);
+        if (unit) {
+          const plan = plans.get(unit.plan_id);
           if (plan && plan.status !== 'active') {
             throw Object.assign(new Error(
-              `Cannot start step: plan "${plan.title}" is ${plan.status}. Approve it first: lattice plan approve ${plan.id}`
+              `Cannot start task: plan "${plan.title}" is ${plan.status}. Approve it first: clawket plan approve ${plan.id}`
             ), { status: 400 });
           }
+          // Auto-promote unit: pending → active when a task starts
+          if (unit.status === 'pending') {
+            units.update(updatedTask.unit_id, { status: 'active' });
+          }
         }
-        // Check bolt is assigned and active
-        if (!updatedStep.bolt_id) {
+        // Check cycle is assigned and active
+        if (!updatedTask.cycle_id) {
           throw Object.assign(new Error(
-            `Cannot start step: no bolt assigned. Assign to a bolt first: lattice step update ${id} --bolt <BOLT-ID>`
+            `Cannot start task: no cycle assigned. Assign to a cycle first: clawket task update ${id} --cycle <CYC-ID>`
           ), { status: 400 });
         }
-        const bolt = bolts.get(updatedStep.bolt_id);
-        if (bolt && bolt.status !== 'active') {
+        const cycle = cycles.get(updatedTask.cycle_id);
+        if (cycle && cycle.status !== 'active') {
           throw Object.assign(new Error(
-            `Cannot start step: bolt "${bolt.title}" is ${bolt.status}. Activate it first: lattice bolt activate ${bolt.id}`
+            `Cannot start task: cycle "${cycle.title}" is ${cycle.status}. Activate it first: clawket cycle activate ${cycle.id}`
           ), { status: 400 });
         }
       }
     }
 
-    return steps.get(id);
+    // Auto-cascade: terminal task → check unit/plan/cycle completion
+    if ('status' in fields && TERMINAL_TASK_STATUSES.has(fields.status)) {
+      const updatedTask = tasks.get(id);
+      if (updatedTask) {
+        // Unit auto-complete: all tasks in unit are terminal → unit completed
+        if (updatedTask.unit_id) {
+          const unitTasks = tasks.list({ unit_id: updatedTask.unit_id });
+          if (unitTasks.length > 0 && unitTasks.every(s => TERMINAL_TASK_STATUSES.has(s.status))) {
+            const unit = units.get(updatedTask.unit_id);
+            if (unit && unit.status !== 'completed') {
+              units.update(updatedTask.unit_id, { status: 'completed' });
+
+              // Plan auto-complete: all units in plan are completed → plan completed
+              const planUnits = units.list({ plan_id: unit.plan_id });
+              if (planUnits.length > 0 && planUnits.every(p => p.status === 'completed')) {
+                const plan = plans.get(unit.plan_id);
+                if (plan && plan.status === 'active') {
+                  plans.update(unit.plan_id, { status: 'completed' });
+                }
+              }
+            }
+          }
+        }
+
+        // Cycle auto-complete: all tasks in cycle are terminal → cycle completed
+        if (updatedTask.cycle_id) {
+          const cycleTasks = cycles.tasks(updatedTask.cycle_id);
+          if (cycleTasks.length > 0 && cycleTasks.every(s => TERMINAL_TASK_STATUSES.has(s.status))) {
+            const cycle = cycles.get(updatedTask.cycle_id);
+            if (cycle && cycle.status === 'active') {
+              cycles.update(updatedTask.cycle_id, { status: 'completed' });
+            }
+          }
+        }
+      }
+    }
+
+    return tasks.get(id);
   },
   delete(id) {
-    getDb().prepare(`DELETE FROM steps WHERE id = ?`).run(id);
+    getDb().prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
   },
-  /** Bulk update multiple steps with the same fields. Returns updated steps. */
+  /** Bulk update multiple tasks with the same fields. Returns updated tasks. */
   bulkUpdate(ids, fields) {
-    return ids.map(id => steps.update(id, fields));
+    return ids.map(id => tasks.update(id, fields));
   },
   search(query, { limit = 20, mode = 'keyword' } = {}) {
     const db = getDb();
@@ -493,8 +545,8 @@ export const steps = {
         ? query
         : query.split(/\s+/).filter(Boolean).map(t => t + '*').join(' ');
       const ftsResults = db.prepare(
-        `SELECT s.* FROM steps_fts f JOIN steps s ON s.rowid = f.rowid
-         WHERE steps_fts MATCH ? ORDER BY rank LIMIT ?`
+        `SELECT s.* FROM tasks_fts f JOIN tasks s ON s.rowid = f.rowid
+         WHERE tasks_fts MATCH ? ORDER BY rank LIMIT ?`
       ).all(ftsQuery, limit);
 
       if (mode === 'keyword') return ftsResults;
@@ -511,91 +563,91 @@ export const steps = {
     const db = getDb();
     try {
       const rows = db.prepare(
-        `SELECT step_id, distance FROM vec_steps
+        `SELECT task_id, distance FROM vec_tasks
          WHERE embedding MATCH ? ORDER BY distance LIMIT ?`
       ).all(new Float32Array(queryEmbedding), limit);
       return rows.map(r => {
-        const step = steps.get(r.step_id);
-        return step ? { ...step, _distance: r.distance } : null;
+        const task = tasks.get(r.task_id);
+        return task ? { ...task, _distance: r.distance } : null;
       }).filter(Boolean);
     } catch {
       return [];
     }
   },
-  /** Store embedding for a step */
-  storeEmbedding(stepId, embedding) {
+  /** Store embedding for a task */
+  storeEmbedding(taskId, embedding) {
     const db = getDb();
     try {
-      db.prepare(`INSERT OR REPLACE INTO vec_steps (step_id, embedding) VALUES (?, ?)`).run(stepId, new Float32Array(embedding));
+      db.prepare(`INSERT OR REPLACE INTO vec_tasks (task_id, embedding) VALUES (?, ?)`).run(taskId, new Float32Array(embedding));
     } catch { /* vec not available */ }
   },
   addLabel(id, label) {
     const db = getDb();
-    db.prepare(`INSERT OR IGNORE INTO step_labels (step_id, label) VALUES (?, ?)`).run(id, label.toLowerCase().trim());
-    return steps.get(id);
+    db.prepare(`INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)`).run(id, label.toLowerCase().trim());
+    return tasks.get(id);
   },
   removeLabel(id, label) {
     const db = getDb();
-    db.prepare(`DELETE FROM step_labels WHERE step_id = ? AND label = ?`).run(id, label.toLowerCase().trim());
-    return steps.get(id);
+    db.prepare(`DELETE FROM task_labels WHERE task_id = ? AND label = ?`).run(id, label.toLowerCase().trim());
+    return tasks.get(id);
   },
   listByLabel(label) {
     const db = getDb();
     return db.prepare(
-      `SELECT s.* FROM steps s JOIN step_labels l ON l.step_id = s.id WHERE l.label = ? ORDER BY s.phase_id, s.idx`
+      `SELECT s.* FROM tasks s JOIN task_labels l ON l.task_id = s.id WHERE l.label = ? ORDER BY s.unit_id, s.idx`
     ).all(label.toLowerCase().trim());
   },
 };
 
-// -------- Step Relations --------
+// -------- Task Relations --------
 
-export const stepRelations = {
-  create({ source_step_id, target_step_id, relation_type }) {
+export const taskRelations = {
+  create({ source_task_id, target_task_id, relation_type }) {
     const db = getDb();
     const id = newId('REL');
     const ts = now();
     db.prepare(
-      `INSERT INTO step_relations (id, source_step_id, target_step_id, relation_type, created_at)
+      `INSERT INTO task_relations (id, source_task_id, target_task_id, relation_type, created_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).run(id, source_step_id, target_step_id, relation_type, ts);
-    return { id, source_step_id, target_step_id, relation_type, created_at: ts };
+    ).run(id, source_task_id, target_task_id, relation_type, ts);
+    return { id, source_task_id, target_task_id, relation_type, created_at: ts };
   },
-  list({ step_id = null, relation_type = null } = {}) {
+  list({ task_id = null, relation_type = null } = {}) {
     const db = getDb();
     const where = [];
     const vals = [];
-    if (step_id) {
-      where.push('(source_step_id = ? OR target_step_id = ?)');
-      vals.push(step_id, step_id);
+    if (task_id) {
+      where.push('(source_task_id = ? OR target_task_id = ?)');
+      vals.push(task_id, task_id);
     }
     if (relation_type) { where.push('relation_type = ?'); vals.push(relation_type); }
-    const sql = `SELECT * FROM step_relations ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
+    const sql = `SELECT * FROM task_relations ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
     return db.prepare(sql).all(...vals);
   },
   delete(id) {
-    getDb().prepare(`DELETE FROM step_relations WHERE id = ?`).run(id);
+    getDb().prepare(`DELETE FROM task_relations WHERE id = ?`).run(id);
   },
 };
 
-// -------- Bolts (Sprint / AIDLC Bolt cycle) --------
+// -------- Cycles (Sprint / AIDLC Cycle) --------
 
-export const bolts = {
+export const cycles = {
   create({ project_id, title, goal = null, idx = null }) {
     if (!project_id) {
       throw Object.assign(new Error('project_id is required'), { status: 400 });
     }
     const db = getDb();
-    const id = newId('BOLT');
+    const id = newId('CYC');
     const ts = now();
-    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM bolts WHERE project_id = ?`).get(project_id).next);
+    const finalIdx = idx ?? (db.prepare(`SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM cycles WHERE project_id = ?`).get(project_id).next);
     db.prepare(
-      `INSERT INTO bolts (id, project_id, title, goal, idx, created_at, status)
+      `INSERT INTO cycles (id, project_id, title, goal, idx, created_at, status)
        VALUES (?, ?, ?, ?, ?, ?, 'planning')`
     ).run(id, project_id, title, goal, finalIdx, ts);
-    return bolts.get(id);
+    return cycles.get(id);
   },
   get(id) {
-    return getDb().prepare(`SELECT * FROM bolts WHERE id = ?`).get(id) ?? null;
+    return getDb().prepare(`SELECT * FROM cycles WHERE id = ?`).get(id) ?? null;
   },
   list({ project_id = null, status = null } = {}) {
     const db = getDb();
@@ -603,7 +655,7 @@ export const bolts = {
     const vals = [];
     if (project_id) { where.push('project_id = ?'); vals.push(project_id); }
     if (status) { where.push('status = ?'); vals.push(status); }
-    const sql = `SELECT * FROM bolts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY idx`;
+    const sql = `SELECT * FROM cycles ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY idx`;
     return db.prepare(sql).all(...vals);
   },
   update(id, fields) {
@@ -611,7 +663,7 @@ export const bolts = {
     if ('status' in fields) {
       const VALID = new Set(['planning', 'active', 'completed']);
       if (!VALID.has(fields.status)) {
-        throw Object.assign(new Error(`Invalid bolt status: "${fields.status}". Valid: ${[...VALID].join(', ')}`), { status: 400 });
+        throw Object.assign(new Error(`Invalid cycle status: "${fields.status}". Valid: ${[...VALID].join(', ')}`), { status: 400 });
       }
     }
     const allowed = ['title', 'goal', 'status'];
@@ -621,88 +673,88 @@ export const bolts = {
       if (k in fields) { sets.push(`${k} = ?`); vals.push(fields[k]); }
     }
     if ('status' in fields) {
-      // Completed bolts cannot be restarted — create a new bolt instead
-      const currentBolt = bolts.get(id);
-      if (currentBolt && currentBolt.status === 'completed' && fields.status !== 'completed') {
+      // Completed cycles cannot be restarted — create a new cycle instead
+      const currentCycle = cycles.get(id);
+      if (currentCycle && currentCycle.status === 'completed' && fields.status !== 'completed') {
         throw Object.assign(new Error(
-          `Bolt "${currentBolt.title}" is completed and cannot be restarted. Create a new bolt instead.`
+          `Cycle "${currentCycle.title}" is completed and cannot be restarted. Create a new cycle instead.`
         ), { status: 400 });
       }
       if (fields.status === 'active') { sets.push('started_at = COALESCE(started_at, ?)'); vals.push(now()); }
       if (fields.status === 'completed') { sets.push('ended_at = ?'); vals.push(now()); }
     }
-    if (sets.length === 0) return bolts.get(id);
+    if (sets.length === 0) return cycles.get(id);
     vals.push(id);
-    db.prepare(`UPDATE bolts SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-    return bolts.get(id);
+    db.prepare(`UPDATE cycles SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return cycles.get(id);
   },
   delete(id) {
-    // Unassign steps from this bolt before deleting
-    getDb().prepare(`UPDATE steps SET bolt_id = NULL WHERE bolt_id = ?`).run(id);
-    getDb().prepare(`DELETE FROM bolts WHERE id = ?`).run(id);
+    // Unassign tasks from this cycle before deleting
+    getDb().prepare(`UPDATE tasks SET cycle_id = NULL WHERE cycle_id = ?`).run(id);
+    getDb().prepare(`DELETE FROM cycles WHERE id = ?`).run(id);
   },
-  /** List steps assigned to this bolt. */
-  steps(id) {
-    return getDb().prepare(`SELECT * FROM steps WHERE bolt_id = ? ORDER BY idx`).all(id);
+  /** List tasks assigned to this cycle. */
+  tasks(id) {
+    return getDb().prepare(`SELECT * FROM tasks WHERE cycle_id = ? ORDER BY idx`).all(id);
   },
-  /** List backlog steps (not assigned to any bolt) for a project. */
+  /** List backlog tasks (not assigned to any cycle) for a project. */
   backlog(project_id) {
     return getDb().prepare(
-      `SELECT s.* FROM steps s
-       JOIN phases ph ON ph.id = s.phase_id
+      `SELECT s.* FROM tasks s
+       JOIN units ph ON ph.id = s.unit_id
        JOIN plans pl ON pl.id = ph.plan_id
-       WHERE pl.project_id = ? AND s.bolt_id IS NULL
+       WHERE pl.project_id = ? AND s.cycle_id IS NULL
        ORDER BY s.created_at`
     ).all(project_id);
   },
 };
 
-// -------- Step Comments --------
-export const stepComments = {
-  create({ step_id, author, body }) {
+// -------- Task Comments --------
+export const taskComments = {
+  create({ task_id, author, body }) {
     const db = getDb();
     const id = newId('CMT');
     const ts = now();
     db.prepare(
-      `INSERT INTO step_comments (id, step_id, author, body, created_at)
+      `INSERT INTO task_comments (id, task_id, author, body, created_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).run(id, step_id, author, body, ts);
-    return stepComments.get(id);
+    ).run(id, task_id, author, body, ts);
+    return taskComments.get(id);
   },
   get(id) {
-    return getDb().prepare(`SELECT * FROM step_comments WHERE id = ?`).get(id) ?? null;
+    return getDb().prepare(`SELECT * FROM task_comments WHERE id = ?`).get(id) ?? null;
   },
-  list({ step_id }) {
+  list({ task_id }) {
     return getDb().prepare(
-      `SELECT * FROM step_comments WHERE step_id = ? ORDER BY created_at ASC`
-    ).all(step_id);
+      `SELECT * FROM task_comments WHERE task_id = ? ORDER BY created_at ASC`
+    ).all(task_id);
   },
   delete(id) {
-    getDb().prepare(`DELETE FROM step_comments WHERE id = ?`).run(id);
+    getDb().prepare(`DELETE FROM task_comments WHERE id = ?`).run(id);
   },
 };
 
 // -------- Artifacts --------
 export const artifacts = {
-  create({ step_id = null, phase_id = null, plan_id = null, type, title, content = '', content_format = 'md', parent_id = null, scope = 'reference' }) {
+  create({ task_id = null, unit_id = null, plan_id = null, type, title, content = '', content_format = 'md', parent_id = null, scope = 'reference' }) {
     const db = getDb();
     const id = newId('ART');
     const ts = now();
     db.prepare(
-      `INSERT INTO artifacts (id, step_id, phase_id, plan_id, type, title, content, content_format, created_at, parent_id, scope)
+      `INSERT INTO artifacts (id, task_id, unit_id, plan_id, type, title, content, content_format, created_at, parent_id, scope)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, step_id, phase_id, plan_id, type, title, content, content_format, ts, parent_id, scope);
+    ).run(id, task_id, unit_id, plan_id, type, title, content, content_format, ts, parent_id, scope);
     return artifacts.get(id);
   },
   get(id) {
     return getDb().prepare(`SELECT * FROM artifacts WHERE id = ?`).get(id) ?? null;
   },
-  list({ step_id = null, phase_id = null, plan_id = null, type = null } = {}) {
+  list({ task_id = null, unit_id = null, plan_id = null, type = null } = {}) {
     const db = getDb();
     const where = [];
     const vals = [];
-    if (step_id) { where.push('step_id = ?'); vals.push(step_id); }
-    if (phase_id) { where.push('phase_id = ?'); vals.push(phase_id); }
+    if (task_id) { where.push('task_id = ?'); vals.push(task_id); }
+    if (unit_id) { where.push('unit_id = ?'); vals.push(unit_id); }
     if (plan_id) { where.push('plan_id = ?'); vals.push(plan_id); }
     if (type) { where.push('type = ?'); vals.push(type); }
     const sql = `SELECT * FROM artifacts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
@@ -794,24 +846,24 @@ export const artifactVersions = {
 
 // -------- Runs --------
 export const runs = {
-  create({ step_id, session_id = null, agent = 'main' }) {
+  create({ task_id, session_id = null, agent = 'main' }) {
     const db = getDb();
     const id = newId('RUN');
     db.prepare(
-      `INSERT INTO runs (id, step_id, session_id, agent, started_at) VALUES (?, ?, ?, ?, ?)`
-    ).run(id, step_id, session_id, agent, now());
+      `INSERT INTO runs (id, task_id, session_id, agent, started_at) VALUES (?, ?, ?, ?, ?)`
+    ).run(id, task_id, session_id, agent, now());
     return runs.get(id);
   },
   get(id) {
     return getDb().prepare(`SELECT * FROM runs WHERE id = ?`).get(id) ?? null;
   },
-  list({ step_id = null, session_id = null, project_id = null } = {}) {
+  list({ task_id = null, session_id = null, project_id = null } = {}) {
     const db = getDb();
     if (project_id) {
-      // Join through steps → phases → plans to filter by project
+      // Join through tasks → units → plans to filter by project
       const sql = `SELECT r.* FROM runs r
-        JOIN steps s ON r.step_id = s.id
-        JOIN phases ph ON s.phase_id = ph.id
+        JOIN tasks s ON r.task_id = s.id
+        JOIN units ph ON s.unit_id = ph.id
         JOIN plans pl ON ph.plan_id = pl.id
         WHERE pl.project_id = ?
         ORDER BY r.started_at DESC`;
@@ -819,7 +871,7 @@ export const runs = {
     }
     const where = [];
     const vals = [];
-    if (step_id) { where.push('step_id = ?'); vals.push(step_id); }
+    if (task_id) { where.push('task_id = ?'); vals.push(task_id); }
     if (session_id) { where.push('session_id = ?'); vals.push(session_id); }
     const sql = `SELECT * FROM runs ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY started_at DESC`;
     return db.prepare(sql).all(...vals);
@@ -856,7 +908,7 @@ export const activityLog = {
 
 export const timeline = {
   /**
-   * Unified timeline for a project — aggregates activity_log, step_comments,
+   * Unified timeline for a project — aggregates activity_log, task_comments,
    * artifacts, runs, and questions into a single chronological feed.
    */
   list({ project_id, limit = 100, offset = 0, types = null }) {
@@ -866,7 +918,7 @@ export const timeline = {
     const parts = [];
     const allVals = [];
 
-    // 1) activity_log → steps → phases → plans → project
+    // 1) activity_log → tasks → units → plans → project
     if (!typeSet || typeSet.has('status_change') || typeSet.has('created') || typeSet.has('updated') || typeSet.has('assignment')) {
       parts.push(`
         SELECT
@@ -889,22 +941,22 @@ export const timeline = {
           NULL AS detail_duration_ms,
           NULL AS detail_result
         FROM activity_log al
-        LEFT JOIN steps s ON al.entity_type = 'step' AND al.entity_id = s.id
-        LEFT JOIN phases ph ON s.phase_id = ph.id
+        LEFT JOIN tasks s ON al.entity_type = 'task' AND al.entity_id = s.id
+        LEFT JOIN units ph ON s.unit_id = ph.id
         LEFT JOIN plans pl ON ph.plan_id = pl.id
         WHERE pl.project_id = ?
       `);
       allVals.push(project_id);
     }
 
-    // 2) step_comments
+    // 2) task_comments
     if (!typeSet || typeSet.has('comment')) {
       parts.push(`
         SELECT
           cmt.id,
           'comment' AS event_type,
-          'step' AS entity_type,
-          cmt.step_id AS entity_id,
+          'task' AS entity_type,
+          cmt.task_id AS entity_id,
           COALESCE(s.title, '') AS entity_title,
           cmt.author AS actor,
           cmt.created_at,
@@ -916,23 +968,23 @@ export const timeline = {
           NULL AS detail_agent,
           NULL AS detail_duration_ms,
           NULL AS detail_result
-        FROM step_comments cmt
-        JOIN steps s ON cmt.step_id = s.id
-        JOIN phases ph ON s.phase_id = ph.id
+        FROM task_comments cmt
+        JOIN tasks s ON cmt.task_id = s.id
+        JOIN units ph ON s.unit_id = ph.id
         JOIN plans pl ON ph.plan_id = pl.id
         WHERE pl.project_id = ?
       `);
       allVals.push(project_id);
     }
 
-    // 3) artifacts (step/phase/plan level)
+    // 3) artifacts (task/unit/plan level)
     if (!typeSet || typeSet.has('artifact')) {
       parts.push(`
         SELECT
           art.id,
           'artifact' AS event_type,
-          'step' AS entity_type,
-          COALESCE(art.step_id, art.phase_id, art.plan_id) AS entity_id,
+          'task' AS entity_type,
+          COALESCE(art.task_id, art.unit_id, art.plan_id) AS entity_id,
           COALESCE(s.title, ph2.title, pl2.title, '') AS entity_title,
           NULL AS actor,
           art.created_at,
@@ -945,10 +997,10 @@ export const timeline = {
           NULL AS detail_duration_ms,
           NULL AS detail_result
         FROM artifacts art
-        LEFT JOIN steps s ON art.step_id = s.id
-        LEFT JOIN phases ph ON s.phase_id = ph.id
+        LEFT JOIN tasks s ON art.task_id = s.id
+        LEFT JOIN units ph ON s.unit_id = ph.id
         LEFT JOIN plans pl ON ph.plan_id = pl.id
-        LEFT JOIN phases ph2 ON art.phase_id = ph2.id
+        LEFT JOIN units ph2 ON art.unit_id = ph2.id
         LEFT JOIN plans pl2 ON COALESCE(ph2.plan_id, art.plan_id) = pl2.id
         WHERE COALESCE(pl.project_id, pl2.project_id) = ?
       `);
@@ -961,8 +1013,8 @@ export const timeline = {
         SELECT
           r.id || ':start' AS id,
           'run_start' AS event_type,
-          'step' AS entity_type,
-          r.step_id AS entity_id,
+          'task' AS entity_type,
+          r.task_id AS entity_id,
           COALESCE(s.title, '') AS entity_title,
           r.agent AS actor,
           r.started_at AS created_at,
@@ -975,8 +1027,8 @@ export const timeline = {
           NULL AS detail_duration_ms,
           NULL AS detail_result
         FROM runs r
-        JOIN steps s ON r.step_id = s.id
-        JOIN phases ph ON s.phase_id = ph.id
+        JOIN tasks s ON r.task_id = s.id
+        JOIN units ph ON s.unit_id = ph.id
         JOIN plans pl ON ph.plan_id = pl.id
         WHERE pl.project_id = ?
       `);
@@ -986,8 +1038,8 @@ export const timeline = {
         SELECT
           r.id || ':end' AS id,
           'run_end' AS event_type,
-          'step' AS entity_type,
-          r.step_id AS entity_id,
+          'task' AS entity_type,
+          r.task_id AS entity_id,
           COALESCE(s.title, '') AS entity_title,
           r.agent AS actor,
           r.ended_at AS created_at,
@@ -1000,8 +1052,8 @@ export const timeline = {
           (r.ended_at - r.started_at) AS detail_duration_ms,
           r.result AS detail_result
         FROM runs r
-        JOIN steps s ON r.step_id = s.id
-        JOIN phases ph ON s.phase_id = ph.id
+        JOIN tasks s ON r.task_id = s.id
+        JOIN units ph ON s.unit_id = ph.id
         JOIN plans pl ON ph.plan_id = pl.id
         WHERE pl.project_id = ? AND r.ended_at IS NOT NULL
       `);
@@ -1015,11 +1067,11 @@ export const timeline = {
           q.id,
           'question' AS event_type,
           CASE
-            WHEN q.step_id IS NOT NULL THEN 'step'
-            WHEN q.phase_id IS NOT NULL THEN 'phase'
+            WHEN q.task_id IS NOT NULL THEN 'task'
+            WHEN q.unit_id IS NOT NULL THEN 'unit'
             ELSE 'plan'
           END AS entity_type,
-          COALESCE(q.step_id, q.phase_id, q.plan_id) AS entity_id,
+          COALESCE(q.task_id, q.unit_id, q.plan_id) AS entity_id,
           COALESCE(s.title, ph2.title, pl2.title, '') AS entity_title,
           q.asked_by AS actor,
           q.created_at,
@@ -1032,10 +1084,10 @@ export const timeline = {
           NULL AS detail_duration_ms,
           NULL AS detail_result
         FROM questions q
-        LEFT JOIN steps s ON q.step_id = s.id
-        LEFT JOIN phases ph ON s.phase_id = ph.id
+        LEFT JOIN tasks s ON q.task_id = s.id
+        LEFT JOIN units ph ON s.unit_id = ph.id
         LEFT JOIN plans pl ON ph.plan_id = pl.id
-        LEFT JOIN phases ph2 ON q.phase_id = ph2.id
+        LEFT JOIN units ph2 ON q.unit_id = ph2.id
         LEFT JOIN plans pl2 ON COALESCE(ph2.plan_id, q.plan_id) = pl2.id
         WHERE COALESCE(pl.project_id, pl2.project_id) = ?
       `);
