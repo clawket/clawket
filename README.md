@@ -26,7 +26,7 @@ Clawket fixes this with a persistent database, 6 lifecycle hooks, and a web dash
 - **Web Dashboard** — Summary, Plans, Board (Kanban), Backlog, Timeline, Wiki — 6 views
 - **Agent Swimlane Timeline** — Per-agent horizontal bar chart with concurrent work visualization
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for cycle assignment
-- **Wiki** — File tree navigation with configurable paths, artifact versioning, local RAG
+- **Wiki** — File tree navigation with configurable paths, artifact versioning, hybrid search (FTS5 + sqlite-vec) over artifacts
 - **Hook Guardrails** — Blocks work without active task, injects project context per session
 - **Ticket Numbers** — Human-readable IDs (CK-1, CK-2) with token-optimized output
 - **CLI + Web** — Both LLM (CLI) and human (web UI) can manage all entities
