@@ -164,7 +164,7 @@ export function approvePlan(id: string): Promise<Plan> {
 }
 
 // ---------------------------------------------------------------------------
-// Cycles (Sprint / AIDLC Cycle)
+// Cycles (Sprint — time-boxed iteration, cross-cutting)
 // ---------------------------------------------------------------------------
 
 export function listCycles(params?: {

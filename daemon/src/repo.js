@@ -407,7 +407,8 @@ export const tasks = {
     }
     id = canonical;
 
-    const allowed = ['title', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_task_id', 'cycle_id', 'unit_id', 'reporter', 'type', 'agent_id'];
+    const allowed = ['title', 'body', 'status', 'assignee', 'priority', 'complexity', 'estimated_edits', 'parent_task_id', 'cycle_id', 'unit_id', 'reporter', 'type', 'agent_id'];
+    const nullable = new Set(['cycle_id', 'parent_task_id', 'assignee', 'agent_id', 'complexity', 'estimated_edits', 'reporter', 'body']);
     const sets = [];
     const vals = [];
 
@@ -416,8 +417,11 @@ export const tasks = {
 
     for (const k of allowed) {
       if (k in fields) {
+        let v = fields[k];
+        // Normalize empty string to null for nullable FK/text fields (enables detach-to-backlog via CLI)
+        if (v === '' && nullable.has(k)) v = null;
         sets.push(`${k} = ?`);
-        vals.push(fields[k]);
+        vals.push(v);
       }
     }
     if ('status' in fields) {
@@ -654,7 +658,7 @@ export const taskRelations = {
   },
 };
 
-// -------- Cycles (Sprint / AIDLC Cycle) --------
+// -------- Cycles (Sprint — time-boxed iteration, cross-cutting) --------
 
 export const cycles = {
   create({ project_id, title, goal = null, idx = null }) {

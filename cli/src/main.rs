@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use serde_json::json;
 
 #[derive(Parser)]
-#[command(name = "clawket", about = "LLM-native work management CLI for Claude Code.\n\nWorkflow: Project → Plan (approve) → Unit → Task (backlog) → Cycle (activate) → Start\n\nPlan must be approved (draft → active) before tasks can be started.\nTasks can be created without a cycle (goes to backlog).\nStarting a task (in_progress) requires an assigned active cycle.\nCycle must be activated (planning → active) before tasks can be started.\nUnit is a pure grouping entity with no status.\nTask is the only entity managed directly: todo → in_progress → done/cancelled.\nCompleted cycles cannot be restarted — create a new one.\n\nQuick start:\n  clawket project create \"my-app\" --cwd .\n  clawket plan create --project PROJ-my-app \"MVP\"\n  clawket plan approve PLAN-xxx\n  clawket unit create --plan PLAN-xxx \"Unit 1\"\n  clawket task create \"Build login\" --assignee main          # goes to backlog\n  clawket cycle create --project PROJ-my-app \"Sprint 1\"\n  clawket cycle activate CYC-xxx\n  clawket task update TASK-xxx --cycle CYC-xxx             # assign to cycle\n  clawket task update TASK-xxx --status in_progress\n  clawket task update TASK-xxx --status done")]
+#[command(name = "clawket", version, about = "LLM-native work management CLI for Claude Code.\n\nWorkflow: Project → Plan (approve) → Unit → Task (backlog) → Cycle (activate) → Start\n\nPlan must be approved (draft → active) before tasks can be started.\nTasks can be created without a cycle (goes to backlog).\nStarting a task (in_progress) requires an assigned active cycle.\nCycle must be activated (planning → active) before tasks can be started.\nUnit is a pure grouping entity with no status.\nTask is the only entity managed directly: todo → in_progress → done/cancelled.\nCompleted cycles cannot be restarted — create a new one.\n\nQuick start:\n  clawket project create \"my-app\" --cwd .\n  clawket plan create --project PROJ-my-app \"MVP\"\n  clawket plan approve PLAN-xxx\n  clawket unit create --plan PLAN-xxx \"Unit 1\"\n  clawket task create \"Build login\" --assignee main          # goes to backlog\n  clawket cycle create --project PROJ-my-app \"Sprint 1\"\n  clawket cycle activate CYC-xxx\n  clawket task update TASK-xxx --cycle CYC-xxx             # assign to cycle\n  clawket task update TASK-xxx --status in_progress\n  clawket task update TASK-xxx --status done")]
 struct Cli {
     /// Output format: json (default), table, yaml
     #[arg(long, global = true, default_value = "json")]
@@ -95,9 +95,13 @@ enum Command {
 // ========== Daemon ==========
 #[derive(Subcommand)]
 pub enum DaemonAction {
+    /// Start the clawketd daemon in the background (HTTP on localhost:19400 + Unix socket)
     Start,
+    /// Stop the running clawketd daemon
     Stop,
+    /// Show daemon status (PID, uptime, version)
     Status,
+    /// Restart the daemon (stop + start)
     Restart,
 }
 
@@ -119,14 +123,20 @@ enum ProjectAction {
         key: Option<String>,
     },
     /// View project details by ID
-    View { id: String },
+    View {
+        /// Project ID
+        id: String,
+    },
     /// List all projects
     List,
     /// Update project properties
     Update {
+        /// Project ID
         id: String,
+        /// New project name
         #[arg(long)]
         name: Option<String>,
+        /// New project description
         #[arg(long)]
         description: Option<String>,
         /// Wiki root paths as JSON array, e.g. '["docs","wiki","/absolute/path"]'
@@ -134,7 +144,10 @@ enum ProjectAction {
         wiki_paths: Option<String>,
     },
     /// Delete a project and all associated data
-    Delete { id: String },
+    Delete {
+        /// Project ID
+        id: String,
+    },
     /// Manage working directories for a project
     Cwd {
         #[command(subcommand)]
@@ -189,7 +202,10 @@ enum PlanAction {
         source_path: Option<String>,
     },
     /// View plan details
-    View { id: String },
+    View {
+        /// Plan ID
+        id: String,
+    },
     /// List plans with optional filters
     List {
         /// Filter by project ID
@@ -201,9 +217,12 @@ enum PlanAction {
     },
     /// Update plan properties. Status: draft, active, completed
     Update {
+        /// Plan ID
         id: String,
+        /// New plan title
         #[arg(long)]
         title: Option<String>,
+        /// New plan description
         #[arg(long)]
         description: Option<String>,
         /// Plan status: draft, active, completed. Use 'approve' command for draft → active.
@@ -211,19 +230,34 @@ enum PlanAction {
         status: Option<String>,
     },
     /// Delete a plan
-    Delete { id: String },
+    Delete {
+        /// Plan ID
+        id: String,
+    },
     /// Approve a draft plan (draft → active). Required before tasks can be started.
-    Approve { id: String },
+    Approve {
+        /// Plan ID
+        id: String,
+    },
+    /// Mark an active plan as completed (active → completed)
+    Complete {
+        /// Plan ID
+        id: String,
+    },
     /// Import a plan from a markdown file
     Import {
         /// Path to plan markdown file
         file: String,
+        /// Project name to attach the plan to (created if missing)
         #[arg(long)]
         project: Option<String>,
+        /// Working directory (used when project is omitted)
         #[arg(long)]
         cwd: Option<String>,
+        /// Source label recorded on the plan (default: "import")
         #[arg(long, default_value = "import")]
         source: String,
+        /// Preview the parsed plan without creating entities
         #[arg(long)]
         dry_run: bool,
     },
@@ -251,7 +285,10 @@ enum UnitAction {
         mode: String,
     },
     /// View unit details
-    View { id: String },
+    View {
+        /// Unit ID
+        id: String,
+    },
     /// List units with optional filters
     List {
         /// Filter by plan ID
@@ -260,9 +297,12 @@ enum UnitAction {
     },
     /// Update unit properties
     Update {
+        /// Unit ID
         id: String,
+        /// New unit title
         #[arg(long)]
         title: Option<String>,
+        /// Unit goal description
         #[arg(long)]
         goal: Option<String>,
         /// Execution mode: sequential or parallel (multi-agent)
@@ -270,7 +310,10 @@ enum UnitAction {
         mode: Option<String>,
     },
     /// Delete a unit
-    Delete { id: String },
+    Delete {
+        /// Unit ID
+        id: String,
+    },
 }
 
 // ========== Cycle ==========
@@ -293,7 +336,10 @@ enum CycleAction {
         idx: Option<i64>,
     },
     /// View cycle details
-    View { id: String },
+    View {
+        /// Cycle ID
+        id: String,
+    },
     /// List cycles with optional filters
     List {
         /// Filter by project ID
@@ -306,9 +352,12 @@ enum CycleAction {
     /// Update cycle properties. Status: planning, active, completed.
     /// Completed cycles cannot be restarted — create a new cycle instead.
     Update {
+        /// Cycle ID
         id: String,
+        /// New cycle title
         #[arg(long)]
         title: Option<String>,
+        /// Sprint goal
         #[arg(long)]
         goal: Option<String>,
         /// Status: planning, active, completed
@@ -316,11 +365,25 @@ enum CycleAction {
         status: Option<String>,
     },
     /// Delete a cycle (unassigns all tasks)
-    Delete { id: String },
+    Delete {
+        /// Cycle ID
+        id: String,
+    },
     /// Activate a planning cycle (planning → active). Required before tasks can be started.
-    Activate { id: String },
+    Activate {
+        /// Cycle ID
+        id: String,
+    },
+    /// Mark an active cycle as completed (active → completed). Cannot be restarted afterwards.
+    Complete {
+        /// Cycle ID
+        id: String,
+    },
     /// List tasks assigned to this cycle
-    Tasks { id: String },
+    Tasks {
+        /// Cycle ID
+        id: String,
+    },
     /// List backlog tasks (not assigned to any cycle) for a project
     Backlog {
         /// Project ID
@@ -332,7 +395,7 @@ enum CycleAction {
 // ========== Task ==========
 #[derive(Subcommand)]
 enum TaskAction {
-    /// Create a new task (atomic work unit). Requires unit and cycle.
+    /// Create a new task (atomic work unit). Unit and cycle are auto-inferred from the active plan/cycle if omitted.
     /// Status: todo → in_progress → done/cancelled. Blocked for external dependencies.
     Create {
         /// Task title describing the work
@@ -372,7 +435,10 @@ enum TaskAction {
         r#type: String,
     },
     /// View task details by ID
-    View { id: String },
+    View {
+        /// Task ID (TASK-ULID or ticket number like CK-285)
+        id: String,
+    },
     /// List tasks with optional filters
     List {
         /// Filter by unit ID
@@ -388,47 +454,66 @@ enum TaskAction {
         #[arg(long)]
         agent_id: Option<String>,
     },
-    /// Update task fields. Status values: todo, in_progress, blocked, done, cancelled
+    /// Update task fields. Status values: todo, in_progress, blocked, done, cancelled. Pass empty string ("") to --cycle to detach (move to backlog).
     Update {
+        /// Task ID (TASK-ULID or ticket number like CK-285)
         id: String,
+        /// New task title
         #[arg(long)]
         title: Option<String>,
+        /// Replace task body (markdown supported). Pass "" to clear.
+        #[arg(long, allow_hyphen_values = true)]
+        body: Option<String>,
         /// Status: todo, in_progress, blocked, done, cancelled
         #[arg(long)]
         status: Option<String>,
         /// Agent or person responsible
         #[arg(long)]
         assignee: Option<String>,
-        #[arg(long)]
+        #[arg(long, hide = true)]
         session_id: Option<String>,
-        #[arg(long, default_value = "main")]
+        #[arg(long, default_value = "main", hide = true)]
         agent: String,
         /// Priority: critical, high, medium, low
         #[arg(long)]
         priority: Option<String>,
+        /// Complexity estimate (freeform, e.g. "high", "3 files")
         #[arg(long)]
         complexity: Option<String>,
+        /// Estimated number of file edits
         #[arg(long)]
         estimated_edits: Option<i64>,
+        /// Parent task ID (for sub-tasks)
         #[arg(long)]
         parent_task: Option<String>,
+        /// Cycle ID. Pass "" to detach and move task to backlog.
         #[arg(long)]
         cycle: Option<String>,
         /// Claude Code agent_id (from SubagentStart hook)
-        #[arg(long)]
+        #[arg(long, hide = true)]
         agent_id: Option<String>,
         /// Add a comment along with the update
         #[arg(long, allow_hyphen_values = true)]
         comment: Option<String>,
     },
-    Delete { id: String },
-    AppendBody {
+    /// Delete a task (only allowed when its plan is still in draft)
+    Delete {
+        /// Task ID to delete
         id: String,
+    },
+    /// Append text to a task's body (does not replace existing content)
+    AppendBody {
+        /// Task ID
+        id: String,
+        /// Text to append to the body
         #[arg(long, allow_hyphen_values = true)]
         text: String,
     },
+    /// Search tasks by keyword (FTS5) across title and body
     Search {
+        /// Search query
         query: String,
+        /// Maximum number of results
         #[arg(long, default_value = "20")]
         limit: u32,
     },
@@ -437,37 +522,60 @@ enum TaskAction {
 // ========== Artifact ==========
 #[derive(Subcommand)]
 enum ArtifactAction {
+    /// Create a wiki artifact (document, decision, reference). Attach to at least one scope (task/unit/plan).
     Create {
+        /// Artifact title
         title: String,
+        /// Artifact type: doc, decision, reference, note, spec
         #[arg(long)]
         r#type: String,
+        /// Attach to task ID
         #[arg(long)]
         task: Option<String>,
+        /// Attach to unit ID
         #[arg(long)]
         unit: Option<String>,
+        /// Attach to plan ID
         #[arg(long)]
         plan: Option<String>,
+        /// Artifact content (markdown)
         #[arg(long, allow_hyphen_values = true)]
         content: Option<String>,
+        /// Content format: md (default), txt, code
         #[arg(long, default_value = "md")]
         content_format: String,
+        /// Parent artifact ID (for hierarchical wiki structure)
         #[arg(long)]
         parent: Option<String>,
     },
-    View { id: String },
+    /// View an artifact by ID
+    View {
+        /// Artifact ID
+        id: String,
+    },
+    /// List artifacts with optional filters
     List {
+        /// Filter by task ID
         #[arg(long)]
         task_id: Option<String>,
+        /// Filter by unit ID
         #[arg(long)]
         unit_id: Option<String>,
+        /// Filter by plan ID
         #[arg(long)]
         plan_id: Option<String>,
+        /// Filter by type
         #[arg(long)]
         r#type: Option<String>,
     },
-    Delete { id: String },
+    /// Delete an artifact by ID
+    Delete {
+        /// Artifact ID
+        id: String,
+    },
     /// Search wiki artifacts (FTS5 + vector hybrid)
     Search {
+        /// Search query
         query: String,
         /// Search mode: keyword | semantic | hybrid
         #[arg(long, default_value = "hybrid")]
@@ -475,6 +583,7 @@ enum ArtifactAction {
         /// Filter by scope: rag | reference | archive
         #[arg(long, default_value = "rag")]
         scope: String,
+        /// Maximum number of results
         #[arg(long, default_value = "20")]
         limit: u32,
     },
@@ -483,8 +592,10 @@ enum ArtifactAction {
         /// Working directory to scan docs/ from
         #[arg(long)]
         cwd: String,
+        /// Attach imported artifacts to this plan
         #[arg(long)]
         plan_id: Option<String>,
+        /// Attach imported artifacts to this unit
         #[arg(long)]
         unit_id: Option<String>,
         /// Scope for imported artifacts: rag | reference | archive
@@ -496,10 +607,13 @@ enum ArtifactAction {
     },
     /// Export Artifacts to docs/ directory
     Export {
+        /// Target working directory (writes to <cwd>/docs/)
         #[arg(long)]
         cwd: String,
+        /// Export only artifacts attached to this plan
         #[arg(long)]
         plan_id: Option<String>,
+        /// Export only artifacts attached to this unit
         #[arg(long)]
         unit_id: Option<String>,
     },
@@ -508,26 +622,41 @@ enum ArtifactAction {
 // ========== Run ==========
 #[derive(Subcommand)]
 enum RunAction {
+    /// Start a run record for a task (usually auto-created by hooks on task start)
     Start {
+        /// Task ID to start a run for
         #[arg(long)]
         task: String,
-        #[arg(long)]
+        /// Claude Code session ID (internal, from hook)
+        #[arg(long, hide = true)]
         session_id: Option<String>,
+        /// Agent executing the run
         #[arg(long, default_value = "main")]
         agent: String,
     },
+    /// Finish an active run with a result
     Finish {
+        /// Run ID
         id: String,
+        /// Result: success | failure | cancelled
         #[arg(long)]
         result: String,
+        /// Free-form notes about the run outcome
         #[arg(long, allow_hyphen_values = true)]
         notes: Option<String>,
     },
-    View { id: String },
+    /// View run details by ID
+    View {
+        /// Run ID
+        id: String,
+    },
+    /// List runs with optional filters
     List {
+        /// Filter by task ID
         #[arg(long)]
         task_id: Option<String>,
-        #[arg(long)]
+        /// Filter by session ID
+        #[arg(long, hide = true)]
         session_id: Option<String>,
     },
 }
@@ -535,36 +664,57 @@ enum RunAction {
 // ========== Question ==========
 #[derive(Subcommand)]
 enum QuestionAction {
+    /// Create a question requesting human clarification or decision
     Create {
+        /// Question body
         body: String,
+        /// Attach to plan ID
         #[arg(long)]
         plan: Option<String>,
+        /// Attach to unit ID
         #[arg(long)]
         unit: Option<String>,
+        /// Attach to task ID
         #[arg(long)]
         task: Option<String>,
+        /// Question kind: clarification | decision | blocker
         #[arg(long, default_value = "clarification")]
         kind: String,
+        /// Origin of the question: prompt | plan | review
         #[arg(long, default_value = "prompt")]
         origin: String,
+        /// Who asked the question
         #[arg(long, default_value = "main")]
         asked_by: String,
     },
+    /// Answer an open question
     Answer {
+        /// Question ID
         id: String,
+        /// Answer text
         #[arg(long, allow_hyphen_values = true)]
         text: String,
+        /// Who answered: human | main | <agent-name>
         #[arg(long, default_value = "human")]
         by: String,
     },
-    View { id: String },
+    /// View question details by ID
+    View {
+        /// Question ID
+        id: String,
+    },
+    /// List questions with optional filters
     List {
+        /// Filter by plan ID
         #[arg(long)]
         plan_id: Option<String>,
+        /// Filter by unit ID
         #[arg(long)]
         unit_id: Option<String>,
+        /// Filter by task ID
         #[arg(long)]
         task_id: Option<String>,
+        /// If true, show only unanswered questions
         #[arg(long)]
         pending: Option<bool>,
     },
@@ -573,19 +723,29 @@ enum QuestionAction {
 // ========== Comment ==========
 #[derive(Subcommand)]
 enum CommentAction {
+    /// Add a comment to a task (used for progress notes, decisions, status change rationale)
     Create {
+        /// Target task ID
         #[arg(long)]
         task: String,
+        /// Comment body (markdown supported)
         #[arg(long, allow_hyphen_values = true)]
         body: String,
+        /// Comment author (defaults to "main")
         #[arg(long, default_value = "main")]
         author: String,
     },
+    /// List comments for a task
     List {
+        /// Task ID
         #[arg(long)]
         task_id: String,
     },
-    Delete { id: String },
+    /// Delete a comment by ID
+    Delete {
+        /// Comment ID
+        id: String,
+    },
 }
 
 fn strip_nulls(val: &serde_json::Value) -> serde_json::Value {
@@ -845,6 +1005,9 @@ async fn main() -> Result<()> {
             PlanAction::Approve { id } => {
                 output(&client::request(&c, "POST", &format!("/plans/{id}/approve"), None).await?);
             }
+            PlanAction::Complete { id } => {
+                output(&client::request(&c, "PATCH", &format!("/plans/{id}"), Some(json!({"status": "completed"}))).await?);
+            }
             PlanAction::Import { file, project, cwd, source, dry_run } => {
                 output(&client::request(&c, "POST", "/plans/import", Some(json!({
                     "file": file, "project": project, "cwd": cwd, "source": source, "dryRun": dry_run,
@@ -918,6 +1081,9 @@ async fn main() -> Result<()> {
             CycleAction::Activate { id } => {
                 output(&client::request(&c, "POST", &format!("/cycles/{id}/activate"), None).await?);
             }
+            CycleAction::Complete { id } => {
+                output(&client::request(&c, "PATCH", &format!("/cycles/{id}"), Some(json!({"status": "completed"}))).await?);
+            }
             CycleAction::Tasks { id } => {
                 output(&client::get(&c, &format!("/cycles/{id}/tasks")).await?);
             }
@@ -945,20 +1111,21 @@ async fn main() -> Result<()> {
                 let qs = query_string(&[("unit_id", &unit_id), ("plan_id", &plan_id), ("status", &status), ("agent_id", &agent_id)]);
                 output(&client::get(&c, &format!("/tasks{qs}")).await?);
             }
-            TaskAction::Update { id, title, status, assignee, session_id, agent, priority, complexity, estimated_edits, parent_task, cycle, agent_id, comment } => {
-                let mut body = json!({});
-                if let Some(v) = title { body["title"] = json!(v); }
-                if let Some(v) = status { body["status"] = json!(v); }
-                if let Some(ref v) = assignee { body["assignee"] = json!(v); }
-                if let Some(v) = session_id { body["_session_id"] = json!(v); }
-                body["_agent"] = json!(agent);
-                if let Some(v) = priority { body["priority"] = json!(v); }
-                if let Some(v) = complexity { body["complexity"] = json!(v); }
-                if let Some(v) = estimated_edits { body["estimated_edits"] = json!(v); }
-                if let Some(v) = parent_task { body["parent_task_id"] = json!(v); }
-                if let Some(v) = cycle { body["cycle_id"] = json!(v); }
-                if let Some(v) = agent_id { body["agent_id"] = json!(v); }
-                output(&client::request(&c, "PATCH", &format!("/tasks/{id}"), Some(body)).await?);
+            TaskAction::Update { id, title, body: task_body, status, assignee, session_id, agent, priority, complexity, estimated_edits, parent_task, cycle, agent_id, comment } => {
+                let mut payload = json!({});
+                if let Some(v) = title { payload["title"] = json!(v); }
+                if let Some(v) = task_body { payload["body"] = json!(v); }
+                if let Some(v) = status { payload["status"] = json!(v); }
+                if let Some(ref v) = assignee { payload["assignee"] = json!(v); }
+                if let Some(v) = session_id { payload["_session_id"] = json!(v); }
+                payload["_agent"] = json!(agent);
+                if let Some(v) = priority { payload["priority"] = json!(v); }
+                if let Some(v) = complexity { payload["complexity"] = json!(v); }
+                if let Some(v) = estimated_edits { payload["estimated_edits"] = json!(v); }
+                if let Some(v) = parent_task { payload["parent_task_id"] = json!(v); }
+                if let Some(v) = cycle { payload["cycle_id"] = json!(v); }
+                if let Some(v) = agent_id { payload["agent_id"] = json!(v); }
+                output(&client::request(&c, "PATCH", &format!("/tasks/{id}"), Some(payload)).await?);
                 if let Some(text) = comment {
                     let author = assignee.as_deref().unwrap_or(&agent);
                     client::request(&c, "POST", &format!("/tasks/{id}/comments"), Some(json!({"task_id": id, "author": author, "body": text}))).await?;
