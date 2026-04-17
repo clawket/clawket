@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const http = require('http');
+const https = require('https');
 
 const {
   cacheDir,
@@ -15,6 +16,9 @@ const {
   writeJson,
 } = require('./common.cjs');
 const { buildSummary, parseInProgressTasks } = require('./session-context.cjs');
+
+const CLI_VERSION = process.env.CLAWKET_CLI_VERSION || 'v2.2.1';
+const CLI_REPO = process.env.CLAWKET_CLI_REPO || 'clawket/cli';
 
 function runtime(pluginRoot) {
   return {
@@ -49,36 +53,90 @@ function readOnlyBashPatterns() {
   ];
 }
 
-function installModule(modDir, label) {
-  const nodeModules = path.resolve(modDir, 'node_modules');
-  if (!fs.existsSync(path.resolve(modDir, 'package.json'))) return;
-  if (fs.existsSync(nodeModules)) return;
-  process.stderr.write(`[clawket] Installing ${label} dependencies...\n`);
-  const npmrc = path.resolve(modDir, '.npmrc');
-  if (!fs.existsSync(npmrc)) {
-    fs.writeFileSync(npmrc, 'node-linker=hoisted\n');
+function detectCliTarget() {
+  const platform = os.platform();
+  const arch = os.arch();
+  if (platform === 'darwin' && arch === 'x64') return 'x86_64-apple-darwin';
+  if (platform === 'darwin' && arch === 'arm64') return 'aarch64-apple-darwin';
+  if (platform === 'linux' && arch === 'x64') return 'x86_64-unknown-linux-gnu';
+  if (platform === 'linux' && arch === 'arm64') return 'aarch64-unknown-linux-gnu';
+  if (platform === 'win32') return 'x86_64-pc-windows-msvc';
+  throw new Error(`Unsupported platform: ${platform}/${arch}`);
+}
+
+function downloadToFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        file.close();
+        fs.unlinkSync(dest);
+        return downloadToFile(res.headers.location, dest).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) {
+        file.close();
+        fs.unlinkSync(dest);
+        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+      }
+      res.pipe(file);
+      file.on('finish', () => file.close(resolve));
+    }).on('error', (err) => {
+      fs.unlinkSync(dest);
+      reject(err);
+    });
+  });
+}
+
+async function ensureCliBinary(pluginRoot) {
+  const binDir = path.resolve(pluginRoot, 'bin');
+  const binName = os.platform() === 'win32' ? 'clawket.exe' : 'clawket';
+  const binPath = path.resolve(binDir, binName);
+  if (fs.existsSync(binPath)) return binPath;
+
+  fs.mkdirSync(binDir, { recursive: true });
+  const target = detectCliTarget();
+  const ext = os.platform() === 'win32' ? 'zip' : 'tar.gz';
+  const assetName = `clawket-${CLI_VERSION}-${target}.${ext}`;
+  const url = `https://github.com/${CLI_REPO}/releases/download/${CLI_VERSION}/${assetName}`;
+  const archive = path.resolve(binDir, assetName);
+
+  process.stderr.write(`[clawket-setup] Downloading CLI ${CLI_VERSION} for ${target}...\n`);
+  await downloadToFile(url, archive);
+  if (ext === 'tar.gz') {
+    exec(`tar -xzf "${archive}" -C "${binDir}"`);
+    const extracted = path.resolve(binDir, `clawket-${CLI_VERSION}-${target}`, 'clawket');
+    if (fs.existsSync(extracted)) {
+      fs.copyFileSync(extracted, binPath);
+      fs.chmodSync(binPath, 0o755);
+    }
+  } else {
+    exec(`cd "${binDir}" && unzip -o "${assetName}"`);
+    const extracted = path.resolve(binDir, `clawket-${CLI_VERSION}-${target}`, 'clawket.exe');
+    if (fs.existsSync(extracted)) fs.copyFileSync(extracted, binPath);
   }
+  fs.unlinkSync(archive);
+  process.stderr.write(`[clawket-setup] CLI installed at ${binPath}\n`);
+  return binPath;
+}
+
+function installNpmDeps(pluginRoot) {
+  if (!fs.existsSync(path.resolve(pluginRoot, 'package.json'))) return;
+  if (fs.existsSync(path.resolve(pluginRoot, 'node_modules'))) return;
+  process.stderr.write('[clawket-setup] Installing npm dependencies (@clawket/daemon, @clawket/mcp)...\n');
   try {
     exec('pnpm --version');
-    exec('pnpm install --prod', { cwd: modDir, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
-    process.stderr.write(`[clawket] ${label} dependencies installed (pnpm)\n`);
+    exec('pnpm install --prod', { cwd: pluginRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 180000 });
   } catch {
     try {
-      exec('npm install --production', { cwd: modDir, stdio: ['pipe', 'pipe', process.stderr], timeout: 120000 });
-      process.stderr.write(`[clawket] ${label} dependencies installed (npm)\n`);
+      exec('npm install --production', { cwd: pluginRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 180000 });
     } catch (error) {
-      process.stderr.write(`[clawket] ERROR: Failed to install ${label} dependencies: ${error.message}\n`);
+      process.stderr.write(`[clawket-setup] ERROR: npm install failed: ${error.message}\n`);
     }
   }
 }
 
-function ensureDeps(pluginRoot) {
-  installModule(path.resolve(pluginRoot, 'daemon'), 'daemon');
-  installModule(path.resolve(pluginRoot, 'mcp'), 'mcp');
-}
-
 function ensureDaemon(clawket, pluginRoot) {
-  ensureDeps(pluginRoot);
+  installNpmDeps(pluginRoot);
   const status = exec(`${clawket} daemon status`);
   if (!status.includes('running')) {
     exec(`${clawket} daemon start`);
@@ -429,34 +487,15 @@ function runStop() {
   } catch {}
 }
 
-function runSetup() {
+async function runSetup() {
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   ensureXdgDirs();
-  ensureDeps(pluginRoot);
-
-  const binDir = path.resolve(pluginRoot, 'bin');
-  if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
-  const cliBin = path.resolve(binDir, 'clawket');
-  if (fs.existsSync(cliBin)) {
-    process.stderr.write('[clawket-setup] CLI binary found\n');
-    return;
-  }
-
-  const cliDir = path.resolve(pluginRoot, 'cli');
-  if (fs.existsSync(path.resolve(cliDir, 'Cargo.toml'))) {
-    try {
-      exec('cargo --version');
-      process.stderr.write('[clawket-setup] Building CLI from source...\n');
-      exec('cargo build --release', { cwd: cliDir, timeout: 300000 });
-      const built = path.resolve(cliDir, 'target', 'release', 'clawket');
-      if (fs.existsSync(built)) {
-        fs.copyFileSync(built, cliBin);
-        fs.chmodSync(cliBin, 0o755);
-        process.stderr.write('[clawket-setup] CLI binary built\n');
-      }
-    } catch {
-      process.stderr.write('[clawket-setup] WARNING: Rust not available. Place clawket binary in bin/\n');
-    }
+  installNpmDeps(pluginRoot);
+  try {
+    await ensureCliBinary(pluginRoot);
+  } catch (error) {
+    process.stderr.write(`[clawket-setup] WARNING: CLI binary download failed: ${error.message}\n`);
+    process.stderr.write(`[clawket-setup] Hint: place a clawket binary at ${path.resolve(pluginRoot, 'bin', 'clawket')} manually, or rerun setup with CLAWKET_CLI_VERSION override.\n`);
   }
 }
 

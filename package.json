@@ -1,17 +1,17 @@
 {
-  "name": "clawket-mono",
+  "name": "clawket-plugin",
   "private": true,
+  "version": "2.3.0",
+  "description": "Claude Code plugin shell for Clawket — hooks + prompts + skills; delegates runtime to @clawket/{cli,daemon,mcp,web}",
   "scripts": {
-    "lint": "cd web && npx eslint .",
-    "typecheck": "cd web && npx tsc -b",
-    "build": "cd web && npx vite build",
-    "prepare": "husky"
-  },
-  "devDependencies": {
-    "husky": "^9.1.7"
+    "setup": "node scripts/setup.cjs"
   },
   "dependencies": {
-    "@wireweave/markdown-plugin": "^1.2.10",
-    "remark-gfm": "^4.0.1"
+    "@clawket/daemon": ">=2.2.0 <3.0.0",
+    "@clawket/mcp": ">=0.1.0 <1.0.0"
+  },
+  "compat": {
+    "@clawket/cli": ">=2.2.0 <3.0.0",
+    "@clawket/web": ">=2.2.0 <3.0.0"
   }
 }
