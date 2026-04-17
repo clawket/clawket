@@ -101,7 +101,7 @@ clawket codex status        # 어댑터 상태 확인
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - Node.js 20+
-- Rust 툴체인 (소스에서 CLI 빌드 시에만 필요, `bin/`에 사전 빌드된 바이너리 포함)
+- Rust 툴체인은 **불필요** — 플러그인 setup 이 `clawket/cli` GitHub Releases 에서 사전 빌드된 `clawket` 바이너리를 자동 다운로드합니다. CLI 를 직접 개발할 때만 Rust 가 필요합니다.
 
 ## 로컬 RAG
 
@@ -178,29 +178,37 @@ Codex 플러그인/wrapper 훅 ──▶ clawketd (Node.js + Hono)
 
 ## 디렉토리 구조
 
+**v2.3.0** 부터 이 레포는 얇은 플러그인 쉘입니다. cli/daemon/mcp/web 소스는 `clawket`
+GitHub 조직의 형제 레포로 이관되었고, setup 이 빌드 산출물을 받아옵니다.
+
 ```
 clawket/
-├── cli/                     # Rust CLI 소스 + 런타임 런처
-├── daemon/                  # Node.js 데몬 (Hono) — HTTP API, RAG, sqlite-vec
-│   └── src/                 # server.js, repo.js, db.js, embeddings.js
-├── mcp/                     # @clawket/mcp — 별도 stdio 서버 (dist/에 빌드 산출물)
-├── web/                     # React 19 대시보드 소스 (빌드 산출물을 데몬이 서빙)
-├── adapters/
-│   ├── shared/              # 공용 런타임 헬퍼
-│   ├── claude/              # Claude 어댑터 엔트리포인트 (10개 훅 .cjs 핸들러)
-│   └── codex/               # Codex 어댑터 (훅 핸들러 + 문서)
-├── hooks/hooks.json         # Claude 훅 라우팅 매니페스트
-├── skills/clawket/          # /clawket 스킬 (SKILL.md)
-├── plugins/clawket/         # 레포 로컬 Codex 플러그인 (훅 + 매니페스트)
-├── .agents/plugins/         # Codex 마켓플레이스 매니페스트 (사용자 레벨 등록 대상)
 ├── .claude-plugin/          # Claude 플러그인 매니페스트 + 마켓플레이스 메타
 ├── .mcp.json                # Claude Code가 읽는 MCP stdio 서버 등록 파일
-├── scripts/                 # Claude 훅 호환 shim
+├── hooks/hooks.json         # Claude 훅 라우팅 매니페스트
+├── skills/clawket/          # /clawket 스킬 (SKILL.md)
 ├── prompts/                 # 공용 + 런타임별 프롬프트 조각
-├── bin/                     # 사전 빌드된 CLI 바이너리 (Rust release)
+├── adapters/
+│   ├── shared/              # 공용 런타임 헬퍼 + setup 다운로더
+│   └── claude/              # Claude 어댑터 엔트리포인트 (훅 .cjs 핸들러)
+├── scripts/                 # Claude 훅 호환 shim
+├── docs/                    # COMPATIBILITY.md + RELEASING.md + HOOK_ENFORCEMENT.md
 ├── assets/                  # 로고, 마스코트, 브랜딩
-└── screenshots/             # 대시보드 스크린샷
+├── screenshots/             # 대시보드 스크린샷
+└── bin/                     # (setup 이 생성) 다운로드한 clawket CLI 바이너리
 ```
+
+### 분리 레포
+
+| 레포 | 내용 | 소비 방식 |
+|---|---|---|
+| [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI 소스 | GitHub Releases 바이너리 |
+| [`clawket/daemon`](https://github.com/clawket/daemon) | Node 데몬 (+ Rust scaffold) | `@clawket/daemon` npm |
+| [`clawket/mcp`](https://github.com/clawket/mcp) | MCP stdio 서버 | `@clawket/mcp` npm |
+| [`clawket/web`](https://github.com/clawket/web) | React 대시보드 | npm (빌드 산출물) |
+| [`clawket/landing`](https://github.com/clawket/landing) | 공개 랜딩 페이지 | Cloudflare Pages |
+
+버전 호환 범위는 `docs/COMPATIBILITY.md` 참조.
 
 ## 웹 대시보드
 
