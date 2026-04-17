@@ -1,0 +1,20 @@
+{
+  "name": "clawket-local",
+  "interface": {
+    "displayName": "Clawket Local"
+  },
+  "plugins": [
+    {
+      "name": "clawket",
+      "source": {
+        "source": "local",
+        "path": "./plugins/clawket"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

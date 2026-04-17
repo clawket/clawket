@@ -1,0 +1,41 @@
+{
+  "name": "@clawket/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Clawket — LLM pull access to work management RAG",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "clawket-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "clawket",
+    "claude-code",
+    "rag",
+    "work-management"
+  ],
+  "author": "Seungwoo Lee",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

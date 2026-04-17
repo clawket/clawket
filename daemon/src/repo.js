@@ -599,11 +599,13 @@ export const tasks = {
       return [];
     }
   },
-  /** Store embedding for a task */
+  /** Store embedding for a task. sqlite-vec vec0 does not support INSERT OR REPLACE — must DELETE then INSERT to update. */
   storeEmbedding(taskId, embedding) {
     const db = getDb();
+    const vec = new Float32Array(embedding);
     try {
-      db.prepare(`INSERT OR REPLACE INTO vec_tasks (task_id, embedding) VALUES (?, ?)`).run(taskId, new Float32Array(embedding));
+      db.prepare(`DELETE FROM vec_tasks WHERE task_id = ?`).run(taskId);
+      db.prepare(`INSERT INTO vec_tasks (task_id, embedding) VALUES (?, ?)`).run(taskId, vec);
     } catch { /* vec not available */ }
   },
   addLabel(id, label) {
@@ -791,8 +793,10 @@ export const artifacts = {
   },
   storeEmbedding(artifactId, embedding) {
     const db = getDb();
+    const vec = new Float32Array(embedding);
     try {
-      db.prepare(`INSERT OR REPLACE INTO vec_artifacts (artifact_id, embedding) VALUES (?, ?)`).run(artifactId, new Float32Array(embedding));
+      db.prepare(`DELETE FROM vec_artifacts WHERE artifact_id = ?`).run(artifactId);
+      db.prepare(`INSERT INTO vec_artifacts (artifact_id, embedding) VALUES (?, ?)`).run(artifactId, vec);
     } catch { /* vec not available */ }
   },
   vectorSearch(queryEmbedding, { limit = 20, scope = 'rag' } = {}) {

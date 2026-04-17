@@ -1,0 +1,37 @@
+{
+  "name": "clawket",
+  "version": "2.2.1",
+  "description": "Structured Clawket task context and guardrails for Codex.",
+  "author": {
+    "name": "Seungwoo Lee"
+  },
+  "license": "MIT",
+  "keywords": [
+    "clawket",
+    "codex",
+    "tasks",
+    "workflow"
+  ],
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Clawket",
+    "shortDescription": "Startup context and task guardrails for Codex",
+    "longDescription": "Injects Clawket dashboard context at session start and blocks mutating Codex tools when no active task exists.",
+    "developerName": "Seungwoo Lee",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/claude-code/lattice-mono",
+    "privacyPolicyURL": "https://github.com/claude-code/lattice-mono",
+    "termsOfServiceURL": "https://github.com/claude-code/lattice-mono",
+    "defaultPrompt": [
+      "Show my active Clawket tasks",
+      "Explain this codebase with task context",
+      "Continue the current Clawket task"
+    ],
+    "brandColor": "#157347"
+  }
+}

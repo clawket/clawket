@@ -1,6 +1,9 @@
 mod client;
 mod paths;
 mod daemon;
+mod codex;
+mod runtime;
+mod mcp;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -36,6 +39,20 @@ enum Command {
         #[command(subcommand)]
         action: DaemonAction,
     },
+    /// Inspect supported runtimes and adapter capabilities
+    Runtime {
+        #[command(subcommand)]
+        action: RuntimeAction,
+    },
+    /// Launch or inspect the Codex adapter runtime
+    Codex {
+        #[command(subcommand)]
+        action: Option<CodexAction>,
+    },
+    /// Run the Clawket MCP stdio server (for Claude Code's .mcp.json).
+    /// Exposes read-only RAG tools: search_artifacts, search_tasks, find_similar_tasks,
+    /// get_task_context, get_recent_decisions. Requires clawketd running.
+    Mcp,
     /// Manage projects
     #[command(alias = "proj")]
     Project {
@@ -103,6 +120,31 @@ pub enum DaemonAction {
     Status,
     /// Restart the daemon (stop + start)
     Restart,
+}
+
+#[derive(Subcommand)]
+enum RuntimeAction {
+    /// List supported runtimes
+    List,
+    /// Run environment checks for a runtime
+    Doctor {
+        #[arg(value_parser = ["claude", "codex"])]
+        runtime: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum CodexAction {
+    /// Register the Codex adapter in the user's Codex config so plain `codex` loads Clawket hooks
+    Install,
+    /// Remove the Codex adapter registration from the user's Codex config
+    Uninstall,
+    /// Show Codex wrapper session state
+    Status,
+    /// Run Codex adapter checks
+    Doctor,
+    /// Close open runs for the current Codex wrapper session
+    Stop,
 }
 
 // ========== Project ==========
@@ -901,6 +943,12 @@ async fn main() -> Result<()> {
         Command::Daemon { action } => {
             return daemon::run(action).await;
         }
+        Command::Codex { action: None } => {
+            return codex::launch().await;
+        }
+        Command::Mcp => {
+            return mcp::run();
+        }
         _ => {}
     }
 
@@ -924,6 +972,26 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Daemon { .. } => unreachable!(),
+        Command::Runtime { action } => match action {
+            RuntimeAction::List => output(&runtime::list_runtimes()),
+            RuntimeAction::Doctor { runtime: runtime_name } => {
+                let rt = if runtime_name == "claude" {
+                    runtime::RuntimeName::Claude
+                } else {
+                    runtime::RuntimeName::Codex
+                };
+                output(&runtime::doctor(rt));
+            }
+        },
+        Command::Codex { action: Some(action) } => match action {
+            CodexAction::Install => output(&codex::install()?),
+            CodexAction::Uninstall => output(&codex::uninstall()?),
+            CodexAction::Status => output(&codex::status()?),
+            CodexAction::Doctor => output(&runtime::doctor(runtime::RuntimeName::Codex)),
+            CodexAction::Stop => output(&codex::stop().await?),
+        },
+        Command::Codex { action: None } => unreachable!(),
+        Command::Mcp => unreachable!(),
 
         Command::Dashboard { cwd, show } => {
             let cwd = cwd.unwrap_or_else(|| std::env::current_dir().unwrap().to_string_lossy().to_string());

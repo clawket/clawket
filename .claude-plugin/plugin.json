@@ -1,7 +1,7 @@
 {
   "name": "clawket",
-  "version": "2.1.0",
-  "description": "LLM-native work management dashboard for Claude Code — structured task board across sessions",
+  "version": "2.2.1",
+  "description": "LLM-native work management dashboard for Claude Code — structured task board + MCP RAG pull tools across sessions",
   "author": {
     "name": "Seungwoo Lee"
   },
@@ -10,11 +10,13 @@
     "task-management",
     "work-dashboard",
     "state-layer",
-    "project-management"
+    "project-management",
+    "mcp",
+    "rag"
   ],
-  "skills": "./skills/",
+  "skills": "./adapters/claude/skills/",
   "setup": {
-    "command": "node scripts/setup.cjs",
+    "command": "node adapters/claude/setup.cjs",
     "timeout": 120
   }
 }

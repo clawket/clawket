@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "clawket": {
+      "command": "clawket",
+      "args": ["mcp"]
+    }
+  }
+}

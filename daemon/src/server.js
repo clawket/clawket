@@ -19,6 +19,31 @@ const VERSION = (() => {
   } catch { return '0.0.0'; }
 })();
 
+// Background backfill: embed tasks that have no vec_tasks row (runs once on startup after server is listening).
+async function backfillMissingEmbeddings() {
+  try {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT s.id, s.title, s.body FROM tasks s
+      WHERE NOT EXISTS (SELECT 1 FROM vec_tasks v WHERE v.task_id = s.id)
+    `).all();
+    if (rows.length === 0) return;
+    process.stderr.write(`[clawket] Backfilling embeddings for ${rows.length} tasks...\n`);
+    const { embed } = await import('./embeddings.js');
+    let done = 0, failed = 0;
+    for (const row of rows) {
+      try {
+        const vec = await embed(`${row.title}\n${row.body || ''}`);
+        if (vec) { tasks.storeEmbedding(row.id, Array.from(vec)); done++; }
+        else failed++;
+      } catch { failed++; }
+    }
+    process.stderr.write(`[clawket] Backfill complete: ${done} embedded, ${failed} failed\n`);
+  } catch (err) {
+    process.stderr.write(`[clawket] Backfill error: ${err.message}\n`);
+  }
+}
+
 export function startServer() {
   ensureDirs();
   getDb();
@@ -252,6 +277,11 @@ export function startServer() {
 
     delete body.cwd; // Don't pass cwd to create
     const result = tasks.create(body);
+    if (result && result.title) {
+      import('./embeddings.js').then(({ embed }) =>
+        embed(`${result.title}\n${result.body || ''}`).then(vec => { if (vec) tasks.storeEmbedding(result.id, Array.from(vec)); })
+      ).catch(() => {});
+    }
     broadcastEvent('task:created', { id: result.id });
     return c.json(result);
   });
@@ -286,7 +316,13 @@ export function startServer() {
   });
   app.get('/tasks/:id', (c) => jsonOr404(c, tasks.get(c.req.param('id'))));
   app.patch('/tasks/:id', async (c) => {
-    const result = tasks.update(c.req.param('id'), await c.req.json());
+    const body = await c.req.json();
+    const result = tasks.update(c.req.param('id'), body);
+    if (result && (body.title !== undefined || body.body !== undefined)) {
+      import('./embeddings.js').then(({ embed }) =>
+        embed(`${result.title}\n${result.body || ''}`).then(vec => { if (vec) tasks.storeEmbedding(result.id, Array.from(vec)); })
+      ).catch(() => {});
+    }
     broadcastEvent('task:updated', { id: c.req.param('id') });
     return c.json(result);
   });
@@ -389,6 +425,32 @@ export function startServer() {
   app.delete('/relations/:id', (c) => {
     taskRelations.delete(c.req.param('id'));
     return c.json({ deleted: c.req.param('id') });
+  });
+
+  // ========== Task Similarity ==========
+  // Seed-task vector search: embed source task's title+body, return nearest neighbors.
+  // Source task itself is excluded from results.
+  app.get('/tasks/:id/similar', async (c) => {
+    const rawId = c.req.param('id');
+    const canonical = resolveTaskId(rawId);
+    const task = tasks.get(canonical);
+    if (!task) return c.json({ error: 'Task not found' }, 404);
+    const limit = Math.min(Number(c.req.query('limit') || 10), 30);
+    const statusFilter = c.req.query('status'); // optional single status
+    try {
+      const { embed } = await import('./embeddings.js');
+      const vec = await embed(`${task.title}\n${task.body || ''}`);
+      if (!vec) return c.json([]);
+      // over-fetch to compensate for self-exclusion and status filtering
+      const results = tasks.vectorSearch(Array.from(vec), { limit: limit + 5 });
+      const filtered = results
+        .filter(t => t.id !== task.id)
+        .filter(t => !statusFilter || t.status === statusFilter)
+        .slice(0, limit);
+      return c.json(filtered);
+    } catch {
+      return c.json([]);
+    }
   });
 
   // ========== Cycles ==========
@@ -502,8 +564,10 @@ export function startServer() {
   app.patch('/artifacts/:id', async (c) => {
     const body = await c.req.json();
     const result = artifacts.update(c.req.param('id'), body);
-    // Re-embed if scope=rag and content changed
-    if (result && result.scope === 'rag' && body.content !== undefined) {
+    // Re-embed if scope=rag and either content changed or scope was promoted to rag.
+    // body.scope === 'rag' covers both promotion (reference→rag) and idempotent re-tag;
+    // storeEmbedding uses INSERT OR REPLACE so redundant runs are safe.
+    if (result && result.scope === 'rag' && (body.content !== undefined || body.scope === 'rag')) {
       import('./embeddings.js').then(({ embed }) =>
         embed(`${result.title}\n${result.content}`).then(vec => { if (vec) artifacts.storeEmbedding(result.id, Array.from(vec)); })
       ).catch(() => {});
@@ -1112,6 +1176,8 @@ export function startServer() {
   });
 
   writeFileSync(paths.pidFile, String(process.pid));
+
+  backfillMissingEmbeddings();
 
   let shuttingDown = false;
   function shutdown(signal) {
