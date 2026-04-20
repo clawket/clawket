@@ -4,7 +4,7 @@
   <img src="assets/main.png" width="600" alt="Clawket — LLM 네이티브 작업 관리" />
 </p>
 
-<p align="center">Claude Code와 Codex CLI를 위한 LLM 네이티브 작업 관리 + 로컬 RAG 플러그인</p>
+<p align="center">Claude Code를 위한 LLM 네이티브 작업 관리 + 로컬 RAG 플러그인</p>
 
 Clawket은 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + Confluence를 대체합니다. 프로젝트 계획, 유닛, 태스크, 산출물, 실행 이력을 로컬 SQLite + 경량 데몬으로 세션 간 영구 보존합니다. 훅 기반 가드레일이 에이전트가 등록된 태스크 없이 작업하지 못하게 보장합니다 — 모든 작업은 추적되고, 모든 세션은 컨텍스트를 가집니다.
 
@@ -25,8 +25,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 ## 주요 기능
 
 - **구조화된 워크플로우** — Project → Plan (approve) → Unit → Task → Cycle (activate)
-- **런타임 어댑터** — 공용 코어 + Claude Code 어댑터(주력) + Codex CLI 어댑터
-- **라이프사이클 훅** — Claude 어댑터가 9개 이벤트 타입에 10개 훅 배치
+- **라이프사이클 훅** — 9개 이벤트 타입에 10개 훅 배치
 - **웹 대시보드** — 요약, 계획, 보드(칸반), 백로그, 타임라인, 위키 6개 뷰
 - **에이전트 Swimlane 타임라인** — 에이전트별 수평 바 차트로 동시 작업 시각화
 - **드래그 앤 드롭** — 칸반 DnD로 상태 변경, 백로그 DnD로 사이클 배정
@@ -36,13 +35,6 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 - **훅 가드레일** — 활성 태스크 없이 작업 불가, 세션마다 프로젝트 컨텍스트 자동 주입
 - **티켓 번호** — 내부 ULID와 함께 사람이 읽을 수 있는 ID (CK-1, CK-2) + 토큰 최적화
 - **CLI + Web** — LLM(CLI)과 사람(웹 UI)이 동일한 상태를 관리
-
-### 런타임 어댑터
-
-| 런타임 | 통합 방식 | 지원 범위 |
-|------|---------|---------|
-| **Claude Code** | 플러그인 + 라이프사이클 훅 + 스킬 + MCP stdio | 전체 지원 |
-| **Codex CLI** | 사용자 설치형 플러그인 훅 + 선택적 wrapper 런처 | 세션 컨텍스트 + PreToolUse 가드레일 |
 
 ### Claude 훅
 
@@ -71,7 +63,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 | 임베딩 | `@xenova/transformers`의 `all-MiniLM-L6-v2` (384d, 온디바이스, 초기 1회 ~23MB 다운로드) |
 | MCP | `@modelcontextprotocol/sdk` stdio 서버, 별도 프로세스 |
 | 웹 | React 19 + Vite + Tailwind + dnd-kit |
-| 어댑터 | Claude (plugin + hooks + skills + `.mcp.json`) / Codex (plugin + hooks + 선택 wrapper) |
+| 어댑터 | Claude Code plugin + hooks + skills + `.mcp.json` |
 
 ## 설치
 
@@ -84,18 +76,6 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 ```
 
 첫 실행 시 setup 훅이 데몬 의존성(`pnpm install`)을 설치하고 임베딩 모델을 내려받습니다. MCP stdio 서버는 플러그인의 `.mcp.json`을 통해 자동 등록됩니다.
-
-### Codex 설치
-
-Codex 어댑터는 사용자 레벨 활성화가 필요합니다 — 레포 로컬 마켓플레이스만으로는 동작하지 않습니다.
-
-```bash
-clawket codex install       # ~/.codex/config.toml에 레포 로컬 마켓플레이스 등록
-clawket codex uninstall     # 제거
-clawket codex status        # 어댑터 상태 확인
-```
-
-이후 일반 `codex` 세션이 해당 설정을 통해 Clawket 플러그인을 자동 인식합니다.
 
 ### 사전 요구사항
 
@@ -154,7 +134,8 @@ Claude Code
                          @clawket/mcp (stdio 서버)
                               │ (HTTP, 포트 자동 탐지)
                               ▼
-Codex 플러그인/wrapper 훅 ──▶ clawketd (Node.js + Hono)
+                              ▼
+                         clawketd (Node.js + Hono)
                               │   ├─ Unix socket: ~/.cache/clawket/clawketd.sock
                               │   ├─ TCP: http://127.0.0.1:<port>
                               │   ├─ SSE 이벤트 버스 (/events)
@@ -240,19 +221,6 @@ clawket/
 ## 사용법
 
 Clawket은 구조화된 워크플로우를 강제합니다. 프로젝트 + 활성 플랜 + 활성 태스크가 모두 존재해야 에이전트가 변경 작업을 시작할 수 있습니다. PreToolUse 훅이 활성 태스크 없이 Edit/Write/Bash/Agent/TeamCreate/SendMessage 호출을 차단합니다.
-
-### 런타임 명령
-
-```bash
-clawket runtime list
-clawket runtime doctor claude
-clawket runtime doctor codex
-clawket codex install
-clawket codex uninstall
-clawket codex status
-clawket codex           # 선택적 wrapper 기반 Codex 세션 런처
-clawket codex stop
-```
 
 ### 처음 시작하기
 

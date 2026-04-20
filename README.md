@@ -4,7 +4,7 @@
   <img src="assets/main.png" width="600" alt="Clawket — LLM-native work management" />
 </p>
 
-<p align="center">LLM-native work management with local RAG and adapter-based runtimes for Claude Code and Codex</p>
+<p align="center">LLM-native work management with local RAG for Claude Code</p>
 
 Clawket is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, units, tasks, artifacts, and execution history across sessions via a local SQLite database and a lightweight daemon. Hook-based guardrails ensure the agent never works without a registered task — every action is tracked, every session has context.
 
@@ -25,8 +25,7 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 ## Features
 
 - **Structured Workflow** — Project → Plan (approve) → Unit → Task → Cycle (activate)
-- **Runtime Adapters** — Shared core with Claude Code adapter (primary) and Codex CLI adapter
-- **Lifecycle Hooks** — Claude adapter keeps 10 hooks across 9 event types
+- **Lifecycle Hooks** — 10 hooks across 9 event types
 - **Web Dashboard** — Summary, Plans, Board (Kanban), Backlog, Timeline, Wiki — 6 views
 - **Agent Swimlane Timeline** — Per-agent horizontal bar chart with concurrent work visualization
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for cycle assignment
@@ -36,13 +35,6 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 - **Hook Guardrails** — Blocks work without active task, injects project context per session
 - **Ticket Numbers** — Human-readable IDs (CK-1, CK-2) with token-optimized output
 - **CLI + Web** — Both LLM (CLI) and human (web UI) manage the same state
-
-### Runtime Adapters
-
-| Runtime | Integration model | Status |
-|------|---------|-------------|
-| **Claude Code** | Plugin + lifecycle hooks + skills + MCP stdio | Full support |
-| **Codex CLI** | User-installed plugin hooks + optional wrapper launcher | Session context + PreToolUse guardrails |
 
 ### Claude Hooks
 
@@ -71,7 +63,7 @@ When a task transitions to `done`/`cancelled`, the daemon auto-cascades completi
 | Embeddings | `@xenova/transformers` with `all-MiniLM-L6-v2` (384d, on-device, ~23MB first-run download) |
 | MCP | `@modelcontextprotocol/sdk` stdio server, separate process |
 | Web | React 19 + Vite + Tailwind + dnd-kit |
-| Adapters | Claude (plugin + hooks + skills + `.mcp.json`) and Codex (plugin + hooks + optional wrapper) |
+| Adapter | Claude Code plugin + hooks + skills + `.mcp.json` |
 
 ## Installation
 
@@ -84,18 +76,6 @@ When a task transitions to `done`/`cancelled`, the daemon auto-cascades completi
 ```
 
 The setup hook installs daemon dependencies (`pnpm install`) and downloads the embedding model on first use. The MCP stdio server is registered automatically through the plugin's `.mcp.json`.
-
-### Codex setup
-
-Codex adapter activation is user-level — the repo-local marketplace is not enough by itself.
-
-```bash
-clawket codex install       # register repo-local marketplace in ~/.codex/config.toml
-clawket codex uninstall     # remove it
-clawket codex status        # check adapter health
-```
-
-Plain `codex` sessions then discover the Clawket plugin through the user's Codex config.
 
 ### Prerequisites
 
@@ -154,7 +134,8 @@ Claude Code
                          @clawket/mcp (stdio server)
                               │ (HTTP, port auto-discovery)
                               ▼
-Codex plugin/wrapper hooks ─▶ clawketd (Node.js + Hono)
+                              ▼
+                         clawketd (Node.js + Hono)
                               │   ├─ Unix socket: ~/.cache/clawket/clawketd.sock
                               │   ├─ TCP: http://127.0.0.1:<port>
                               │   ├─ SSE event bus (/events)
@@ -240,19 +221,6 @@ Access at `http://localhost:19400` when the daemon is running. Six views, real-t
 ## Usage
 
 Clawket enforces a structured workflow. The agent cannot start mutating work until a project, an active plan, and an active task all exist. The PreToolUse hook blocks all mutating tools (Edit, Write, Bash, Agent, TeamCreate, SendMessage) until an active task exists.
-
-### Runtime commands
-
-```bash
-clawket runtime list
-clawket runtime doctor claude
-clawket runtime doctor codex
-clawket codex install
-clawket codex uninstall
-clawket codex status
-clawket codex           # optional wrapper-launched Codex session
-clawket codex stop
-```
 
 ### First-time setup
 

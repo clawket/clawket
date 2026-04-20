@@ -113,16 +113,7 @@ function loadRuntimePrompt(pluginRoot, runtimeName) {
   ]);
 }
 
-function buildCodexBootstrap(pluginRoot, cwd, context) {
-  const runtimePrompt = loadRuntimePrompt(pluginRoot, 'codex');
-  const header = context
-    ? `# Active Clawket Context\n\n${context}`
-    : `# Clawket\n\nNo project is registered for \`${cwd}\`.\nRegister one with:\n\n\`clawket project create "<name>" --cwd "${cwd}"\``;
-  return [header, runtimePrompt].filter(Boolean).join('\n\n');
-}
-
 module.exports = {
-  buildCodexBootstrap,
   buildSummary,
   loadRuntimePrompt,
   parseInProgressTasks,
