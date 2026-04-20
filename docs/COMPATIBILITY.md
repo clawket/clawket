@@ -8,10 +8,10 @@ and non-npm assets). Bumping the plugin requires recording the tested combinatio
 
 | Component | Repo | Distribution | Declared in plugin |
 |---|---|---|---|
-| `@clawket/daemon` | `clawket/daemon` | npm | `dependencies` |
-| `@clawket/mcp` | `clawket/mcp` | npm | `dependencies` |
-| `@clawket/cli` | `clawket/cli` | GitHub Releases binary | `compat` |
-| `@clawket/web` | `clawket/web` | npm (built bundle) | `compat` |
+| `@clawket/mcp` | `clawket/mcp` | npm (Node, transitional) | `dependencies` |
+| `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust) | `compat` |
+| `@clawket/daemon` | `clawket/daemon` | GitHub Releases tarball (Node, transitional → Rust binary) | `compat` |
+| `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
 
 ## Matrix

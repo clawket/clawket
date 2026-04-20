@@ -127,7 +127,7 @@ async function ensureCliBinary(pluginRoot) {
 function installNpmDeps(pluginRoot) {
   if (!fs.existsSync(path.resolve(pluginRoot, 'package.json'))) return;
   if (fs.existsSync(path.resolve(pluginRoot, 'node_modules'))) return;
-  process.stderr.write('[clawket-setup] Installing npm dependencies (@clawket/daemon, @clawket/mcp)...\n');
+  process.stderr.write('[clawket-setup] Installing npm dependencies (@clawket/mcp)...\n');
   try {
     exec('pnpm --version');
     exec('pnpm install --prod', { cwd: pluginRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 180000 });

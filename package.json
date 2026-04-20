@@ -7,11 +7,11 @@
     "setup": "node scripts/setup.cjs"
   },
   "dependencies": {
-    "@clawket/daemon": ">=2.2.0 <3.0.0",
     "@clawket/mcp": ">=0.1.0 <1.0.0"
   },
   "compat": {
     "@clawket/cli": ">=2.2.0 <3.0.0",
+    "@clawket/daemon": ">=2.2.0 <3.0.0",
     "@clawket/web": ">=2.2.0 <3.0.0"
   }
 }
