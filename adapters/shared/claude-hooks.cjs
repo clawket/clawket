@@ -226,6 +226,39 @@ function resolveWebDir(pluginRoot) {
   return fs.existsSync(path.join(distPath, 'index.html')) ? distPath : null;
 }
 
+// Symlink the plugin-managed clawket binary into ~/.local/bin so the user can
+// invoke `clawket daemon restart` and friends from a normal shell. The skill
+// docs document unqualified `clawket` usage; without this symlink, the binary
+// is only discoverable at `<pluginRoot>/bin/clawket`, which users won't know.
+function linkCliToUserBin(pluginRoot) {
+  if (os.platform() === 'win32') return;
+  const src = path.resolve(pluginRoot, 'bin', 'clawket');
+  if (!fs.existsSync(src)) return;
+
+  const userBin = path.resolve(os.homedir(), '.local', 'bin');
+  const dest = path.resolve(userBin, 'clawket');
+  try {
+    fs.mkdirSync(userBin, { recursive: true });
+    try { fs.unlinkSync(dest); } catch (e) {
+      if (e && e.code !== 'ENOENT') throw e;
+    }
+    fs.symlinkSync(src, dest);
+    process.stderr.write(`[clawket-setup] Linked CLI into ${dest}\n`);
+  } catch (err) {
+    process.stderr.write(`[clawket-setup] WARNING: failed to link ${dest}: ${err.message}\n`);
+    return;
+  }
+
+  const pathEntries = (process.env.PATH || '').split(path.delimiter);
+  if (!pathEntries.includes(userBin)) {
+    process.stderr.write(
+      `[clawket-setup] NOTE: ${userBin} is not on your PATH.\n` +
+      `[clawket-setup] Add it with:  export PATH="$HOME/.local/bin:$PATH"\n` +
+      `[clawket-setup] (put it in ~/.zshrc or ~/.bashrc to persist).\n`
+    );
+  }
+}
+
 // ensureDaemon — best-effort daemon liveness check with visible diagnostics.
 //
 // Contract (CLAWKET_DAEMON_BIN injection):
@@ -628,6 +661,7 @@ async function runSetup() {
     process.stderr.write(`[clawket-setup] WARNING: web bundle download failed: ${error.message}\n`);
     process.stderr.write(`[clawket-setup] Hint: extract clawket-web-<version>.tar.gz into ${path.resolve(pluginRoot, 'web')} manually, or rerun setup with CLAWKET_WEB_VERSION override.\n`);
   }
+  linkCliToUserBin(pluginRoot);
   // Node's default https Agent keeps download sockets alive past completion,
   // which prevents natural event-loop exit. Destroy the pool explicitly so
   // Claude Code's install hook does not block on the plugin.

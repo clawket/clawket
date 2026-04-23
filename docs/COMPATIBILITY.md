@@ -23,6 +23,7 @@ the tested combination here.
 | `2.3.1` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` (installed) |
 | `2.3.2` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | removed from `dependencies` |
 | `2.3.3` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a — no auto-migration (warn-only) |
+| `2.3.4` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
 versions consumed by setup live in `components.json` (e.g. `daemon: v0.2.0`, `cli: v0.2.0`).
