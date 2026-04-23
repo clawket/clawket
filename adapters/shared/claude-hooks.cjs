@@ -21,6 +21,7 @@ const { buildSummary, parseInProgressTasks } = require('./session-context.cjs');
 
 const CLI_REPO = process.env.CLAWKET_CLI_REPO || 'clawket/cli';
 const DAEMON_REPO = process.env.CLAWKET_DAEMON_REPO || 'clawket/daemon';
+const WEB_REPO = process.env.CLAWKET_WEB_REPO || 'clawket/web';
 
 // Corporate MITM proxies inject a private CA into the macOS keychain (or
 // Linux system trust store). Node's default TLS stack ignores those stores
@@ -194,6 +195,37 @@ async function ensureDaemonBinary(pluginRoot, version) {
   return binPath;
 }
 
+async function ensureWebBundle(pluginRoot, version) {
+  const webVersion = process.env.CLAWKET_WEB_VERSION || version;
+  if (!webVersion) throw new Error('web version missing (components.json.web)');
+
+  const webRoot = path.resolve(pluginRoot, 'web');
+  const indexFile = path.resolve(webRoot, 'dist', 'index.html');
+  if (fs.existsSync(indexFile)) return webRoot;
+
+  fs.mkdirSync(webRoot, { recursive: true });
+  const assetName = `clawket-web-${webVersion}.tar.gz`;
+  const url = `https://github.com/${WEB_REPO}/releases/download/${webVersion}/${assetName}`;
+  const archive = path.resolve(webRoot, assetName);
+
+  process.stderr.write(`[clawket-setup] Downloading web ${webVersion}...\n`);
+  await downloadToFile(url, archive);
+  exec(`tar -xzf "${archive}" -C "${webRoot}"`);
+  fs.unlinkSync(archive);
+
+  if (!fs.existsSync(indexFile)) {
+    throw new Error(`web bundle extracted but dist/index.html missing at ${indexFile}`);
+  }
+  process.stderr.write(`[clawket-setup] web installed at ${webRoot}\n`);
+  return webRoot;
+}
+
+function resolveWebDir(pluginRoot) {
+  if (process.env.CLAWKET_WEB_DIR) return process.env.CLAWKET_WEB_DIR;
+  const distPath = path.resolve(pluginRoot, 'web', 'dist');
+  return fs.existsSync(path.join(distPath, 'index.html')) ? distPath : null;
+}
+
 // ensureDaemon — best-effort daemon liveness check with visible diagnostics.
 //
 // Contract (CLAWKET_DAEMON_BIN injection):
@@ -207,9 +239,10 @@ async function ensureDaemonBinary(pluginRoot, version) {
 function ensureDaemon(clawket, pluginRoot) {
   const daemonBin = path.resolve(pluginRoot, 'daemon', 'bin', 'clawketd');
   const hasPluginBin = fs.existsSync(daemonBin);
-  const env = hasPluginBin
-    ? { ...process.env, CLAWKET_DAEMON_BIN: daemonBin }
-    : process.env;
+  const webDir = resolveWebDir(pluginRoot);
+  const env = { ...process.env };
+  if (hasPluginBin) env.CLAWKET_DAEMON_BIN = daemonBin;
+  if (webDir) env.CLAWKET_WEB_DIR = webDir;
 
   if (exec(`${clawket} daemon status`, { env }).includes('running')) return;
 
@@ -588,6 +621,12 @@ async function runSetup() {
   } catch (error) {
     process.stderr.write(`[clawket-setup] WARNING: daemon binary download failed: ${error.message}\n`);
     process.stderr.write(`[clawket-setup] Hint: place a clawketd binary at ${path.resolve(pluginRoot, 'daemon', 'bin', 'clawketd')} manually, or rerun setup with CLAWKET_DAEMON_VERSION override.\n`);
+  }
+  try {
+    await ensureWebBundle(pluginRoot, manifest.web);
+  } catch (error) {
+    process.stderr.write(`[clawket-setup] WARNING: web bundle download failed: ${error.message}\n`);
+    process.stderr.write(`[clawket-setup] Hint: extract clawket-web-<version>.tar.gz into ${path.resolve(pluginRoot, 'web')} manually, or rerun setup with CLAWKET_WEB_VERSION override.\n`);
   }
   // Node's default https Agent keeps download sockets alive past completion,
   // which prevents natural event-loop exit. Destroy the pool explicitly so
