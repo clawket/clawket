@@ -8,7 +8,7 @@
 
 Clawket is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, units, tasks, artifacts, and execution history across sessions via a local SQLite database and a lightweight daemon. Hook-based guardrails ensure the agent never works without a registered task — every action is tracked, every session has context.
 
-On top of the state layer, Clawket ships a **local RAG stack** (sqlite-vec + on-device embeddings) and an **MCP stdio server** that lets Claude Code pull semantic context across sessions without shipping anything to an external vector DB.
+On top of the state layer, Clawket ships a **local RAG stack** (sqlite-vec + on-device embeddings) and an **MCP stdio server** (embedded in the CLI binary via rmcp 1.5) that lets Claude Code pull semantic context across sessions without shipping anything to an external vector DB.
 
 ## Why Clawket
 
@@ -31,7 +31,7 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for cycle assignment
 - **Wiki + Local RAG** — File-tree navigation, artifact versioning, hybrid search (FTS5 keyword + sqlite-vec semantic) over `scope=rag` artifacts
 - **Auto-Embedding** — `scope=rag` artifacts and all tasks are embedded on create/update using on-device `all-MiniLM-L6-v2` (384d). Missing embeddings are backfilled at daemon startup.
-- **MCP RAG Pull** — A separate stdio server (`clawket mcp`) exposes 5 read-only tools for Claude Code's tool_use, enforcing the `rag`-only scope boundary.
+- **MCP RAG Pull** — `clawket mcp` (stdio server embedded in the CLI binary) exposes 5 read-only tools for Claude Code's tool_use, enforcing the `rag`-only scope boundary.
 - **Hook Guardrails** — Blocks work without active task, injects project context per session
 - **Ticket Numbers** — Human-readable IDs (CK-1, CK-2) with token-optimized output
 - **CLI + Web** — Both LLM (CLI) and human (web UI) manage the same state
@@ -57,11 +57,11 @@ When a task transitions to `done`/`cancelled`, the daemon auto-cascades completi
 
 | Layer | Tech |
 |---|---|
-| CLI | Rust (~10ms cold start), single static binary |
-| Daemon | Node.js + Hono (Unix socket + TCP), better-sqlite3 |
+| CLI | Rust, single static binary (`clawket` / `clawket mcp`) |
+| Daemon | Rust (axum + rusqlite), Unix socket + TCP |
 | Storage | SQLite + sqlite-vec (vec0 virtual tables) |
-| Embeddings | `@xenova/transformers` with `all-MiniLM-L6-v2` (384d, on-device, ~23MB first-run download) |
-| MCP | `@modelcontextprotocol/sdk` stdio server, separate process |
+| Embeddings | `candle-core` with `all-MiniLM-L6-v2` (384d, on-device) |
+| MCP | `rmcp` 1.5 stdio server, embedded in the CLI binary |
 | Web | React 19 + Vite + Tailwind + dnd-kit |
 | Adapter | Claude Code plugin + hooks + skills + `.mcp.json` |
 
@@ -75,13 +75,13 @@ When a task transitions to `done`/`cancelled`, the daemon auto-cascades completi
 /plugin install clawket@Seungwoo321-clawket
 ```
 
-The setup hook installs daemon dependencies (`pnpm install`) and downloads the embedding model on first use. The MCP stdio server is registered automatically through the plugin's `.mcp.json`.
+The setup hook downloads the prebuilt `clawket` CLI and `clawketd` daemon binaries from GitHub Releases. The embedding model is fetched on first use by the daemon. The MCP stdio server is registered automatically through the plugin's `.mcp.json` as `clawket mcp`.
 
 ### Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- Node.js 20+
-- Rust toolchain is **not** required — the plugin setup downloads a prebuilt `clawket` binary from `clawket/cli` GitHub Releases. Build from source only if you want to develop the CLI.
+- Node.js 20+ (setup hook only)
+- Rust toolchain is **not** required — the plugin setup downloads prebuilt `clawket` + `clawketd` binaries. Build from source only if you want to develop the CLI or daemon.
 
 ## Local RAG
 
@@ -109,7 +109,7 @@ The daemon exposes HTTP endpoints for keyword (FTS5), semantic (KNN over vec0), 
 
 ## MCP Server
 
-Clawket ships an MCP stdio server (`@clawket/mcp`) so Claude Code can **pull** context on demand (complementing SessionStart's push injection). It is a separate process, not part of the daemon — it auto-discovers the daemon's port from `~/.cache/clawket/clawketd.port` and calls the daemon's HTTP API. The plugin's `.mcp.json` registers `clawket mcp` as the stdio command.
+Clawket ships an MCP stdio server so Claude Code can **pull** context on demand (complementing SessionStart's push injection). It is implemented in Rust via `rmcp` 1.5 and **embedded in the `clawket` CLI binary** — invoked as `clawket mcp` (stdio). It auto-discovers the daemon's port from `~/.cache/clawket/clawketd.port` and calls the daemon's HTTP API. The plugin's `.mcp.json` wires it into Claude Code.
 
 | Tool | Purpose |
 |------|---------|
@@ -119,9 +119,11 @@ Clawket ships an MCP stdio server (`@clawket/mcp`) so Claude Code can **pull** c
 | `clawket_get_task_context` | Task + related artifacts / relations / comments / activity history |
 | `clawket_get_recent_decisions` | `type=decision, scope=rag` artifacts in reverse chronological order |
 
-Run manually: `clawket mcp` (stdio). Override dev path: `CLAWKET_MCP_PATH=/path/to/mcp/dist/index.js clawket mcp`.
+Run manually: `clawket mcp` (stdio).
 
 **Scope boundary**: `archive` and `reference` artifacts are never returned — only `rag`-scoped knowledge is exposed to the LLM.
+
+> The legacy `@clawket/mcp` npm package (Node stdio server) is no longer registered in `.mcp.json` and will be archived in plugin v11 U4.
 
 ## Architecture
 
@@ -131,11 +133,10 @@ Claude Code
   └─ .mcp.json → stdio child ─┐ │
                               │ │
                               ▼ ▼
-                         @clawket/mcp (stdio server)
+                        clawket mcp (rmcp stdio, embedded in CLI)
                               │ (HTTP, port auto-discovery)
                               ▼
-                              ▼
-                         clawketd (Node.js + Hono)
+                         clawketd (Rust: axum + rusqlite)
                               │   ├─ Unix socket: ~/.cache/clawket/clawketd.sock
                               │   ├─ TCP: http://127.0.0.1:<port>
                               │   ├─ SSE event bus (/events)
@@ -159,8 +160,10 @@ Web Dashboard (React 19) ──────▶ clawketd HTTP API + SSE
 
 ## Project Structure
 
-Since **v2.3.0** this repo is a thin plugin shell — source code for cli/daemon/mcp/web
-lives in sibling repos under the `clawket` GitHub org. Setup pulls compiled artifacts.
+Since **v2.3.0** this repo is a thin plugin shell — source code for cli/daemon/web
+lives in sibling repos under the `clawket` GitHub org. Setup pulls compiled binaries
+(`clawket`, `clawketd`) from GitHub Releases; no npm install happens at plugin
+install time since **v2.3.2**.
 
 ```
 clawket/
@@ -183,11 +186,11 @@ clawket/
 
 | Repo | Content | Consumed as |
 |---|---|---|
-| [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI source | GitHub Releases binary |
-| [`clawket/daemon`](https://github.com/clawket/daemon) | Node daemon (+Rust scaffold) | `@clawket/daemon` npm |
-| [`clawket/mcp`](https://github.com/clawket/mcp) | MCP stdio server | `@clawket/mcp` npm |
-| [`clawket/web`](https://github.com/clawket/web) | React dashboard | npm (built bundle) |
+| [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI + embedded `clawket mcp` (rmcp 1.5) | GitHub Releases binary |
+| [`clawket/daemon`](https://github.com/clawket/daemon) | Rust daemon (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases binary |
+| [`clawket/web`](https://github.com/clawket/web) | React dashboard | GitHub Releases tarball |
 | [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Cloudflare Pages |
+| [`clawket/mcp`](https://github.com/clawket/mcp) | Legacy Node MCP server | **deprecated** — scheduled for archive in plugin v11 U4 |
 
 See `docs/COMPATIBILITY.md` for version range guarantees.
 
@@ -325,18 +328,19 @@ In the web dashboard, go to **Project Settings** and toggle **Clawket Management
 
 ## Development
 
-```bash
-# Daemon
-cd daemon && pnpm install && node src/index.js
+Each component lives in its own repo under the `clawket` org.
 
-# MCP (separate package)
-cd mcp && pnpm install && pnpm build
+```bash
+# CLI (+ embedded MCP)
+cd cli && cargo build --release
+./target/release/clawket mcp    # run embedded MCP stdio locally
+
+# Daemon
+cd daemon && cargo build --release
+./target/release/clawketd
 
 # Web dashboard
 cd web && pnpm install && pnpm dev
-
-# CLI
-cd cli && cargo build --release
 ```
 
 ## License

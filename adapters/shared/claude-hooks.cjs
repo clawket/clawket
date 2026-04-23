@@ -25,12 +25,8 @@ const DAEMON_REPO = process.env.CLAWKET_DAEMON_REPO || 'clawket/daemon';
 // Corporate MITM proxies inject a private CA into the macOS keychain (or
 // Linux system trust store). Node's default TLS stack ignores those stores
 // and uses only its bundled Mozilla roots, which is why `curl` succeeds but
-// Node / pnpm / npm fail with "self-signed certificate in certificate chain".
-// We reconcile by (1) passing merged root+system CAs to in-process https
-// requests and (2) writing the system bundle to a temp PEM so child
-// processes (pnpm, npm, cargo, curl) trust the same chain via env vars.
-let systemCaBundlePath = null;
-
+// Node fails with "self-signed certificate in certificate chain". We merge
+// root + system CAs into the `ca` option on in-process https downloads.
 function resolveCaList() {
   if (typeof tls.getCACertificates !== 'function') return null;
   try {
@@ -41,37 +37,6 @@ function resolveCaList() {
   } catch {
     return null;
   }
-}
-
-function ensureSystemCaBundle() {
-  if (systemCaBundlePath && fs.existsSync(systemCaBundlePath)) return systemCaBundlePath;
-  if (typeof tls.getCACertificates !== 'function') return null;
-  try {
-    const system = tls.getCACertificates('system') || [];
-    if (!system.length) return null;
-    const bundled = tls.rootCertificates || [];
-    const pem = [...bundled, ...system].join('\n') + '\n';
-    const file = path.resolve(os.tmpdir(), `clawket-ca-${process.pid}.pem`);
-    fs.writeFileSync(file, pem, { mode: 0o600 });
-    systemCaBundlePath = file;
-    return file;
-  } catch {
-    return null;
-  }
-}
-
-function childEnvWithSystemCa(base = process.env) {
-  const bundle = ensureSystemCaBundle();
-  if (!bundle) return base;
-  const prior = base.NODE_OPTIONS ? `${base.NODE_OPTIONS} ` : '';
-  return {
-    ...base,
-    NODE_OPTIONS: `${prior}--use-system-ca`,
-    NODE_EXTRA_CA_CERTS: base.NODE_EXTRA_CA_CERTS || bundle,
-    NPM_CONFIG_CAFILE: base.NPM_CONFIG_CAFILE || bundle,
-    npm_config_cafile: base.npm_config_cafile || bundle,
-    SSL_CERT_FILE: base.SSL_CERT_FILE || bundle,
-  };
 }
 
 // Component versions are pinned per plugin release in `<pluginRoot>/components.json`.
@@ -227,23 +192,6 @@ async function ensureDaemonBinary(pluginRoot, version) {
   fs.unlinkSync(archive);
   process.stderr.write(`[clawket-setup] daemon installed at ${binPath}\n`);
   return binPath;
-}
-
-function installNpmDeps(pluginRoot) {
-  if (!fs.existsSync(path.resolve(pluginRoot, 'package.json'))) return;
-  if (fs.existsSync(path.resolve(pluginRoot, 'node_modules'))) return;
-  process.stderr.write('[clawket-setup] Installing npm dependencies (@clawket/mcp)...\n');
-  const childEnv = childEnvWithSystemCa();
-  try {
-    exec('pnpm --version', { env: childEnv });
-    exec('pnpm install --prod', { cwd: pluginRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 180000, env: childEnv });
-  } catch {
-    try {
-      exec('npm install --production', { cwd: pluginRoot, stdio: ['pipe', 'pipe', process.stderr], timeout: 180000, env: childEnv });
-    } catch (error) {
-      process.stderr.write(`[clawket-setup] ERROR: npm install failed: ${error.message}\n`);
-    }
-  }
 }
 
 // ensureDaemon — best-effort daemon liveness check with visible diagnostics.
@@ -628,7 +576,6 @@ function runStop() {
 async function runSetup() {
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   ensureXdgDirs();
-  installNpmDeps(pluginRoot);
   const manifest = loadComponentsManifest(pluginRoot);
   try {
     await ensureCliBinary(pluginRoot, manifest.cli);
@@ -647,9 +594,6 @@ async function runSetup() {
   // Claude Code's install hook does not block on the plugin.
   try { https.globalAgent.destroy(); } catch {}
   try { http.globalAgent.destroy(); } catch {}
-  if (systemCaBundlePath && fs.existsSync(systemCaBundlePath)) {
-    try { fs.unlinkSync(systemCaBundlePath); } catch {}
-  }
 }
 
 module.exports = {

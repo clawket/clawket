@@ -1,13 +1,10 @@
 {
   "name": "clawket-plugin",
   "private": true,
-  "version": "2.3.0",
-  "description": "Claude Code plugin shell for Clawket — hooks + prompts + skills; delegates runtime to @clawket/{cli,daemon,mcp,web}",
+  "version": "2.3.2",
+  "description": "Claude Code plugin shell for Clawket — hooks + prompts + skills; delegates runtime to @clawket/{cli,daemon,web}",
   "scripts": {
     "setup": "node scripts/setup.cjs"
-  },
-  "dependencies": {
-    "@clawket/mcp": ">=0.1.0 <1.0.0"
   },
   "compat": {
     "@clawket/cli": ">=2.2.0 <3.0.0",

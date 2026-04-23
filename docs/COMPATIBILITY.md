@@ -1,36 +1,38 @@
 # Clawket Compatibility Matrix
 
 The plugin shell (`clawket/clawket`) declares permitted version ranges for each independent
-component in `package.json` (`dependencies` for Node packages, `compat` for external binaries
-and non-npm assets). Bumping the plugin requires recording the tested combination here.
+component in `package.json` (`compat` for external binaries and non-npm assets) and pins the
+exact binary version per release in `components.json`. Bumping the plugin requires recording
+the tested combination here.
 
 ## Components
 
 | Component | Repo | Distribution | Declared in plugin |
 |---|---|---|---|
-| `@clawket/mcp` | `clawket/mcp` | npm (Node, transitional) | `dependencies` |
-| `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust) | `compat` |
-| `@clawket/daemon` | `clawket/daemon` | GitHub Releases tarball (Node, transitional → Rust binary) | `compat` |
-| `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` |
+| `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust; `clawket` + embedded `clawket mcp`) | `compat` + `components.json.cli` |
+| `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat` + `components.json.daemon` |
+| `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
+| `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **deprecated, scheduled for archive in plugin v11 U4** — not installed since v2.3.2 |
 
 ## Matrix
 
-| Plugin | daemon | mcp | cli | web |
+| Plugin | daemon | cli | web | mcp (legacy) |
 |---|---|---|---|---|
-| `2.3.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` |
+| `2.3.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` (installed) |
+| `2.3.1` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` (installed) |
+| `2.3.2` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | removed from `dependencies` |
 
-Ranges are SemVer — a major bump in any component triggers a plugin major bump.
+Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
+versions consumed by setup live in `components.json` (e.g. `daemon: v0.2.0`, `cli: v0.2.0`).
 
 ## Release coordination
 
 1. **Breaking change in a component** — bump component major, open a PR to plugin repo
    updating the compat range. Do not release plugin until integration CI passes.
 2. **Additive changes** — component minor/patch bump, no plugin change required.
-3. **CLI binary release** — plugin setup resolves binaries by reading
-   `CLAWKET_CLI_VERSION` (default pinned in `adapters/shared/claude-hooks.cjs`). To roll
-   CLI forward, bump that constant and cut a plugin patch.
-4. **npm dep bump** — update plugin `package.json` and tag a plugin patch.
+3. **Binary release (CLI or daemon)** — cut a release in the component repo; an automated
+   workflow updates `components.json` via a bump PR; merge triggers a plugin patch.
 
 ## Integration test responsibility
 
