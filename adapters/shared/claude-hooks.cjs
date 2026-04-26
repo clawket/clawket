@@ -100,7 +100,7 @@ function detectCliTarget() {
   throw new Error(`Unsupported platform: ${platform}/${arch}`);
 }
 
-function downloadToFile(url, dest) {
+function downloadToFileOnce(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     const ca = resolveCaList();
@@ -108,21 +108,48 @@ function downloadToFile(url, dest) {
     https.get(url, opts, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         file.close();
-        fs.unlinkSync(dest);
-        return downloadToFile(res.headers.location, dest).then(resolve, reject);
+        try { fs.unlinkSync(dest); } catch {}
+        return downloadToFileOnce(res.headers.location, dest).then(resolve, reject);
       }
       if (res.statusCode !== 200) {
         file.close();
-        fs.unlinkSync(dest);
-        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        try { fs.unlinkSync(dest); } catch {}
+        const err = new Error(`HTTP ${res.statusCode} for ${url}`);
+        err.statusCode = res.statusCode;
+        return reject(err);
       }
       res.pipe(file);
       file.on('finish', () => file.close(resolve));
     }).on('error', (err) => {
-      fs.unlinkSync(dest);
+      try { fs.unlinkSync(dest); } catch {}
       reject(err);
     });
   });
+}
+
+// GitHub's release CDN occasionally returns transient 5xx (502/503/504) under
+// load. Retry with exponential backoff so a single hiccup does not poison
+// plugin setup. Network errors (ECONNRESET/ETIMEDOUT/EAI_AGAIN) are retried
+// for the same reason. 4xx is fatal — those are real misconfiguration.
+async function downloadToFile(url, dest, opts = {}) {
+  const maxAttempts = opts.maxAttempts ?? 4;
+  const baseDelayMs = opts.baseDelayMs ?? 1000;
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await downloadToFileOnce(url, dest);
+    } catch (error) {
+      lastError = error;
+      const transient =
+        (error.statusCode && error.statusCode >= 500 && error.statusCode < 600) ||
+        ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH', 'ECONNREFUSED'].includes(error.code);
+      if (!transient || attempt === maxAttempts) throw error;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      process.stderr.write(`[clawket-setup] transient ${error.message} — retry ${attempt}/${maxAttempts - 1} in ${delay}ms\n`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
 }
 
 // Version tracking for installed components.

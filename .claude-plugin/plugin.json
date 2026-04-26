@@ -1,6 +1,6 @@
 {
   "name": "clawket",
-  "version": "2.3.8",
+  "version": "2.3.9",
   "description": "LLM-native work management dashboard for Claude Code — structured task board + MCP RAG pull tools across sessions",
   "author": {
     "name": "Seungwoo Lee"
