@@ -433,8 +433,39 @@ function apiPost(port, pathname, body) {
   });
 }
 
-function runSessionStart() {
+// Idempotent install gate. plugin.json `setup` is not auto-executed by Claude
+// Code (the field is not in the official plugin manifest schema), so the very
+// first SessionStart after `/plugin install` must perform setup itself.
+// Subsequent sessions are a no-op when version markers match — the cost of
+// the gate is a few syscalls on the warm path.
+async function ensureInstalled(pluginRoot) {
+  let manifest;
+  try {
+    manifest = loadComponentsManifest(pluginRoot);
+  } catch (err) {
+    process.stderr.write(`[clawket-setup] WARNING: components.json missing or invalid: ${err.message}\n`);
+    return;
+  }
+
+  const cliBin = path.resolve(pluginRoot, 'bin', os.platform() === 'win32' ? 'clawket.exe' : 'clawket');
+  const daemonBin = path.resolve(pluginRoot, 'daemon', 'bin', os.platform() === 'win32' ? 'clawketd.exe' : 'clawketd');
+  const webIndex = path.resolve(pluginRoot, 'web', 'dist', 'index.html');
+  const cliMarker = path.resolve(pluginRoot, 'bin', '.clawket-version');
+  const daemonMarker = path.resolve(pluginRoot, 'daemon', 'bin', '.clawket-version');
+  const webMarker = path.resolve(pluginRoot, 'web', '.clawket-version');
+
+  const cliOk = fs.existsSync(cliBin) && readInstalledVersion(cliMarker) === manifest.cli;
+  const daemonOk = fs.existsSync(daemonBin) && readInstalledVersion(daemonMarker) === manifest.daemon;
+  const webOk = fs.existsSync(webIndex) && readInstalledVersion(webMarker) === manifest.web;
+  if (cliOk && daemonOk && webOk) return;
+
+  process.stderr.write('[clawket-setup] First-run install (downloading binaries — this can take ~30s)\n');
+  await runSetup();
+}
+
+async function runSessionStart() {
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
+  await ensureInstalled(pluginRoot);
   const { clawket } = runtime(pluginRoot);
   ensureDaemon(clawket, pluginRoot);
 

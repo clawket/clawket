@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/cache/clawket\"; node \"$_R/adapters/claude/session-start.cjs\"",
-            "timeout": 30
+            "timeout": 120
           }
         ]
       }
