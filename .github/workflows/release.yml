@@ -1,0 +1,158 @@
+name: Release
+
+# Plugin shell release workflow.
+# Trigger: push to main → conventional-commit 기반 자동 버전업 → tag → GitHub Release.
+#
+# 마켓플레이스 install 은 main HEAD 의 marketplace.json 만 보지만 정식 태그/릴리즈는
+# 회귀 추적, 사용자 가시성, 롤백 경로를 위해 유지한다.
+#
+# Required org-level secret:
+#   - CLAWKET_RELEASE_PAT : fine-grained PAT, contents: write + pull_requests: write
+#
+# Conventional Commits → SemVer:
+#   - BREAKING CHANGE / feat!: / fix!: → major
+#   - feat: → minor
+#   - fix: / perf: → patch
+#   - 그 외 (chore/docs/ci/test/refactor) → no release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Override version bump (patch/minor/major)'
+        required: false
+        type: choice
+        options: ['', patch, minor, major]
+        default: ''
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CLAWKET_RELEASE_PAT }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Determine next version
+        id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          RANGE="${LAST_TAG:+${LAST_TAG}..HEAD}"
+          RANGE="${RANGE:-HEAD}"
+
+          if [ -n "$LAST_TAG" ] && [ -z "$(git log ${LAST_TAG}..HEAD --oneline)" ]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No new commits since $LAST_TAG"
+            exit 0
+          fi
+
+          # Guard against double-bump: if a PR already manually bumped package.json
+          # past the last tag (legacy flow), skip auto-bump and instead just tag
+          # the current version. This makes the workflow tolerant of either flow:
+          # a) PR includes manual bump → we tag it and create release here
+          # b) PR uses conventional commits only → we bump + tag + release
+          CURRENT=$(node -p "require('./package.json').version")
+          LAST_VER="${LAST_TAG#v}"
+          LAST_VER="${LAST_VER:-0.0.0}"
+          if [ "$(printf '%s\n%s\n' "$LAST_VER" "$CURRENT" | sort -V | tail -1)" = "$CURRENT" ] \
+             && [ "$CURRENT" != "$LAST_VER" ]; then
+            echo "package.json already at $CURRENT (> $LAST_VER) — tagging without bump."
+            TAG="v$CURRENT"
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "Tag $TAG exists; nothing to do."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git tag "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BUMP="${{ inputs.bump }}"
+          if [ -z "$BUMP" ]; then
+            SUBJECTS=$(git log $RANGE --format='%s')
+            BODIES=$(git log $RANGE --format='%B')
+            if grep -qE '^BREAKING CHANGE:' <<< "$BODIES" \
+               || grep -qE '^[a-z]+(\(.+\))?!:' <<< "$SUBJECTS"; then
+              BUMP=major
+            elif grep -qE '^feat(\(.+\))?:' <<< "$SUBJECTS"; then
+              BUMP=minor
+            elif grep -qE '^(fix|perf)(\(.+\))?:' <<< "$SUBJECTS"; then
+              BUMP=patch
+            else
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "No release-worthy commits since ${LAST_TAG:-<init>}"
+              exit 0
+            fi
+          fi
+
+          CURRENT=$(node -p "require('./package.json').version")
+          NEXT=$(node -e "
+            const [maj, min, pat] = process.argv[1].split('.').map(Number);
+            const bump = process.argv[2];
+            if (bump === 'major') console.log(\`\${maj+1}.0.0\`);
+            else if (bump === 'minor') console.log(\`\${maj}.\${min+1}.0\`);
+            else console.log(\`\${maj}.\${min}.\${pat+1}\`);
+          " "$CURRENT" "$BUMP")
+          TAG="v$NEXT"
+
+          # 3-file sync: package.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json
+          node -e "
+            const fs = require('fs');
+            const next = process.argv[1];
+            for (const p of ['package.json', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']) {
+              const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+              if (data.version) data.version = next;
+              if (Array.isArray(data.plugins)) data.plugins.forEach(plg => plg.version = next);
+              fs.writeFileSync(p, JSON.stringify(data, null, 2) + '\n');
+            }
+          " "$NEXT"
+
+          # Append COMPATIBILITY.md row (best-effort idempotent).
+          if ! grep -q "\`$NEXT\`" docs/COMPATIBILITY.md; then
+            LAST_ROW=$(grep '^| `[0-9]' docs/COMPATIBILITY.md | tail -1)
+            NEW_ROW=$(echo "$LAST_ROW" | sed "s/| \`[0-9.]*\`/| \`$NEXT\`/")
+            sed -i.bak "/^| \`$(node -p "require('./package.json').version")\`/a\\
+$NEW_ROW
+" docs/COMPATIBILITY.md || true
+            rm -f docs/COMPATIBILITY.md.bak
+          fi
+
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+          git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json docs/COMPATIBILITY.md
+          git commit -m "chore: release $TAG [skip ci]"
+          git tag "$TAG" -m "Release $TAG"
+          git push --atomic origin HEAD:main "$TAG"
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CLAWKET_RELEASE_PAT }}
+        run: |
+          gh release create "${{ steps.bump.outputs.tag }}" \
+            --generate-notes \
+            --title "${{ steps.bump.outputs.tag }}"
