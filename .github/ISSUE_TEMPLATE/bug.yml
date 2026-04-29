@@ -1,0 +1,31 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What's broken? One sentence is enough.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps. Include the exact command and the version (`clawket --version` / `clawketd --version` / commit SHA).
+      placeholder: |
+        1. ...
+        2. ...
+        3. observed: ...
+           expected: ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, arch, install method (brew/install.sh/source). Output of `clawket doctor` if relevant.
+    validations:
+      required: false

@@ -1,0 +1,19 @@
+name: Docs issue
+description: Documentation is wrong, missing, or unclear.
+title: "[Docs]: "
+labels: [docs]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      description: File path, URL, or command output that's wrong/missing.
+      placeholder: README.md / docs/RELEASING.md / clawket --help
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change
+    validations:
+      required: true

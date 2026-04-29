@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose a new capability or change.
+title: "[Feature]: "
+labels: [feat]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-facing pain are you trying to remove? Skip if this is purely additive.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How would the feature work from the user's perspective? CLI flags, UI text, API shape.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What did you reject and why? Helps avoid bikeshedding in review.
