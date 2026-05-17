@@ -1,5 +1,6 @@
 {
-  "daemon": "v0.2.4",
-  "cli": "v0.2.6",
-  "web": "v0.1.0"
+  "daemon": "v3.0.0",
+  "cli": "v3.0.0",
+  "web": "v3.0.0",
+  "vendor_adapter": null
 }

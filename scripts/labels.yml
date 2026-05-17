@@ -1,0 +1,31 @@
+# Cross-repo label standard — Single Source of Truth
+#
+# Spec: docs/labels.md
+# Sync: scripts/sync-labels.sh
+#
+# Format: array of { name, color, description }.
+# Color is a 6-digit hex without leading "#".
+
+- name: good-first-issue
+  color: 7057ff
+  description: Good for newcomers — well-scoped, < 50 LOC, fix path is clear
+
+- name: help-wanted
+  color: 008672
+  description: Maintainer wants outside contribution
+
+- name: bug
+  color: d73a4a
+  description: Observed behavior contradicts documented or expected behavior
+
+- name: feat
+  color: a2eeef
+  description: New capability or non-trivial enhancement
+
+- name: docs
+  color: 0075ca
+  description: Documentation, examples, comments, or developer-facing copy
+
+- name: breaking
+  color: b60205
+  description: Backwards-incompatible change — triggers SemVer major bump

@@ -1,15 +1,16 @@
 {
   "name": "clawket-plugin",
   "private": true,
-  "version": "2.3.12",
-  "description": "Claude Code plugin shell for Clawket — hooks + prompts + skills; delegates runtime to @clawket/{cli,daemon,web}",
+  "version": "3.0.0",
+  "description": "Structured task contracts for LLM coding agents — Claude Code plugin shell for Clawket (hooks + prompts + skills); delegates runtime to @clawket/{cli,daemon,web}",
   "scripts": {
     "setup": "node scripts/setup.cjs",
-    "dev:fresh-install": "node scripts/dev-fresh-install.cjs"
+    "dev:fresh-install": "node scripts/dev-fresh-install.cjs",
+    "test": "node --test tests/*.test.cjs"
   },
   "compat": {
-    "@clawket/cli": ">=2.2.0 <3.0.0",
-    "@clawket/daemon": ">=2.2.0 <3.0.0",
-    "@clawket/web": ">=2.2.0 <3.0.0"
+    "@clawket/cli": ">=3.0.0 <4.0.0",
+    "@clawket/daemon": ">=3.0.0 <4.0.0",
+    "@clawket/web": ">=3.0.0 <4.0.0"
   }
 }

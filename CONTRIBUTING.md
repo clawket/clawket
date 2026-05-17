@@ -53,3 +53,9 @@ generation easier later.
 See [`ROADMAP.md`](./ROADMAP.md) (or the [v11 plan in
 Clawket](https://github.com/clawket/clawket/blob/main/plans/v11-structured-task-contracts.md))
 for the cross-repo milestones (M5 distribution, M7 contract compliance).
+
+## Code of Conduct
+
+By participating you agree to abide by the
+[Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). Reports go to
+**conduct@clawket.dev**; see the file for the full enforcement policy.

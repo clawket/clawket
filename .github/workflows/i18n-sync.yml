@@ -1,0 +1,26 @@
+name: i18n-sync
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '**/*.ko.md'
+      - 'scripts/check-i18n-sync.sh'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - '**/*.ko.md'
+      - 'scripts/check-i18n-sync.sh'
+
+jobs:
+  drift-check:
+    name: README ko/en drift guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required so `git log -1 --format=%ct` works
+
+      - name: Run drift check (local script — this repo owns it)
+        run: bash scripts/check-i18n-sync.sh --repo .

@@ -38,6 +38,14 @@ jobs:
       - name: Compat matrix doc exists
         run: test -f docs/COMPATIBILITY.md
 
+      - name: Hook + invariant tests
+        # Includes LM-7 destructive-pattern catalog, LM-8 path-separation
+        # invariant, LM-9 doctor data-loss panel, and LM-10 plugin-reinstall
+        # regression scenarios. Scenario 5 (doctor) is auto-skipped when the
+        # cli debug binary isn't checked in — the matching cli crate has its
+        # own cargo-test job in clawket/cli.
+        run: npm test
+
   setup-smoke:
     # Requires clawket/cli Release + @clawket/{daemon,mcp} on npm.
     # Run manually via workflow_dispatch until all artifacts are published.

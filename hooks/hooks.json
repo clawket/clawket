@@ -1,5 +1,6 @@
 {
-  "description": "Clawket work dashboard hooks",
+  "schema_version": "v3",
+  "description": "Clawket work dashboard hooks (v3 — 7 standard Claude Code events). PDD anti-pattern enforcement (X3 scenario_id / X7 batch>30 / X8 evidence NULL / X9 sync-Agent reasoning) is implemented in adapters/shared/claude-hooks.cjs (checkX3ScenarioId / checkX7BatchSize / checkX8Evidence / checkX9SyncReasoning) and routed via: PreToolUse=X3+X7+X8+X9, PostToolUse=X3, SubagentStart=X3+X7+X9, SubagentStop=X8. See adapters/claude/README.md.",
   "hooks": {
     "SessionStart": [
       {
@@ -47,9 +48,11 @@
             "timeout": 10
           }
         ]
-      },
+      }
+    ],
+    "ExitPlanMode": [
       {
-        "matcher": "ExitPlanMode",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
@@ -79,42 +82,6 @@
             "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/cache/clawket\"; node \"$_R/adapters/claude/subagent-stop.cjs\"",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "TaskCreated": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/cache/clawket\"; node \"$_R/adapters/claude/task-created.cjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/cache/clawket\"; node \"$_R/adapters/claude/task-completed.cjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/cache/clawket\"; node \"$_R/adapters/claude/stop.cjs\"",
-            "timeout": 15
           }
         ]
       }

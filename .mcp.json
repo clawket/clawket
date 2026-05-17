@@ -2,8 +2,8 @@
   "mcpServers": {
     "clawket": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-launch.cjs"]
+      "command": "clawket",
+      "args": ["mcp"]
     }
   }
 }

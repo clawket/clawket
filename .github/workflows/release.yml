@@ -161,3 +161,13 @@ jobs:
           gh release create "${{ steps.bump.outputs.tag }}" \
             --generate-notes \
             --title "${{ steps.bump.outputs.tag }}"
+
+      - name: Notify clawket/landing of baseline bump
+        if: steps.bump.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CLAWKET_RELEASE_PAT }}
+        run: |
+          gh api repos/clawket/landing/dispatches \
+            -f event_type=baseline-bumped \
+            -f "client_payload[tag]=${{ steps.bump.outputs.tag }}" \
+            || echo "warning: dispatch to clawket/landing failed; daily cron sweep will catch up at 06:00 UTC"

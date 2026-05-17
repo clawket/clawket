@@ -10,9 +10,39 @@
   "plugins": [
     {
       "name": "clawket",
-      "version": "2.3.12",
+      "version": "3.0.0",
       "source": "./",
-      "description": "LLM-native work management dashboard for Claude Code — structured task board + MCP RAG pull tools across sessions"
+      "description": "LLM-native work management dashboard for Claude Code — structured task board + MCP RAG pull tools across sessions",
+      "skills": [
+        {
+          "name": "clawket",
+          "description": "Manage work dashboard — view/update tasks, plans, units, cycles."
+        },
+        {
+          "name": "pdd",
+          "description": "PDD Plan + Unit 사전 예비 설계. 발견-수렴 루프 Phase 1 진입점."
+        },
+        {
+          "name": "scenario-author",
+          "description": "Atomic 사용자 시나리오 작성 (Given/When/Then). 발견-수렴 루프 Phase 0 진입점."
+        },
+        {
+          "name": "qa-batch",
+          "description": "Sub-agent batch dispatch + TSV evidence emit + bulk sync transcription. PDD A8 운영 인터페이스."
+        },
+        {
+          "name": "discover-loop",
+          "description": "발견-수렴 루프 메인 엔진 — Round R dispatch + 3-way 수렴 판정 + 다음 라운드 schedule."
+        },
+        {
+          "name": "scenario-refine",
+          "description": "scenario_error 3-way 처리 (atomic 분해 / 의도 재정의 / 삭제) + audit 기록."
+        },
+        {
+          "name": "qa-fix",
+          "description": "QA defect → fix task 처리 (결함 해결 plan 의 Round R unit 등록)."
+        }
+      ]
     }
   ]
 }

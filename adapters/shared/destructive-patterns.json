@@ -1,0 +1,214 @@
+{
+  "schema_version": "v3",
+  "description": "Destructive shell pattern catalog enforced by PreToolUse hook (LM-7). Each entry is a single regex compiled with the given flags; a match denies the Bash tool call. The reason and remediation fields support locale-keyed objects (en/ko/ja) or a plain string fallback.",
+  "patterns": [
+    {
+      "id": "rm-rf-clawket-data",
+      "category": "data-loss",
+      "regex": "\\brm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*r|--recursive))(?=[\\s\\S]*(?:-[a-zA-Z]*f|--force))(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data/clawket))",
+      "flags": "i",
+      "reason": {
+        "en": "Clawket SSoT data loss risk: rm -rf targeting ~/.local/share/clawket | ~/.cache/clawket | ~/.config/clawket | ~/.local/state/clawket | .claude/plugins/data/clawket",
+        "ko": "Clawket SSoT 데이터 손실 위험: ~/.local/share/clawket | ~/.cache/clawket | ~/.config/clawket | ~/.local/state/clawket | .claude/plugins/data/clawket 경로를 rm -rf 로 삭제 시도",
+        "ja": "Clawket SSoTデータ損失リスク: ~/.local/share/clawket などを rm -rf で削除しようとしています"
+      },
+      "remediation": {
+        "en": "Use 'clawket project delete' or 'clawket plan delete --force' for safe cleanup via CLI (audit log + triggers preserved).",
+        "ko": "정상 정리는 'clawket project delete' 또는 'clawket plan delete --force' 사용 (감사 로그 + 트리거 보존).",
+        "ja": "'clawket project delete' または 'clawket plan delete --force' を使用してください（監査ログ保持）。"
+      }
+    },
+    {
+      "id": "rm-rf-bare-home-or-root",
+      "category": "catastrophic",
+      "regex": "\\brm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*r|--recursive))(?=[\\s\\S]*(?:-[a-zA-Z]*f|--force))(?=[\\s\\S]*(?:(?:^|\\s)(?:~|\\$\\{?HOME\\}?|/Users/[^/\\s]+|/home/[^/\\s]+|/)\\s*(?:$|;|&&|\\|\\||\\|)))",
+      "flags": "i",
+      "reason": {
+        "en": "Catastrophic data loss risk: rm -rf targeting user home (~ / $HOME / /Users/<id>) or root (/)",
+        "ko": "치명적 데이터 손실 위험: 사용자 홈 (~ / $HOME / /Users/<id>) 또는 루트(/) 전체를 rm -rf 로 삭제 시도",
+        "ja": "致命的データ損失リスク: ユーザーホームまたはルートへの rm -rf"
+      },
+      "remediation": {
+        "en": "Narrow the deletion path to a specific directory. This pattern has no bypass — request user approval out-of-band and run the command yourself.",
+        "ko": "삭제 대상을 구체 경로로 좁히세요. 이 패턴에는 우회 옵션이 없습니다 — 사용자에게 명시 승인을 받고 직접 실행하세요.",
+        "ja": "削除対象を具体的なパスに絞り込んでください。このパターンに回避オプションはありません。"
+      }
+    },
+    {
+      "id": "sqlite-destructive-clawket-db",
+      "category": "data-loss",
+      "regex": "\\bsqlite3?\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite))(?=[\\s\\S]*(?:DROP\\s+TABLE|DELETE\\s+FROM|DROP\\s+DATABASE|TRUNCATE\\b))",
+      "flags": "i",
+      "reason": {
+        "en": "Direct SQLite destruction attempt on Clawket DB: DROP TABLE / DELETE FROM / DROP DATABASE / TRUNCATE targeting ~/.local/share/clawket",
+        "ko": "Clawket SQLite DB 직접 파괴 시도: DROP TABLE / DELETE FROM / DROP DATABASE / TRUNCATE 가 ~/.local/share/clawket DB 를 대상으로 함",
+        "ja": "Clawket SQLiteデータベースへの直接破壊操作（DROP TABLE / DELETE FROM等）"
+      },
+      "remediation": {
+        "en": "use clawket task update --status cancelled OR clawket task delete <ID> instead. For plan/unit/cycle entities use the corresponding CLI delete (audit log + triggers preserved). Migrations require explicit user approval out-of-band.",
+        "ko": "use clawket task update --status cancelled OR clawket task delete <ID> instead. plan/unit/cycle 엔티티는 해당 CLI delete 명령을 사용하세요 (감사 로그 + 트리거 보장). 마이그레이션은 사용자 승인을 별도로 받으세요.",
+        "ja": "use clawket task update --status cancelled OR clawket task delete <ID> instead. plan/unit/cycleエンティティは対応するCLI deleteコマンドを使用してください（監査ログ保持）。"
+      }
+    },
+    {
+      "id": "clawket-delete-force-aggregate",
+      "category": "history-loss",
+      "regex": "\\bclawket\\s+(?:plan|unit|cycle|project)\\s+delete\\b[\\s\\S]*--force\\b",
+      "flags": "i",
+      "reason": {
+        "en": "clawket plan/unit/cycle/project --force delete destroys all child tasks and execution history. Unrecoverable.",
+        "ko": "Clawket plan/unit/cycle/project --force 삭제는 하위 태스크/실행 이력을 동반 파괴. 사고 시 복구 불가",
+        "ja": "clawket --force 削除は子タスクと実行履歴を完全削除します。復元不可能。"
+      },
+      "remediation": {
+        "en": "Use 'clawket {plan,unit,cycle} cancel' to change status only, or clean up task-by-task. Force-delete requires explicit user approval out-of-band.",
+        "ko": "'clawket {plan,unit,cycle} cancel' 으로 상태만 변경하거나, 부분 정리는 task 단위로 진행. force-delete 가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "'clawket {plan,unit,cycle} cancel' でステータス変更のみ行うか、タスク単位で整理してください。"
+      }
+    },
+    {
+      "id": "git-reset-hard",
+      "category": "uncommitted-loss",
+      "regex": "\\bgit\\s+reset\\s+--hard\\b",
+      "flags": "i",
+      "reason": {
+        "en": "git reset --hard permanently discards untracked/unstaged changes. Blocked without explicit user approval.",
+        "ko": "git reset --hard 는 untracked/unstaged 변경을 영구 삭제. 사용자 명시 승인 없는 호출 차단",
+        "ja": "git reset --hard はuntracked/unstaged変更を永続的に削除します。"
+      },
+      "remediation": {
+        "en": "Use 'git stash' or a new branch to safely preserve changes. Discarding requires explicit user approval out-of-band.",
+        "ko": "'git stash' 또는 새 브랜치로 변경을 안전하게 보존하세요. 폐기가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "'git stash' または新しいブランチで変更を安全に保存してください。"
+      }
+    },
+    {
+      "id": "docker-rm-volumes",
+      "category": "data-loss",
+      "regex": "\\bdocker\\s+rm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*v\\b|--volumes\\b))",
+      "flags": "i",
+      "reason": {
+        "en": "docker rm -v / --volumes destroys container volumes, risking permanent data loss.",
+        "ko": "docker rm -v / --volumes 는 컨테이너 볼륨을 함께 파괴. 영속 데이터 영구 손실 위험",
+        "ja": "docker rm -v / --volumes はコンテナボリュームを破壊します。永続データが失われる可能性があります。"
+      },
+      "remediation": {
+        "en": "Remove -v if volume preservation is intended. Volume deletion requires explicit user approval out-of-band.",
+        "ko": "볼륨 보존이 의도라면 -v 제거. 볼륨 삭제가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "ボリュームを保持する場合は -v を削除してください。"
+      }
+    },
+    {
+      "id": "chmod-zero-lockout",
+      "category": "lockout",
+      "regex": "\\bchmod\\s+(?:000|0)(?=\\s|$)",
+      "flags": "",
+      "reason": {
+        "en": "chmod 000 completely removes all access permissions, causing lockout for subsequent operations.",
+        "ko": "chmod 000 은 파일/디렉터리 접근을 완전 차단해 후속 작업 lockout 유발",
+        "ja": "chmod 000 はファイル/ディレクトリへのすべてのアクセスを遮断します。"
+      },
+      "remediation": {
+        "en": "Specify explicit permissions (e.g. 600 / 700). Lockout-level chmod requires explicit user approval out-of-band.",
+        "ko": "구체 권한 (예: 600/700) 명시. lockout 수준의 권한 회수가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "具体的な権限（例: 600/700）を指定してください。"
+      }
+    },
+    {
+      "id": "find-delete-protected",
+      "category": "data-loss",
+      "regex": "\\bfind\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data))(?=[\\s\\S]*\\s-delete\\b)",
+      "flags": "i",
+      "reason": {
+        "en": "find ... -delete targeting Clawket data directories (~/.local/share/clawket etc.) risks bulk deletion accidents.",
+        "ko": "find ... -delete 가 Clawket 데이터 디렉터리(~/.local/share/clawket 등)를 대상으로 함. 부분 일괄 삭제 사고 위험",
+        "ja": "find ... -delete がClawketデータディレクトリを対象にしています。一括削除事故のリスクがあります。"
+      },
+      "remediation": {
+        "en": "Use 'clawket task delete' etc. for individual cleanup. Bulk find -delete requires explicit user approval out-of-band.",
+        "ko": "'clawket task delete' 등 CLI 로 개별 정리. 일괄 find -delete 가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "'clawket task delete' など CLI で個別に整理してください。"
+      }
+    },
+    {
+      "id": "alter-drop-column-clawket-db",
+      "category": "data-loss",
+      "regex": "\\bsqlite3?\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite))(?=[\\s\\S]*\\bALTER\\s+TABLE\\b)(?=[\\s\\S]*\\bDROP\\s+COLUMN\\b)",
+      "flags": "i",
+      "reason": {
+        "en": "ALTER TABLE ... DROP COLUMN on Clawket DB is destructive — columns cannot be recovered once dropped from SQLite.",
+        "ko": "Clawket DB 에 ALTER TABLE ... DROP COLUMN 시도. SQLite 에서 컬럼 삭제 후 복구 불가.",
+        "ja": "Clawket DBへのALTER TABLE ... DROP COLUMN操作。SQLiteではカラム削除後の復元は不可能です。"
+      },
+      "remediation": {
+        "en": "Only ADD COLUMN (non-destructive) is permitted on Clawket DB. DROP COLUMN requires explicit user approval out-of-band.",
+        "ko": "Clawket DB 는 ADD COLUMN (비파괴) 만 허용. DROP COLUMN 이 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "Clawket DBではADD COLUMN（非破壊）のみ許可されています。DROP COLUMNにはユーザーの明示的な承認が必要です。"
+      }
+    },
+    {
+      "id": "alter-drop-column-bare",
+      "category": "data-loss",
+      "regex": "\\bALTER\\s+TABLE\\s+\\S+\\s+DROP\\s+COLUMN\\b",
+      "flags": "i",
+      "reason": {
+        "en": "ALTER TABLE ... DROP COLUMN detected without sqlite3 wrapper; covers bare CLI / heredoc invocations that bypass the sqlite3-prefixed pattern. SQLite cannot recover dropped columns.",
+        "ko": "sqlite3 prefix 없이도 ALTER TABLE ... DROP COLUMN 시도 감지 (bare bash / heredoc 우회 차단). SQLite 는 삭제된 컬럼을 복구하지 못합니다.",
+        "ja": "sqlite3プレフィックスなしでもALTER TABLE ... DROP COLUMN操作を検出します。SQLiteでは削除後復元不可。"
+      },
+      "remediation": {
+        "en": "Only ADD COLUMN (non-destructive) is permitted. For Clawket data lifecycle, use clawket task update --status cancelled OR clawket task delete <ID> instead. DROP COLUMN requires explicit user approval out-of-band.",
+        "ko": "ADD COLUMN (비파괴) 만 허용. Clawket 데이터 생명주기 변경은 'use clawket task update --status cancelled OR clawket task delete <ID> instead' 사용. DROP COLUMN 은 사용자 승인을 별도로 받으세요.",
+        "ja": "ADD COLUMN（非破壊）のみ許可。DROP COLUMNにはユーザー承認が必要です。"
+      }
+    },
+    {
+      "id": "drop-table-standalone",
+      "category": "data-loss",
+      "regex": "(?:^|\\s|;)DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?!.*clawket)\\S+",
+      "flags": "i",
+      "reason": {
+        "en": "DROP TABLE without Clawket DB targeting detected. Irreversible table deletion blocked as a safety measure.",
+        "ko": "DROP TABLE 감지 (Clawket DB 외 범용). 되돌릴 수 없는 테이블 삭제 차단.",
+        "ja": "DROP TABLEが検出されました。元に戻せないテーブル削除として安全のためブロックされます。"
+      },
+      "remediation": {
+        "en": "use clawket task update --status cancelled OR clawket task delete <ID> instead. Table-level deletion requires explicit user approval out-of-band; use schema migration tooling with version control.",
+        "ko": "use clawket task update --status cancelled OR clawket task delete <ID> instead. 테이블 단위 삭제는 사용자 승인을 별도로 받으세요. 버전 관리된 스키마 마이그레이션 도구를 사용하세요.",
+        "ja": "use clawket task update --status cancelled OR clawket task delete <ID> instead. テーブル削除にはユーザー承認が必要です。バージョン管理されたスキーママイグレーションツールを使用してください。"
+      }
+    },
+    {
+      "id": "truncate-any-table",
+      "category": "data-loss",
+      "regex": "(?:^|\\s|;)TRUNCATE\\s+(?:TABLE\\s+)?\\S+",
+      "flags": "i",
+      "reason": {
+        "en": "TRUNCATE TABLE permanently deletes all rows without row-level hooks or audit trail. Blocked regardless of target.",
+        "ko": "TRUNCATE TABLE 은 행 단위 훅·감사 로그 없이 전체 행을 영구 삭제. 대상 무관 차단.",
+        "ja": "TRUNCATE TABLEは行レベルのフックや監査ログなしに全行を永久削除します。対象に関係なくブロックされます。"
+      },
+      "remediation": {
+        "en": "use clawket task update --status cancelled OR clawket task delete <ID> instead. For non-Clawket data use DELETE FROM with a WHERE clause; TRUNCATE requires explicit user approval out-of-band.",
+        "ko": "use clawket task update --status cancelled OR clawket task delete <ID> instead. Clawket 외 데이터는 WHERE 절이 있는 DELETE FROM 을 사용하세요. TRUNCATE 는 사용자 승인을 별도로 받으세요.",
+        "ja": "use clawket task update --status cancelled OR clawket task delete <ID> instead. Clawket以外のデータはWHERE句付きDELETE FROMを使用してください。"
+      }
+    },
+    {
+      "id": "redirect-overwrite-clawket-db",
+      "category": "data-loss",
+      "regex": "(?:^|\\s|;|&&|\\|\\|)>\\s*(?:[^>\\s]+/)?(?:\\.local/share/clawket/|\\.cache/clawket/|clawket/db\\.sqlite)",
+      "flags": "i",
+      "reason": {
+        "en": "Output redirect (>) is targeting Clawket SQLite DB / data files, risking permanent SSoT loss.",
+        "ko": "출력 redirect (>) 가 Clawket SQLite DB / 데이터 파일을 덮어쓰려 함. SSoT 영구 손실 위험",
+        "ja": "出力リダイレクト(>)がClawket SQLiteデータベース/データファイルを上書きしようとしています。"
+      },
+      "remediation": {
+        "en": "Direct DB manipulation is prohibited. Use CLI/MCP for data changes. Override requires explicit user approval out-of-band.",
+        "ko": "DB 직접 조작은 금지. 데이터 변경은 CLI/MCP 경유. 우회가 필요하면 사용자 승인을 별도로 받으세요.",
+        "ja": "DBの直接操作は禁止されています。CLI/MCPを使用してデータを変更してください。"
+      }
+    }
+  ]
+}

@@ -27,7 +27,7 @@ No outbound network requests are made.
 
 ## Embedding Model
 
-When wiki artifact search is used, Clawket runs a local embedding model (`all-MiniLM-L6-v2` via `@xenova/transformers`) entirely on your machine. No data is sent to any external API.
+When knowledge search is used, Clawket runs a local embedding model (`paraphrase-multilingual-MiniLM-L12-v2` via `candle-core`) entirely on your machine. No data is sent to any external API.
 
 ## Third-Party Services
 

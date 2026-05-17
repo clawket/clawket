@@ -13,7 +13,8 @@ the tested combination here.
 | `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat` + `components.json.daemon` |
 | `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
-| `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **deprecated, scheduled for archive in plugin v11 U4** — not installed since v2.3.2 |
+| `@clawket/evals` | `clawket/evals` | GitHub Pages JSON feed (`latest.json`); not installed | n/a — runtime-consumed by landing badge only |
+| `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived in plugin v11 U4** (final deprecation commit `542c397`) — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 
 ## Matrix
 
@@ -32,9 +33,41 @@ the tested combination here.
 | `2.3.10` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
 | `2.3.11` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
 | `2.3.12` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
+| `3.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
-versions consumed by setup live in `components.json` (e.g. `daemon: v0.2.0`, `cli: v0.2.0`).
+versions consumed by setup live in `components.json` (e.g. `daemon: v3.0.0`, `cli: v3.0.0`).
+
+## v3.0.0 breaking changes (summary)
+
+The simultaneous major bump across plugin shell + cli + daemon + web in v3.0 is justified by
+multiple cross-component contract breaks. See `MIGRATION-v2-to-v3.md` for the full guide.
+
+- **Schema** — `tasks.tier`, `cycles.unit_id NOT NULL` + FK, `units` loses `status/approval_*`,
+  `audit_log` table replaces `activity_log` semantics, QA workflow fields on `tasks`,
+  `wiki_idx`/`wiki_depth` on knowledge, multilingual embedding model (re-embed required).
+- **Daemon API** — ISO 8601 timestamps everywhere, `/plans/:id/counts` added, single-active-plan
+  invariant returns 409, sync embedding on knowledge create/update, hybrid search returns
+  3-score breakdown.
+- **CLI** — removed `clawket execute`, `task envelope` subcommands (envelope contract retired);
+  removed v11 MCP tools (`execute_task`, `walk_task_tree`, `decompose_task`, `validate_envelope`);
+  added `clawket completions <shell>` for shell completion.
+- **Plugin shell** — `hooks.json` `schema_version: "v3"`, dropped `TaskCreated/Completed/Stop`,
+  added `ExitPlanMode` hook; `/clawket` skill restructured into 7 sub-flows; locale-aware hooks
+  via `CLAWKET_LOCALE` chain; `CLAWKET_ALLOW_DESTRUCTIVE` bypass keyword removed; tier mismatch
+  enforced as exit-code 3 (Policy).
+- **Web** — daemon health indicator, theme toggle, command palette, knowledge default for wiki;
+  bundle size 588 kB.
+- **Distribution** — canonical asset names (`{cmd}-{os}-{arch}{.exe}`), SHA256SUMS published per
+  release, brew tap auto-update workflow.
+
+## v2 → v3 migration data path
+
+The daemon’s automatic schema migration applies all pending migrations (011 onward; latest pinned in `daemon/src/db.rs`) on first start of v3. There
+is no rollback — backup `~/.local/share/clawket/db.sqlite` before upgrading. The legacy
+`activity_log` table is preserved for backward-compat rollup queries but is no longer written
+to (writes go to `audit_log`). Embeddings are re-generated on first read of each knowledge entry
+because the embedding model itself changed (the 384-dimensional vector schema is preserved, but values are not comparable across versions).
 
 ## Release coordination
 

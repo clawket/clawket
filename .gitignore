@@ -1,18 +1,24 @@
 .DS_Store
 node_modules/
-target/
-dist/
 *.log
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
 
-# Runtime artifacts — downloaded by scripts/setup.cjs at install time
-# (from GitHub Releases and npm), not tracked in source.
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Runtime artifacts — downloaded by adapters/shared/claude-hooks.cjs at
+# install time (from GitHub Releases), not tracked in source.
 bin/
 daemon/bin/
-daemon/web/
-mcp/dist/
-mcp/node_modules/
-mcp/pnpm-lock.yaml
-mcp/package-lock.json
+web/dist/
