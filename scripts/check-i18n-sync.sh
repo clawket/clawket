@@ -88,9 +88,13 @@ count_lines() {  # count_lines <pattern> <file>
 }
 
 extract_urls() {  # print sorted unique URLs from markdown links
-  grep -oE '\]\([^)]+\)' "$1" 2>/dev/null \
+  # `set -euo pipefail` (top of file) makes any failing pipe command kill the
+  # script. When a markdown file has no links at all, the leading grep returns
+  # exit 1 with no output. Without `|| true` on each grep, the function aborts
+  # the entire script silently for any link-free file.
+  { grep -oE '\]\([^)]+\)' "$1" 2>/dev/null || true; } \
     | sed -E 's/^\]\(//; s/\)$//' \
-    | grep -E '^https?://' \
+    | { grep -E '^https?://' || true; } \
     | sort -u
 }
 
