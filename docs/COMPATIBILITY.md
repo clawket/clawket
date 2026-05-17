@@ -12,31 +12,35 @@ the tested combination here.
 | `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust; `clawket` + embedded `clawket mcp`) | `compat` + `components.json.cli` |
 | `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat` + `components.json.daemon` |
 | `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
+| `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat` + `components.json.desktop` (`null` until first release) |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
 | `@clawket/evals` | `clawket/evals` | GitHub Pages JSON feed (`latest.json`); not installed | n/a — runtime-consumed by landing badge only |
 | `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived in plugin v11 U4** (final deprecation commit `542c397`) — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 
 ## Matrix
 
-| Plugin | daemon | cli | web | mcp (legacy) |
-|---|---|---|---|---|
-| `2.3.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` (installed) |
-| `2.3.1` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=0.1.0 <1.0.0` (installed) |
-| `2.3.2` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | removed from `dependencies` |
-| `2.3.3` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a — no auto-migration (warn-only) |
-| `2.3.4` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.5` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.6` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.7` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.8` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.9` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.10` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.11` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `2.3.12` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | n/a |
-| `3.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | dropped (legacy MCP fully removed) |
+| Plugin | daemon | cli | web | desktop | mcp (legacy) |
+|---|---|---|---|---|---|
+| `2.3.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | `>=0.1.0 <1.0.0` (installed) |
+| `2.3.1` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | `>=0.1.0 <1.0.0` (installed) |
+| `2.3.2` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | removed from `dependencies` |
+| `2.3.3` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a — no auto-migration (warn-only) |
+| `2.3.4` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.5` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.6` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.7` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.8` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.9` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.10` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.11` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `2.3.12` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
+| `3.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
 versions consumed by setup live in `components.json` (e.g. `daemon: v3.0.0`, `cli: v3.0.0`).
+The `desktop` column entered the matrix in v3.0.0; the `—` for prior rows reflects that the
+component did not exist. The v3.0.0 pin is `null` until the first `clawket/desktop` GitHub
+Release lands — install gate treats `null` as a no-op skip.
 
 ## v3.0.0 breaking changes (summary)
 
