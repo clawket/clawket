@@ -1,6 +1,6 @@
 {
   "daemon": "v0.2.5",
-  "cli": "v0.2.6",
+  "cli": "v0.2.7",
   "web": "v0.1.0",
   "desktop": null
 }
