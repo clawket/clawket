@@ -1,6 +1,6 @@
 ---
 name: scenario-refine
-description: scenario_error 처리 — atomic 분해 / 의도 재정의 / 삭제 3-way 분기. cancelled QA task comment + audit knowledge 동시 기록. 발견-수렴 루프의 시나리오 정련 단계. Clawket plugin 정본 skill (v3.0). RULE.md (scenario-authoring.md v3.0) 적용.
+description: scenario_error 처리 — atomic 분해 / 의도 재정의 / 삭제 3-way 분기. cancelled QA task comment + audit knowledge 동시 기록. 발견-수렴 루프의 시나리오 정련 단계. Clawket plugin 정본 skill. RULE.md (scenario-authoring.md) 적용.
 ---
 
 # /scenario-refine — 라운드 내 시나리오 정련
@@ -75,7 +75,7 @@ TSV row example (qa-flow §5):
 
 ```
 원본 (US-CHESS-PUZZLE-007):
-  Then 모든 정답 수가 표시된다  ← v3 비전과 어긋남 (예: 3개 한정 표시)
+  Then 모든 정답 수가 표시된다  ← 제품 비전과 어긋남 (예: 3개 한정 표시)
 
 재정의 (같은 ID):
   Then 정답 수 중 우선순위 상위 3개가 표시된다
@@ -83,13 +83,13 @@ TSV row example (qa-flow §5):
 
 #### (c) 삭제 (ID 영구 비움)
 
-- v4-scope 으로 deferred / 기능 자체 폐기 등
+- 다음 major scope 으로 deferred / 기능 자체 폐기 등
 - ID 는 영구 비움 (재사용 금지)
 - 다른 knowledge 로 이관 시 새 ID 부여
 
 ```
-US-CHESS-PUZZLE-019: deferred to v4 → ID 영구 비움
-새 knowledge "v4 chess scope" 에 새 ID `US-V4-CHESS-001` 로 이관
+US-CHESS-PUZZLE-019: 다음 major scope 으로 deferred → ID 영구 비움
+새 knowledge "next-major chess scope" 에 새 ID `US-NEXT-CHESS-001` 로 이관
 ```
 
 ### 3. cancelled QA task comment 기록 (영구 흔적)
@@ -130,8 +130,8 @@ clawket knowledge create --project <PROJ> --type note --title "scenario_error au
 | Round | 원본 ID | 분기 | 사유 | 신규 ID(들) | reasoning 인용 |
 |---|---|---|---|---|---|
 | R3 | US-DAEMON-API-042 | atomic 분해 | 두 가정 섞임 | 043, 044 | sub-agent reasoning 인용 |
-| R3 | US-CHESS-PUZZLE-007 | 의도 재정의 | v3 비전 불일치 | (보존) | ... |
-| R3 | US-CHESS-PUZZLE-019 | 삭제 | v4-scope deferred | (없음) | ... |
+| R3 | US-CHESS-PUZZLE-007 | 의도 재정의 | 제품 비전 불일치 | (보존) | ... |
+| R3 | US-CHESS-PUZZLE-019 | 삭제 | 다음 major scope 으로 deferred | (없음) | ... |
 ```
 
 라운드를 거치며 누적 (절대 갱신 X — append-only).
@@ -181,7 +181,7 @@ comment + audit knowledge 에).
 자율 처리 시 불가침:
 - 시나리오 amend / delete 가 "의도 부적절" 사유 임을 명시 (시간/비용 사유 X)
 - 의심스러운 amendment 는 사용자 confirm
-- 2.x 런타임 / DB DDL / git 작업 절대 금지
+- 런타임 / DB DDL / git 작업 절대 금지
 
 ## 출력
 

@@ -1,11 +1,11 @@
 ---
 name: scenario-author
-description: atomic 사용자 시나리오 작성 — Given/When/Then 형식 강제, 도메인별 knowledge 산출. 발견-수렴 루프의 Phase 0 진입점. Clawket plugin 정본 skill (v3.0). RULE.md (scenario-authoring.md v3.0) 적용.
+description: atomic 사용자 시나리오 작성 — Given/When/Then 형식 강제, 도메인별 knowledge 산출. 발견-수렴 루프의 Phase 0 진입점. Clawket plugin 정본 skill. RULE.md (scenario-authoring.md) 적용.
 ---
 
 # /scenario-author — Atomic 시나리오 작성
 
-PDD 발견-수렴 루프의 Phase 0 (시나리오 사전 예비 설계) 를 담당. `skills/scenario-author/RULE.md` (scenario-authoring.md v3.0 룰) 의 운영 인터페이스. Phase 0 (`/scenario-author`) 산출 knowledge 를 입력으로 받아 Plan/Unit 골격을 박는다.
+PDD 발견-수렴 루프의 Phase 0 (시나리오 사전 예비 설계) 를 담당. `skills/scenario-author/RULE.md` (scenario-authoring.md 룰) 의 운영 인터페이스. Phase 0 (`/scenario-author`) 산출 knowledge 를 입력으로 받아 Plan/Unit 골격을 박는다.
 
 ## 입력
 
@@ -67,12 +67,6 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 - [ ] 알려진 버그를 의도된 형태로 적었다 (현 동작 받아쓰기 안 했다)
 - [ ] 모든 ID 가 unique 이다
 - [ ] knowledge 에 changelog/변경 이력 흔적이 0 건이다 (현재 의도만)
-
-## v3.0 변화 요약
-
-- atomic 분해는 *작성 시점에 끝내는 결과물* 이 아니라 *발견-수렴 루프 안에서 도달하는 과정*
-- 시나리오는 mutable — 갱신 사유는 "의도 부적절" 한정
-- 갱신 절차는 `/scenario-refine` skill 이 담당 (본 skill 은 Phase 0 작성 + 의도 재정의 호출 진입점)
 
 ## 출력
 
