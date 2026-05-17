@@ -216,10 +216,10 @@ function readOnlyBashPatterns() {
 function detectCliTarget() {
   const platform = os.platform();
   const arch = os.arch();
-  if (platform === 'darwin' && arch === 'x64') return 'x86_64-apple-darwin';
-  if (platform === 'darwin' && arch === 'arm64') return 'aarch64-apple-darwin';
-  if (platform === 'linux' && arch === 'x64') return 'x86_64-unknown-linux-gnu';
-  if (platform === 'linux' && arch === 'arm64') return 'aarch64-unknown-linux-gnu';
+  if (platform === 'darwin' && arch === 'x64') return 'darwin-x64';
+  if (platform === 'darwin' && arch === 'arm64') return 'darwin-arm64';
+  if (platform === 'linux' && arch === 'x64') return 'linux-x64';
+  if (platform === 'linux' && arch === 'arm64') return 'linux-arm64';
   if (platform === 'win32') {
     throw new Error(
       'Windows is not yet supported by the Clawket CLI. ' +
@@ -385,17 +385,23 @@ function writeInstalledVersion(markerPath, version) {
 // environments where the SHA256SUMS file itself may be blocked. This env var
 // is documented in the setup guide; it must be set explicitly by the user.
 async function fetchSha256Sums(repo, version) {
-  const url = `https://github.com/${repo}/releases/download/${version}/SHA256SUMS`;
-  return new Promise((resolve, reject) => {
-    const ca = resolveCaList();
-    const opts = ca ? { ca } : {};
+  const initialUrl = `https://github.com/${repo}/releases/download/${version}/SHA256SUMS`;
+  const ca = resolveCaList();
+  const opts = ca ? { ca } : {};
+  const maxRedirects = 5;
+
+  const fetchUrl = (url, redirectsLeft) => new Promise((resolve, reject) => {
     https.get(url, opts, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchSha256Sums(res.headers.location.replace('https://github.com/', ''), version)
-          .then(resolve, reject);
+        if (redirectsLeft <= 0) {
+          return reject(new Error(`SHA256SUMS fetch exceeded redirect limit at ${url}`));
+        }
+        // GitHub redirects to an absolute URL on release-assets.githubusercontent.com —
+        // follow it verbatim instead of trying to remap to the original github.com host.
+        const next = new URL(res.headers.location, url).toString();
+        return fetchUrl(next, redirectsLeft - 1).then(resolve, reject);
       }
       if (res.statusCode === 404) {
-        // No SHA256SUMS for this release — skip verification with a warning.
         process.stderr.write(`[clawket-setup] WARNING: SHA256SUMS not found for ${repo}@${version}. Skipping integrity check.\n`);
         return resolve(null);
       }
@@ -410,6 +416,8 @@ async function fetchSha256Sums(repo, version) {
       resolve(null);
     });
   });
+
+  return fetchUrl(initialUrl, maxRedirects);
 }
 
 function parseSha256Sums(content, filename) {
@@ -2929,5 +2937,8 @@ module.exports = {
     checkX8Evidence,
     checkX9SyncReasoning,
     getDaemonPort,
+    detectCliTarget,
+    fetchSha256Sums,
+    parseSha256Sums,
   },
 };
