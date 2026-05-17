@@ -80,7 +80,11 @@ fail_count=0
 warn_count=0
 
 count_lines() {  # count_lines <pattern> <file>
-  grep -cE "$1" "$2" 2>/dev/null || echo 0
+  # grep -c prints the count to stdout AND exits 1 when zero matches.
+  # `|| echo 0` would then append a second "0", producing "0\n0" — which
+  # later breaks `[[ "$h_ko" -ne "$h_en" ]]` with a syntax error. Suppress
+  # the non-zero exit instead of falling through to echo.
+  grep -cE "$1" "$2" 2>/dev/null; true
 }
 
 extract_urls() {  # print sorted unique URLs from markdown links
