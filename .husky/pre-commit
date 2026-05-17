@@ -1,54 +1,53 @@
 #!/bin/sh
+# Plugin shell pre-commit gate.
+# Enforces invariants documented in .claude/rules/*.md and CLAUDE.md "AI 가드레일".
+# Slow e2e tests live in CI — this hook stays under ~1s on staged-only diffs.
 
-echo "🔍 Running pre-commit checks..."
+set -u
+FAILED=0
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$STAGED" ] && exit 0
 
-# Check if web/ source files are staged (not just package.json/lock)
-WEB_STAGED=$(git diff --cached --name-only -- 'web/' || true)
-WEB_SRC=$(echo "$WEB_STAGED" | grep -E '\.(ts|tsx|css|html)$' || true)
+fail() { echo "✗ $1"; FAILED=1; }
 
-if [ -n "$WEB_SRC" ]; then
-  echo "📦 web/ source changes detected"
-
-  # Lint check
-  echo "  ▸ ESLint..."
-  cd web && npx eslint . --quiet
-  LINT_EXIT=$?
-  cd ..
-
-  if [ $LINT_EXIT -ne 0 ]; then
-    echo "❌ Lint check failed"
-    exit 1
-  fi
-  echo "  ✅ Lint passed"
-
-  # Type check (TS files)
-  TS_STAGED=$(echo "$WEB_SRC" | grep -E '\.(ts|tsx)$' || true)
-  if [ -n "$TS_STAGED" ]; then
-    echo "  ▸ TypeScript type check..."
-    cd web && npx tsc -b --noEmit
-    TSC_EXIT=$?
-    cd ..
-
-    if [ $TSC_EXIT -ne 0 ]; then
-      echo "❌ Type check failed"
-      exit 1
-    fi
-    echo "  ✅ Type check passed"
-  fi
-
-  # Build check
-  echo "  ▸ Build check..."
-  cd web && npx vite build
-  BUILD_EXIT=$?
-  cd ..
-
-  if [ $BUILD_EXIT -ne 0 ]; then
-    echo "❌ Build check failed"
-    exit 1
-  fi
-  echo "  ✅ Build passed"
-elif [ -n "$WEB_STAGED" ]; then
-  echo "📦 web/ config changes only (package.json/lock) — skipping source checks"
+# 1. Unit tests when any tracked surface changes (adapters / tests / skills / manifests / hooks).
+if echo "$STAGED" | grep -qE '^(adapters/|tests/|skills/|\.claude-plugin/|hooks/hooks\.json$|components\.json$|package\.json$|scripts/)'; then
+  echo "▸ pnpm test:unit"
+  pnpm -s test:unit || fail "unit tests failed (run: pnpm test:unit)"
 fi
 
-echo "✅ All pre-commit checks passed"
+# 2. components.json drift gate — bump must arrive with COMPATIBILITY matrix update
+#    (.claude/rules/components-json-cross-repo-lock-step.md).
+if echo "$STAGED" | grep -qx 'components.json' && ! echo "$STAGED" | grep -qx 'docs/COMPATIBILITY.md'; then
+  fail "components.json changed without docs/COMPATIBILITY.md update — see .claude/rules/components-json-cross-repo-lock-step.md"
+fi
+
+# 3. JSON validity for the 4 manifests that hooks/CLI parse at startup.
+for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json components.json hooks/hooks.json; do
+  if echo "$STAGED" | grep -qx "$f"; then
+    node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" 2>/dev/null || fail "$f is not valid JSON"
+  fi
+done
+
+# 4. Adapter shim line budget — adapters/claude/*.cjs delegate to shared helpers
+#    (CLAUDE.md "2-줄 shim 룰"). 5-line wrap pattern + margin = 8.
+for f in $(echo "$STAGED" | grep -E '^adapters/claude/.*\.cjs$' || true); do
+  [ -f "$f" ] || continue
+  lines=$(wc -l <"$f" | tr -d ' ')
+  [ "$lines" -le 8 ] || fail "$f exceeds shim budget ($lines lines > 8) — move logic to adapters/shared/claude-hooks.cjs"
+done
+
+# 5. Rule body budget — .claude/rules/*.md stay focused (README.md exempt).
+for f in $(echo "$STAGED" | grep -E '^\.claude/rules/.*\.md$' || true); do
+  [ -f "$f" ] || continue
+  [ "$(basename "$f")" = "README.md" ] && continue
+  lines=$(wc -l <"$f" | tr -d ' ')
+  [ "$lines" -le 80 ] || fail "$f exceeds rule body budget ($lines lines > 80) — split or summarize"
+done
+
+# 6. Lockfile hygiene — pnpm is the package manager of record (package.json#packageManager).
+if echo "$STAGED" | grep -qxE '(package-lock\.json|yarn\.lock)'; then
+  fail "package-lock.json / yarn.lock must not be committed — use pnpm (see package.json#packageManager)"
+fi
+
+exit $FAILED

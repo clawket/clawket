@@ -5,6 +5,10 @@ node_modules/
 *.sqlite-wal
 *.sqlite-shm
 
+# Package manager: pnpm-lock.yaml is the lockfile of record — npm/yarn lockfiles must not coexist.
+package-lock.json
+yarn.lock
+
 # Secrets
 .env
 .env.*
@@ -22,3 +26,9 @@ node_modules/
 bin/
 daemon/bin/
 web/dist/
+desktop/dl/
+
+# Plan working copies — the Clawket DB is the source of truth for plan
+# bodies; markdown snapshots under plans/ are generated/regenerated via
+# `clawket plan export` and not tracked.
+plans/
