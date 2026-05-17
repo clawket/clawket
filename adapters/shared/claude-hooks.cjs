@@ -53,6 +53,7 @@ function t(key, vars) {
 const CLI_REPO = process.env.CLAWKET_CLI_REPO || 'clawket/cli';
 const DAEMON_REPO = process.env.CLAWKET_DAEMON_REPO || 'clawket/daemon';
 const WEB_REPO = process.env.CLAWKET_WEB_REPO || 'clawket/web';
+const DESKTOP_REPO = process.env.CLAWKET_DESKTOP_REPO || 'clawket/desktop';
 
 // Corporate MITM proxies inject a private CA into the macOS keychain (or
 // Linux system trust store). Node's default TLS stack ignores those stores
@@ -806,6 +807,71 @@ async function ensureWebBundle(pluginRoot, version) {
   return webRoot;
 }
 
+// Tauri desktop bundle. Unlike CLI/daemon (executables) and web (extracted
+// bundle), the desktop artifact is a platform installer (.dmg / .msi /
+// .AppImage) staged under `pluginRoot/desktop/dl/` for the user to run
+// manually. The plugin tracks which version is "blessed" via the marker file
+// but never invokes the installer — desktop install is a user action.
+//
+// `null` pin (the v3.0.0 sentinel; see `components.json#desktop`) is an
+// explicit no-op: the desktop component is wired but not yet released, so
+// any download attempt would 404. The skip preserves install-gate idempotency.
+function desktopArtifactName(version) {
+  const platform = os.platform();
+  const arch = os.arch();
+  if (platform === 'darwin') {
+    const target = arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
+    return `clawket-desktop-${version}-${target}.dmg`;
+  }
+  if (platform === 'win32') {
+    const target = arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc';
+    return `clawket-desktop-${version}-${target}.msi`;
+  }
+  // linux (and any other unix-like)
+  const target = arch === 'arm64' ? 'aarch64-unknown-linux-gnu' : 'x86_64-unknown-linux-gnu';
+  return `clawket-desktop-${version}-${target}.AppImage`;
+}
+
+async function ensureDesktopBundle(pluginRoot, version) {
+  const desktopVersion = process.env.CLAWKET_DESKTOP_VERSION || version;
+  // null sentinel — desktop sub-repo / release does not yet exist. Skip
+  // without writing a marker so the next session re-evaluates the pin.
+  if (desktopVersion == null) return null;
+
+  const desktopRoot = path.resolve(pluginRoot, 'desktop');
+  const dlDir = path.resolve(desktopRoot, 'dl');
+  const assetName = desktopArtifactName(desktopVersion);
+  const artifactPath = path.resolve(dlDir, assetName);
+  const markerPath = path.resolve(desktopRoot, '.clawket-version');
+
+  if (fs.existsSync(artifactPath) && readInstalledVersion(markerPath) === desktopVersion) {
+    return artifactPath;
+  }
+  if (fs.existsSync(artifactPath)) {
+    process.stderr.write(
+      `[clawket-setup] desktop version mismatch (want ${desktopVersion}, have ${readInstalledVersion(markerPath) || 'unknown'}). Redownloading.\n`
+    );
+    try { fs.unlinkSync(artifactPath); } catch {}
+  }
+
+  fs.mkdirSync(dlDir, { recursive: true });
+  const url = `https://github.com/${DESKTOP_REPO}/releases/download/${desktopVersion}/${assetName}`;
+  const archiveTmp = path.resolve(dlDir, `${assetName}.tmp`);
+
+  try {
+    await downloadAndVerify(url, archiveTmp, artifactPath, { repo: DESKTOP_REPO, version: desktopVersion, assetName });
+  } catch (err) {
+    try { fs.unlinkSync(archiveTmp); } catch {}
+    throw err;
+  }
+
+  writeInstalledVersion(markerPath, desktopVersion);
+  process.stderr.write(progressMsg('install.progress.installed', {
+    component: 'desktop', version: desktopVersion, path: artifactPath,
+  }) + '\n');
+  return artifactPath;
+}
+
 function resolveWebDir(pluginRoot) {
   if (process.env.CLAWKET_WEB_DIR) return process.env.CLAWKET_WEB_DIR;
   const distPath = path.resolve(pluginRoot, 'web', 'dist');
@@ -1079,10 +1145,23 @@ async function ensureInstalled(pluginRoot) {
   const cliMarker = path.resolve(pluginRoot, 'bin', '.clawket-version');
   const daemonMarker = path.resolve(pluginRoot, 'daemon', 'bin', '.clawket-version');
   const webMarker = path.resolve(pluginRoot, 'web', '.clawket-version');
+  const desktopMarker = path.resolve(pluginRoot, 'desktop', '.clawket-version');
 
   const cliOk = fs.existsSync(cliBin) && readInstalledVersion(cliMarker) === manifest.cli;
   const daemonOk = fs.existsSync(daemonBin) && readInstalledVersion(daemonMarker) === manifest.daemon;
   const webOk = fs.existsSync(webIndex) && readInstalledVersion(webMarker) === manifest.web;
+
+  // Desktop component: `null` pin is the v3.0.0 sentinel (sub-repo + first
+  // release not yet published). The skip MUST evaluate to true so the
+  // fast-path AND-chain does not force a perpetual reinstall loop, but
+  // MUST NOT write a marker (no install actually happened). When the pin
+  // becomes a string tag, this collapses to the same marker check as the
+  // other components.
+  const desktopPin = manifest.desktop;
+  const desktopOk = desktopPin == null
+    ? true
+    : fs.existsSync(path.resolve(pluginRoot, 'desktop', 'dl', desktopArtifactName(desktopPin)))
+      && readInstalledVersion(desktopMarker) === desktopPin;
 
   // v3.0 R2 fix (US-CKT-PROMOTE-018): verify the 6 PDD skill RULE.md +
   // SKILL.md files are present in the plugin tree. A partial install (e.g.
@@ -1091,7 +1170,7 @@ async function ensureInstalled(pluginRoot) {
   // would otherwise resolve to nothing at runtime.
   const skillsOk = verifyPddSkills(pluginRoot);
 
-  if (cliOk && daemonOk && webOk && skillsOk) return true; // fast path — no lock needed
+  if (cliOk && daemonOk && webOk && desktopOk && skillsOk) return true; // fast path — no lock needed
 
   process.stderr.write(progressMsg('install.progress.first_run', {}) + '\n');
   await withInstallLock(() => runSetup());
@@ -2789,6 +2868,18 @@ async function runSetup() {
     failures.push(new Error(`web: ${error.message}`));
   }
 
+  // Desktop bundle — `null` pin is a no-op skip (v3.0.0 sentinel). When the
+  // pin is a string tag, a download failure is non-fatal: the desktop app is
+  // an optional companion (CLI/daemon/web carry the full plugin contract),
+  // so we record the failure for visibility without blocking the install.
+  try {
+    await ensureDesktopBundle(pluginRoot, manifest.desktop);
+  } catch (error) {
+    const hint = `Hint: download the desktop installer from https://github.com/${DESKTOP_REPO}/releases manually, or rerun setup with CLAWKET_DESKTOP_VERSION override.`;
+    process.stderr.write(`[clawket-setup] desktop bundle install failed: ${error.message}\n[clawket-setup] ${hint}\n`);
+    failures.push(new Error(`desktop: ${error.message}`));
+  }
+
   linkCliToUserBin(pluginRoot);
   // Node's default https Agent keeps download sockets alive past completion,
   // which prevents natural event-loop exit. Destroy the pool explicitly so
@@ -2824,6 +2915,8 @@ module.exports = {
     ensureCliBinary,
     ensureDaemonBinary,
     ensureWebBundle,
+    ensureDesktopBundle,
+    desktopArtifactName,
     isProjectDisabled,
     readInstalledVersion,
     strictGuideMessage,
