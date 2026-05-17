@@ -38,7 +38,7 @@ the tested combination here.
 | `3.0.1` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
-versions consumed by setup live in `components.json` (current: `daemon: v3.0.1`, `cli: v3.0.1`, `web: v3.0.0`).
+versions consumed by setup live in `components.json` (current: `daemon: v3.0.1`, `cli: v3.0.1`, `web: v3.0.1`).
 The `desktop` column entered the matrix in v3.0.0; the `—` for prior rows reflects that the
 component did not exist. The v3.0.0 pin is `null` until the first `clawket/desktop` GitHub
 Release lands — install gate treats `null` as a no-op skip.
