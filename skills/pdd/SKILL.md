@@ -1,11 +1,11 @@
 ---
 name: pdd-plan
-description: PDD Plan + Unit 사전 예비 설계 — Done 명제, Unit 분해, 의존성 그래프, 수렴 조건 박기. 발견-수렴 루프의 Phase 1 진입점. Clawket plugin 정본 skill (v3.0). RULE.md (pdd.md v3.0) 적용.
+description: PDD Plan + Unit 사전 예비 설계 — Done 명제, Unit 분해, 의존성 그래프, 수렴 조건 박기. 발견-수렴 루프의 Phase 1 진입점. Clawket plugin 정본 skill. RULE.md (pdd.md) 적용.
 ---
 
 # /pdd-plan — Plan + Unit 사전 예비 설계
 
-발견-수렴 루프의 Phase 1 진입점. `skills/pdd/RULE.md` (pdd.md v3.0 룰) 의 운영 인터페이스. Phase 0 (`/scenario-author`) 산출 knowledge 를 입력으로 받아 Plan/Unit 골격을 박는다.
+발견-수렴 루프의 Phase 1 진입점. `skills/pdd/RULE.md` (pdd.md 룰) 의 운영 인터페이스. Phase 0 (`/scenario-author`) 산출 knowledge 를 입력으로 받아 Plan/Unit 골격을 박는다.
 
 ## 입력
 
@@ -74,18 +74,10 @@ clawket plan approve <PLAN_ID>
 - **X5**. 수렴 조건 부재 → 재분해
 - **X6**. 시간 기반 종료 ("2주 후") → 산출물 기반 재정의
 
-## v3.0 변화 요약 (구 룰과의 차이)
-
-- **구 X7 (cross-unit cycle) 기각** — Cycle 은 Unit 에 묶이지 않는다
-- **구 X8 (동일 Unit 동시 cycle) 기각** — 운영 판단 영역
-- **구 X9 (cycle 활성 전 task 미리 박기) 기각** — sub-agent batch 가 자연 해소
-- **구 O4 (cycle 첫 task = scope) 기각** — 9000-런 내내 따른 적 없음
-- **신규 T7 (scenario_id 강제) + T8 (evidence 강제)** — schema 차원 (NOT NULL 후보)
-
 ## 자율 Run 정책 (PDD O8)
 
 자율 dispatch 시 불가침:
-- 2.x 런타임 상태 수정 금지 (`~/.local/share/clawket`, `~/.cache/clawket`, `~/.config/clawket`, `~/.local/state/clawket`, `~/.claude/plugins/clawket-*`)
+- 런타임 상태 수정 금지 (`~/.local/share/clawket`, `~/.cache/clawket`, `~/.config/clawket`, `~/.local/state/clawket`, `~/.claude/plugins/clawket-*`)
 - DB DROP/DELETE/TRUNCATE 절대 금지
 - git reset/commit/push/tag/release 절대 금지
 
