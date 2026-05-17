@@ -48,13 +48,7 @@ function execDiag(cmd, opts = {}) {
 
 function readHookInput() {
   try {
-    const chunks = [];
-    const fd = fs.openSync('/dev/stdin', 'r');
-    const buf = Buffer.alloc(65536);
-    let n;
-    while ((n = fs.readSync(fd, buf)) > 0) chunks.push(Buffer.from(buf.slice(0, n)));
-    fs.closeSync(fd);
-    return JSON.parse(Buffer.concat(chunks).toString());
+    return JSON.parse(fs.readFileSync(0, 'utf-8'));
   } catch {
     return {};
   }
