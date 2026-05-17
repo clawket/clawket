@@ -116,7 +116,7 @@ test('Scenario 4 — marketplace install-data command hard-blocked without CLAWK
     tool_input: { command: incidentCmd },
     cwd: process.cwd(),
   });
-  const env = { ...process.env };
+  const env = { ...process.env, CLAWKET_LOCALE: 'ko' };
   delete env.CLAWKET_ALLOW_DESTRUCTIVE;
   const res = spawnSync('node', [HOOK], { input: payload, env, encoding: 'utf-8', timeout: 15000 });
   let parsed = null;
