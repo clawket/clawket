@@ -37,6 +37,7 @@ the tested combination here.
 | `3.0.4` | `>=0.2.0 <1.0.0` (pin: `v0.2.4`) | `>=0.2.0 <1.0.0` (pin: `v0.2.6`) | `>=0.1.0 <1.0.0` (pin: `v0.1.0`) | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 | `3.0.5` | `>=0.2.0 <1.0.0` (pin: `v0.2.5`) | `>=0.2.0 <1.0.0` (pin: `v0.2.7`) | `>=0.1.0 <2.0.0` (pin: `v1.0.0`) | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 | `3.0.6` | `>=0.2.0 <1.0.0` (pin: `v0.2.5`) | `>=0.2.0 <1.0.0` (pin: `v0.2.7`) | `>=0.1.0 <2.0.0` (pin: `v1.0.0`) | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
+| `3.0.7` | `>=0.2.0 <1.0.0` (pin: `v0.2.5`) | `>=0.2.0 <1.0.0` (pin: `v0.2.7`) | `>=0.1.0 <2.0.0` (pin: `v1.0.0`) | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
 versions consumed by setup live in `components.json` (current: `daemon: v0.2.5`, `cli: v0.2.7`, `web: v1.0.0`).
