@@ -15,9 +15,9 @@
     "husky": "^9.1.7"
   },
   "compat": {
-    "@clawket/cli": ">=3.0.0 <4.0.0",
-    "@clawket/daemon": ">=3.0.0 <4.0.0",
-    "@clawket/web": ">=3.0.0 <4.0.0",
+    "@clawket/cli": ">=0.2.0 <1.0.0",
+    "@clawket/daemon": ">=0.2.0 <1.0.0",
+    "@clawket/web": ">=0.1.0 <2.0.0",
     "@clawket/desktop": ">=3.0.0 <4.0.0"
   }
 }
