@@ -1,6 +1,6 @@
 {
   "daemon": "v3.0.0",
-  "cli": "v3.0.0",
+  "cli": "v3.0.1",
   "web": "v3.0.0",
   "desktop": null,
   "vendor_adapter": null
