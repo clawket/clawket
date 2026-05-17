@@ -39,7 +39,7 @@
 - 새 shim 도입 시 `tests/` 에 brick 시나리오 회귀 테스트 추가
 
 ### DON'T
-- shim 안에 비즈니스 로직을 넣지 마라 (별도 `adapter-shim-delegation-pattern.md` 참조) — 로직이 들어가는 순간 error path 가 늘어나 wrap 만으로 충분하지 않게 된다
+- shim 안에 비즈니스 로직을 넣지 마라 — `adapters/claude/*.cjs` 7개 shim 은 `adapters/shared/claude-hooks.cjs` 의 헬퍼에 위임만 한다 (CLAUDE.md `## AI 가드레일` 의 "2-줄 shim 룰"). 로직이 들어가는 순간 error path 가 늘어나 wrap 만으로 충분하지 않게 된다
 - shared 함수에서 `process.exit(non-zero)` 를 호출하지 마라 — 의도된 deny 라도 exit code 가 아닌 `permissionDecision: 'deny'` JSON 으로 표현
 - `unhandledRejection` 핸들러를 shim 마다 다르게 설치하지 마라 — pattern 통일이 brick 회귀 추적을 가능하게 한다
 - 예외 메시지를 swallow 하지 마라 — `[clawket] <hook> failed: ${err.message}` 같은 actionable prefix 와 함께 stderr 로 흘린다

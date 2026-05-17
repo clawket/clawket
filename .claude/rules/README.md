@@ -12,7 +12,6 @@ Clawket plugin shell sub-repo (`github.com/clawket/clawket`) 특화 가드레일
 | `hook-handler-error-safety.md` | 7 hook shim 의 unhandled throw 가 Claude Code 세션을 brick 하지 않도록 wrap pattern 통일 |
 | `skill-file-integrity-on-install.md` | 6 PDD skill × 2 file (SKILL.md + RULE.md) 무결성을 fast-path 가 강제로 검사 — partial release 차단 |
 | `components-json-cross-repo-lock-step.md` | 컴포넌트 핀 bump 시 GitHub Release + COMPATIBILITY.md + plugin major 의 4-step 동시 갱신 강제 |
-| `adapter-shim-delegation-pattern.md` | `adapters/claude/*.cjs` 는 2-5 line thin shim, 로직은 `adapters/shared/claude-hooks.cjs` 단일 정본 |
 | `xdg-path-separation-invariant-lm8.md` | 플러그인 코드 어디서도 사용자 데이터 (`~/.local/share/clawket/` 등) 에 write 금지 — plugin reinstall 시 데이터 손실 방지 (LM-8) |
 
 ## 적용 범위
