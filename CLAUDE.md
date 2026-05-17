@@ -18,8 +18,8 @@ gate 가 `components.json` 의 핀에 따라 GitHub Releases 에서 바이너리
 | 패키지 | `package.json` — `name: "clawket-plugin"`, `version: 3.0.0`, scripts: `setup` / `dev:fresh-install` / `test` |
 | 플러그인 ID | `clawket` (`.claude-plugin/plugin.json`) — v3.0.0 |
 | MCP 등록 | `.mcp.json` → stdio `clawket mcp` (CLI 바이너리에 내장된 rmcp 1.5 서버) |
-| Compat 범위 | `@clawket/{cli,daemon,web} >=3.0.0 <4.0.0` (`package.json#compat`) |
-| 컴포넌트 핀 | `components.json` — `daemon/cli/web = v3.0.0`, `vendor_adapter = null` |
+| Compat 범위 | `@clawket/{cli,daemon,web,desktop} >=3.0.0 <4.0.0` (`package.json#compat`) |
+| 컴포넌트 핀 | `components.json` — `daemon/cli/web = v3.0.0`, `desktop = null` (sentinel; activates when first `clawket/desktop` release lands), `vendor_adapter = null` |
 | Clawket 프로젝트 | `PROJ-lattice-mono` (key `LM`) — wrapper 와 모든 sub-repo 공유 |
 
 ## Hook 라우팅 (`hooks/hooks.json`)
@@ -48,19 +48,24 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 않는다. 동작:
 
 1. `components.json` 매니페스트 로드 (실패 시 stderr 경고 + `false`).
-2. Fast-path 검사 — `bin/clawket`, `daemon/bin/clawketd`, `web/dist/index.html` 의
-   존재 + `.clawket-version` 마커가 핀된 버전과 일치하는지 + PDD 6 skill 무결성
-   (`verifyPddSkills`). 모두 OK 면 즉시 `true`.
+2. Fast-path 검사 — `bin/clawket`, `daemon/bin/clawketd`, `web/dist/index.html`,
+   `desktop/dl/<artifact>` 의 존재 + `.clawket-version` 마커가 핀된 버전과
+   일치하는지 + PDD 6 skill 무결성 (`verifyPddSkills`). 모두 OK 면 즉시
+   `true`. 단, `components.json#desktop` 이 `null` (v3.0.0 sentinel — desktop
+   sub-repo / first release 미배포) 일 때는 desktop 체크가 항상 통과한다.
 3. 그렇지 않으면 `withInstallLock(() => runSetup())` — `runSetup` 은
-   `ensureCliBinary` / `ensureDaemonBinary` / `ensureWebBundle` 순서로 GitHub Releases
-   에서 받아 `pluginRoot` 아래에 푼다 (`adapters/shared/claude-hooks.cjs:2761`).
+   `ensureCliBinary` / `ensureDaemonBinary` / `ensureWebBundle` /
+   `ensureDesktopBundle` 순서로 GitHub Releases 에서 받아 `pluginRoot` 아래에
+   푼다 (`adapters/shared/claude-hooks.cjs:2761`). `ensureDesktopBundle` 은
+   `null` 핀을 no-op 으로 skip 하므로 v3.0.0 에서는 실제 다운로드가 일어나지
+   않는다.
 4. Post-install 검증 — 데몬을 띄우고 `/health` ping. 실패 시 daemon 마커를 무효화해
    다음 세션이 재시도하도록 만들고 `false` 반환.
 
 진입점:
 - 자동: `adapters/claude/session-start.cjs` 첫 줄의 `runSessionStart()` 가
   `ensureInstalled` 를 호출 (`adapters/shared/claude-hooks.cjs:1614`).
-- 수동/CI: `npm run setup` → `scripts/setup.cjs` → `adapters/claude/setup.cjs` →
+- 수동/CI: `pnpm run setup` → `scripts/setup.cjs` → `adapters/claude/setup.cjs` →
   `runSetup()` (gate 의 download 단계만 직접 호출).
 
 ## 경로 분리 invariant (LM-8)
@@ -73,6 +78,7 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 | `~/.claude/plugins/clawket-*/bin/clawket` | CLI 바이너리 | 삭제 → 재다운로드 |
 | `~/.claude/plugins/clawket-*/daemon/bin/clawketd` | 데몬 바이너리 | 삭제 → 재다운로드 |
 | `~/.claude/plugins/clawket-*/web/dist/` | 웹 번들 | 삭제 → 재다운로드 |
+| `~/.claude/plugins/clawket-*/desktop/dl/` | Tauri 데스크톱 installer (.dmg/.msi/.AppImage); `null` 핀일 때 비어있음 | 삭제 → 재다운로드 (또는 null skip) |
 | `~/.local/share/clawket/` (SQLite 등) | 사용자 데이터 | **보존** |
 | `~/.cache/clawket/` (socket / pid / port) | 캐시 | **보존** |
 | `~/.config/clawket/` | 설정 | **보존** |
@@ -139,10 +145,13 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 
 ```bash
 node --version                # 20+ 필요
-npm run test                  # node --test tests/*.test.cjs (의존성 zero)
-npm run setup                 # ensureInstalled 수동 트리거 (현재 cwd 와 무관)
-npm run dev:fresh-install     # 핀된 바이너리 클린 재설치 (개발 루프)
+pnpm install                  # 개발 의존성 설치 (husky 만; runtime deps 는 zero)
+pnpm test                     # node --test tests/*.test.cjs
+pnpm run setup                # ensureInstalled 수동 트리거 (현재 cwd 와 무관)
+pnpm run dev:fresh-install    # 핀된 바이너리 클린 재설치 (개발 루프)
 ```
+
+**패키지 매니저** — `packageManager: "pnpm@10.x"` 가 `package.json` 에 핀되어 있고 `package-lock.json` / `yarn.lock` 은 `.gitignore` 로 차단된다. 기여자는 `corepack enable` 또는 동일 메이저의 pnpm 을 사용한다 (npm install 은 husky `prepare` 만 실행해 동작하지만, 다른 lockfile 을 만들면 안 된다).
 
 테스트 스위트 (`tests/*.test.cjs`) 는 install/hook 게이트의 회귀를 잡는다 —
 `destructive-patterns`, `disabled-project-bypass`, `exit-plan-mode-strict`,

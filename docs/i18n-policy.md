@@ -11,19 +11,30 @@ This policy fixes the drift problem at the knowledge level (which file is
 authoritative in which language) and at the timing level (how long a
 mismatch is allowed to live before CI complains).
 
-## Policy by knowledge
+## Two axes: documentation vs runtime strings
+
+This policy has two independent scopes:
+
+1. **Documentation translation** (`*.md`, landing pages) — bilingual **English + Korean** only. Tracks drift via the `i18n-sync` workflow.
+2. **Runtime locale strings** (CLI output, hook messages, daemon errors) — trilingual **English + Korean + Japanese**, resolved per-invocation through the `CLAWKET_LOCALE` env var with chained fallback. Not tracked for drift in the same way as documentation; missing keys fall back to the next locale in the chain.
+
+The runtime axis lives in `clawket/locales/{en,ko,ja}.json`, `clawket/adapters/shared/locale.cjs`, and `clawket/destructive-patterns.json` (per-locale phrase tables). Adding a fourth runtime locale is a code change (add the JSON bundle + extend `SUPPORTED`), not a documentation change.
+
+The documentation axis (below) is intentionally **not** extended to Japanese — there is no `*.ja.md` sibling track and no maintainer commitment to keep one in sync.
+
+## Policy by knowledge (documentation axis)
 
 | Knowledge | Authoritative language | Translation | Drift policy |
 |---|---|---|---|
 | `landing/` (clawket.dev) | English | Korean (`/ko/` path or `*.ko.html`) | Translation must exist before launch. Drift > 14d warns, > 21d fails CI. |
-| `*/README.md` | English | `*/README.ko.md` | Translation must exist for `clawket`, `cli`, `daemon`, `web` (the four user-facing repos). `mcp` is deprecated — README.ko optional. `landing`, `tap`, `evals` — translation optional. |
+| `*/README.md` | English | `*/README.ko.md` | Translation must exist for `clawket`, `cli`, `daemon`, `web`, `desktop` (the five user-facing repos). `mcp` is deprecated — README.ko optional. `landing`, `tap`, `evals` — translation optional. |
 | `*/CONTRIBUTING.md` | English | none required | Internal contributors are bilingual. No `.ko` sibling needed. |
 | `*/ROADMAP.md`, `*/CODE_OF_CONDUCT.md` | English | none required | Standard OSS docs in English only. |
 | `clawket/CLAUDE.md`, `lattice-mono/**/CLAUDE.md` | Korean | none | Maintainer-internal operating notes. Translation explicitly **not** wanted (would drift). |
 | `clawket/plans/*.md` | Korean | none | Internal planning. Same reason as CLAUDE.md. |
 | Issue / PR templates | English | none | English-only — issues/PRs can be filed in either language but the form prompts are English. |
-| Launch posts | language-of-the-channel | n/a | HN / Reddit / awesome-claude-code: English. r/Korean / dev.to KR / 한국어 SNS: Korean. No drift tracking — they are point-in-time. |
-| Commit messages | English (Conventional Commits) | n/a | The release workflow auto-bumps SemVer from English prefixes (`feat:`, `fix:`); Korean commit subjects break that. |
+| Launch posts | language-of-the-channel | n/a | HN / Reddit / awesome-claude-code: English. r/Korean / dev.to KR / 한국어 SNS: Korean. Japanese: dev.to / Qiita posts when launched. No drift tracking — they are point-in-time. |
+| Commit messages | English (Conventional Commits) | n/a | The release workflow auto-bumps SemVer from English prefixes (`feat:`, `fix:`); non-English commit subjects break that. |
 
 ## Drift detection
 
@@ -60,7 +71,7 @@ repo with an ADR home today).
 | `^## ` header count mismatch | 0 | always fail |
 | Fenced code-block count mismatch | 0 | always fail |
 | Outbound link URL set mismatch (URL set, not link text) | warn at any difference | fail when ≥ 5 URLs differ |
-| Missing `.ko.md` sibling for a "must-translate" repo (clawket, cli, daemon, web) | n/a | always fail |
+| Missing `.ko.md` sibling for a "must-translate" repo (clawket, cli, daemon, web, desktop) | n/a | always fail |
 
 A header count mismatch fails immediately because that almost always
 means a section was added on the English side without translation, and

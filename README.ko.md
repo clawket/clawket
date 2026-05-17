@@ -179,17 +179,17 @@ Claude Code
 
 ## 디렉토리 구조
 
-이 레포는 얇은 플러그인 쉘입니다. cli / daemon / web 소스는 `clawket` GitHub
-조직의 형제 레포에 있고, setup 이 `clawket`, `clawketd` 바이너리와 웹 번들을
-GitHub Releases 에서 받아옵니다. 플러그인 설치 시 Rust toolchain 이나 npm
-install 은 실행되지 않습니다.
+이 레포는 얇은 플러그인 쉘입니다. cli / daemon / web / desktop 소스는 `clawket`
+GitHub 조직의 형제 레포에 있고, setup 이 `clawket`, `clawketd` 바이너리, 웹
+번들, (핀된 경우) Tauri 데스크톱 installer 를 GitHub Releases 에서 받아옵니다.
+플러그인 설치 시 Rust toolchain 이나 npm install 은 실행되지 않습니다.
 
 ```
 clawket/
 ├── .claude-plugin/          # Claude 플러그인 매니페스트 + 마켓플레이스 메타
 ├── .mcp.json                # `clawket mcp` (stdio) 등록 — `clawket` CLI 직접 호출
 ├── hooks/hooks.json         # Claude 훅 라우팅 매니페스트
-├── components.json          # setup 이 사용하는 cli / daemon / web 바이너리 핀 버전
+├── components.json          # setup 이 사용하는 cli / daemon / web / desktop 바이너리 핀 버전
 ├── skills/clawket/          # /clawket 스킬 (SKILL.md)
 ├── prompts/                 # 공용 + 런타임별 프롬프트 조각
 ├── adapters/
@@ -202,7 +202,8 @@ clawket/
 ├── screenshots/             # 대시보드 스크린샷
 ├── bin/                     # (setup 이 생성) 다운로드한 clawket CLI 바이너리
 ├── daemon/bin/              # (setup 이 생성) 다운로드한 clawketd 바이너리
-└── web/dist/                # (setup 이 생성) 압축 해제된 웹 대시보드 번들
+├── web/dist/                # (setup 이 생성) 압축 해제된 웹 대시보드 번들
+└── desktop/dl/              # (setup 이 생성; null 핀일 때는 비어있음) 다운로드한 Tauri installer
 ```
 
 ### 분리 레포
@@ -212,6 +213,7 @@ clawket/
 | [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI + 내장 `clawket mcp` (rmcp 1.5) | GitHub Releases 바이너리 |
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust 데몬 (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases 바이너리 |
 | [`clawket/web`](https://github.com/clawket/web) | React 대시보드 | GitHub Releases tarball |
+| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 데스크톱 앱 (web 과 동일한 SPA 렌더) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — v3.0.0 에서는 `null` 핀, 첫 릴리즈 대기 중 |
 | [`clawket/landing`](https://github.com/clawket/landing) | 공개 랜딩 페이지 | Cloudflare Pages |
 | [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formula | Homebrew 배포 채널 |
 

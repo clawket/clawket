@@ -13,8 +13,11 @@ Each component has its own repo and its own auto-release workflow. When a coordi
 | 1 | `clawket/daemon`   | Rust daemon | GitHub Releases (5 platform binaries) |
 | 2 | `clawket/cli`      | Rust CLI + embedded `clawket mcp` | GitHub Releases (5 platform binaries) |
 | 3 | `clawket/web`      | React dashboard | GitHub Releases tarball |
-| 4 | `clawket/clawket`  | Plugin shell | Marketplace install (`marketplace.json` on `main` HEAD) + git tag |
-| 5 | `clawket/landing`  | Public landing page | Cloudflare Pages |
+| 4 | `clawket/desktop`  | Tauri 2 desktop app (depends on web bundle for renderer assets) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — `null`-pinned in `components.json` until first release |
+| 5 | `clawket/clawket`  | Plugin shell | Marketplace install (`marketplace.json` on `main` HEAD) + git tag |
+| 6 | `clawket/landing`  | Public landing page | Cloudflare Pages |
+
+`clawket/desktop` slots between `web` and the plugin shell because it consumes the `web` tarball at build time (Tauri bundles the SPA into the renderer). During the v3.0.0 window the desktop pin is `null` (sentinel — sub-repo + first release pending), and the install gate treats that as a no-op skip; the order step is enforced only when the pin becomes a string tag.
 
 `clawket/mcp` (legacy Node MCP server) is no longer part of the release chain — removed from plugin dependencies in v2.3.2 and **archived** in plugin v11 U4 (final deprecation commit `542c397`; the local working copy was removed, the GitHub repo is read-only and remains as the npm replacement pointer).
 

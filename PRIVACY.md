@@ -12,6 +12,7 @@ All data is stored locally on your machine:
 
 - **Database**: `~/.local/share/clawket/db.sqlite` (or `$CLAWKET_DATA_DIR`)
 - **Cache**: `~/.cache/clawket/` (or `$CLAWKET_CACHE_DIR`)
+- **Configuration**: `~/.config/clawket/` (or `$CLAWKET_CONFIG_DIR`)
 - **Logs**: `~/.local/state/clawket/` (or `$CLAWKET_STATE_DIR`)
 
 Paths follow the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/) and can be overridden via environment variables.
@@ -40,6 +41,7 @@ To remove all Clawket data, delete the following directories:
 ```bash
 rm -rf ~/.local/share/clawket
 rm -rf ~/.cache/clawket
+rm -rf ~/.config/clawket
 rm -rf ~/.local/state/clawket
 ```
 
@@ -49,4 +51,4 @@ For privacy-related questions, open an issue at [github.com/clawket/clawket](htt
 
 ---
 
-*Last updated: 2026-04-15*
+*Last updated: 2026-05-14*

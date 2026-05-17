@@ -179,17 +179,18 @@ Web Dashboard (React 19) ──────▶ clawketd HTTP API + SSE
 
 ## Project Structure
 
-This repo is a thin plugin shell. Source for cli / daemon / web lives in
-sibling repos under the `clawket` GitHub org. Setup pulls compiled binaries
-(`clawket`, `clawketd`) and the web bundle from GitHub Releases — no Rust
-toolchain or npm install runs at plugin install time.
+This repo is a thin plugin shell. Source for cli / daemon / web / desktop lives
+in sibling repos under the `clawket` GitHub org. Setup pulls compiled binaries
+(`clawket`, `clawketd`), the web bundle, and (when pinned) the Tauri desktop
+installer from GitHub Releases — no Rust toolchain or npm install runs at
+plugin install time.
 
 ```
 clawket/
 ├── .claude-plugin/          # Claude plugin manifest + marketplace metadata
 ├── .mcp.json                # Registers `clawket mcp` (stdio) — invokes the `clawket` CLI directly
 ├── hooks/hooks.json         # Claude hook routing manifest
-├── components.json          # Pinned versions of cli / daemon / web binaries consumed by setup
+├── components.json          # Pinned versions of cli / daemon / web / desktop binaries consumed by setup
 ├── skills/clawket/          # /clawket skill (SKILL.md)
 ├── prompts/                 # Shared + runtime-specific prompt fragments
 ├── adapters/
@@ -202,7 +203,8 @@ clawket/
 ├── screenshots/             # Dashboard screenshots
 ├── bin/                     # (created by setup) downloaded clawket CLI binary
 ├── daemon/bin/              # (created by setup) downloaded clawketd binary
-└── web/dist/                # (created by setup) extracted web dashboard bundle
+├── web/dist/                # (created by setup) extracted web dashboard bundle
+└── desktop/dl/              # (created by setup; empty while pin is null) downloaded Tauri installer
 ```
 
 ### Separate repos
@@ -212,6 +214,7 @@ clawket/
 | [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI + embedded `clawket mcp` (rmcp 1.5) | GitHub Releases binary |
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust daemon (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases binary |
 | [`clawket/web`](https://github.com/clawket/web) | React dashboard | GitHub Releases tarball |
+| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app (renders the same SPA as `web`) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — pinned to `null` in v3.0.0 until first release |
 | [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Cloudflare Pages |
 | [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formulas | Homebrew distribution channel |
 
