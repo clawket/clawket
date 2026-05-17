@@ -35,6 +35,7 @@ the tested combination here.
 | `2.3.11` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
 | `2.3.12` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | `>=2.2.0 <3.0.0` | — | n/a |
 | `3.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
+| `3.0.1` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
 versions consumed by setup live in `components.json` (current: `daemon: v3.0.1`, `cli: v3.0.1`, `web: v3.0.0`).
