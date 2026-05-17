@@ -1,9 +1,9 @@
-# QA Fix 규칙 (Defect Resolution, v3.0)
+# QA Fix 규칙 (Defect Resolution)
 
 > **상태: STABLE — Clawket plugin 정본.** 본 파일은 `/qa-fix` skill 의 규칙
-> 본체다. qa-flow v3.0 의 §3 절대 규칙 #4 (결함 fix task 는 별도 plan 의
-> 라운드 unit 에 등록) 와 PDD v3.0 의 Task Quality Criteria (T1~T8) 를 운영
-> 기준으로 삼는다.
+> 본체다. qa-flow 의 §3 절대 규칙 #4 (결함 fix task 는 별도 plan 의 라운드
+> unit 에 등록) 와 PDD 의 Task Quality Criteria (T1~T8) 를 운영 기준으로
+> 삼는다.
 >
 > 전체 qa-flow 규칙은 `skills/qa-batch/RULE.md` 를 참조한다.
 
@@ -60,22 +60,8 @@ qa-flow §3 절대 규칙 #1: QA plan 안에서 코드 수정 금지. 수정은 
 
 ## 자율 Run 정책 (PDD O8)
 
-- 2.x 런타임 / DB DDL / git 작업 절대 금지
+- 런타임 / DB DDL / git 작업 절대 금지
 - 코드 수정은 fix task in_progress 상태에서만
 - 수정 범위는 evidence file:line 에서 최소 trace — 무관한 리팩토링 금지
   (별도 task 필요)
 - ALTER TABLE ADD COLUMN (non-destructive) 만 허용
-
-## 라운드 데이터 참고 (9000-런)
-
-| 라운드 | defect 수 | 비고 |
-|--------|-----------|------|
-| R2 | 458 | 초기 대규모 결함 발견 |
-| R3 | 54 | -88% (정상 수렴) |
-| R4 | 17 | -69% |
-| R5 | 1 | -94% |
-| R6 | 0 | 수렴 |
-| R7 | 0 | 2 라운드 연속 0 → 완료 |
-
-단조 감소 패턴 확인. R3 에서 420 scenario_error 가 발생한 것은 시나리오층
-정련이 코드층 수렴보다 앞서 일어나는 자연 패턴.

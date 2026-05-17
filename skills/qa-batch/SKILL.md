@@ -1,13 +1,13 @@
 ---
 name: qa-batch
-description: Sub-agent batch dispatch + TSV evidence emit + Python ThreadPoolExecutor 16-worker bulk sync transcription. 9000-태스크 자율 런 검증 패턴 캡슐화. PDD A8 운영 인터페이스. Clawket plugin 정본 skill (v3.0). RULE.md (qa-flow.md v3.0) 적용.
+description: Sub-agent batch dispatch + TSV evidence emit + Python ThreadPoolExecutor 16-worker bulk sync transcription. PDD A8 운영 인터페이스. Clawket plugin 정본 skill. RULE.md (qa-flow.md) 적용.
 ---
 
 # /qa-batch — Sub-agent batch dispatch + bulk sync transcription
 
-`/discover-loop` 의 Round R 안에서 호출되는 reasoning 단계. 9000-태스크 자율 런
-회고에서 추출한 검증된 작업 패턴: **reasoning (sub-agent batch) ≠ sync (bulk
-transcription)** 분리. 하나라도 섞이면 X9 anti-pattern.
+`/discover-loop` 의 Round R 안에서 호출되는 reasoning 단계. 검증된 작업 패턴:
+**reasoning (sub-agent batch) ≠ sync (bulk transcription)** 분리. 하나라도
+섞이면 X9 anti-pattern.
 
 ## 핵심 모델
 
@@ -93,7 +93,7 @@ evidence 부재 = X8 anti-pattern → 거부 + 재실행.
 
 ## 2단계: Bulk sync transcription (sync only)
 
-### Python ThreadPoolExecutor 패턴 (9000-런 검증됨)
+### Python ThreadPoolExecutor 패턴
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -148,7 +148,7 @@ with ThreadPoolExecutor(max_workers=16) as ex:
 
 ## Batch attention 분산 검증
 
-9000-런 회고: 87 시나리오/agent 배치는 attention dilution 위험.
+배치 크기가 30 시나리오를 초과하면 attention dilution 위험이 관찰된다.
 30 이하가 reasoning 품질 보장 임계.
 
 검증 휴리스틱:
@@ -191,7 +191,7 @@ with ThreadPoolExecutor(max_workers=16) as ex:
 
 ## 자율 Run 정책 (PDD O8)
 
-- 2.x 런타임 / DB DDL / git 작업 절대 금지
+- 런타임 / DB DDL / git 작업 절대 금지
 - ALTER TABLE ADD COLUMN (non-destructive) 만 허용
 - TSV knowledge 는 영속 (`type=evidence, title=Round R evidence — <도메인>`)
 - knowledge 본체는 *현재 라운드* 만 (히스토리는 cancelled task comment + audit
@@ -203,14 +203,6 @@ with ThreadPoolExecutor(max_workers=16) as ex:
 - Clawket task DB rows (1:1 매핑)
 - batch_id 추적 메타 (attention dilution 의심 시 격리 가능)
 - 다음 단계 (`/discover-loop` 의 3-way 수렴 판정으로 복귀)
-
-## 9000-런 검증 데이터 (참고)
-
-- R2: 458 defect / 29 scenario_error
-- R3: 54 defect / 420 scenario_error (390 reclassify 발생) → R4 안정
-- R4-R7: defect 17 → 1 → 0 → 0 (수렴)
-- 1218 시나리오 / 14 unit / 7 라운드 — 87 시나리오/agent 배치는 attention 분산
-  관찰됨, 30 이하로 보수 조정
 
 ## 관련 파일
 
