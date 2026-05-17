@@ -22,7 +22,7 @@
 ## Enforcement gap
 - `verifyPddSkills` 가 `ok=false` 일 때 fast-path 에서 `skillsOk` 가 false 가 되어 재설치 트리거 — 하지만 `runSetup` 자체는 skills/ 를 재배포하지 않는다 (binary + web bundle 만)
 - `plugin.json#skillsList` 와 `verifyPddSkills` 의 hardcoded array 가 분리되어 있어 한쪽만 변경 가능 (현재 manual sync)
-- `marketplace.json` 의 skills 배열도 별개 — 3-source 동기화 필요
+- `plugin.json#skillsList` 는 install 시 정본. `marketplace.json` 에는 skills 배열을 **두지 않는다** (Claude Code marketplace schema 가 거부 → install 실패)
 
 ## Rule body
 
@@ -30,7 +30,7 @@
 - 새 PDD skill 추가 시 **3 곳을 한 commit 에서** 갱신:
   1. `skills/<new>/SKILL.md` + `skills/<new>/RULE.md` 두 파일 생성 (RULE.md 는 `상태: STABLE — Clawket plugin 정본` 라벨 포함)
   2. `adapters/shared/claude-hooks.cjs:1053` 의 `skills` 배열에 이름 추가
-  3. `.claude-plugin/plugin.json#skillsList` 및 `.claude-plugin/marketplace.json` 의 plugins[0].skills 배열에 entry 추가 (`name` + `description` + `path`)
+  3. `.claude-plugin/plugin.json#skillsList` 에 entry 추가 (`name` + `path` + `description`). **`marketplace.json` 에는 skills 를 두지 않는다** — Claude Code marketplace schema 가 거부함
 - skill 명을 rename 시 `tests/skills-integrity.test.cjs:17` 의 `PDD_SKILLS` 배열도 동시 변경
 - release tarball 빌드 후 `tests/skills-integrity.test.cjs` 가 통과하는지 확인 — partial extract 검출
 - `RULE.md` 의 STABLE 라벨은 plugin 정본 표시 — 다른 sub-repo 가 같은 룰을 별도로 보유하지 못하게 한다

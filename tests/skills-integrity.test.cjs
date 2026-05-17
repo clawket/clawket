@@ -81,11 +81,22 @@ test('plugin.json commands array exposes the 7 PDD slash commands', () => {
   }
 });
 
-test('marketplace.json skills array exposes name + description per skill', () => {
-  const market = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'marketplace.json'), 'utf-8'));
-  const skills = market.plugins[0].skills;
-  assert.equal(skills.length, ALL_SKILLS.length);
-  for (const entry of skills) {
-    assert.ok(entry.name && entry.description, `marketplace skill entry malformed: ${JSON.stringify(entry)}`);
+test('plugin.json skillsList exposes name + path + description per skill', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'plugin.json'), 'utf-8'));
+  const skillsList = manifest.skillsList;
+  assert.ok(Array.isArray(skillsList), 'skillsList must be an array');
+  assert.equal(skillsList.length, ALL_SKILLS.length);
+  for (const entry of skillsList) {
+    assert.ok(entry.name && entry.path && entry.description, `skillsList entry malformed: ${JSON.stringify(entry)}`);
+    assert.ok(ALL_SKILLS.includes(entry.name), `unknown skill name in skillsList: ${entry.name}`);
   }
+});
+
+test('marketplace.json plugins[0] omits non-standard skills field', () => {
+  // Schema invariant: marketplace.json plugin entries must NOT carry a `skills`
+  // array. Claude Code's marketplace schema rejects it, causing install to fail
+  // with a misleading "source type unsupported" error. The canonical skill
+  // registry lives in plugin.json#skillsList (validated by the test above).
+  const market = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'marketplace.json'), 'utf-8'));
+  assert.equal(market.plugins[0].skills, undefined, 'marketplace.json plugins[0].skills must be absent');
 });
