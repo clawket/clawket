@@ -33,6 +33,99 @@ Each component has its own repo and its own auto-release workflow. When a coordi
    - appends a row to `docs/COMPATIBILITY.md`
    - tags `vX.Y.Z` on `main` and creates a GitHub Release
 
+## Normal deployment flow (per sub-repo)
+
+The end-to-end loop a contributor follows when shipping a sub-repo (`cli` / `daemon` / `web`) change. Plugin shell follows the same skeleton but the bump-manifest PR step is skipped (the plugin **receives** those PRs from upstream sub-repos).
+
+```
+┌─ sub-repo (cli / daemon / web)  ─────────────────────────────────────┐
+│                                                                       │
+│  1. git pull --rebase                        # always start from main │
+│  2. <implement change>                                                │
+│  3. Conventional Commit (feat: / fix: / chore: …)                     │
+│     - feat: → minor   fix: → patch   feat!: / BREAKING → major        │
+│  4. push branch → PR → review → merge                                 │
+│  5. Auto-release workflow on main:                                    │
+│     - cli/daemon: release-it bumps Cargo.toml + tag + GitHub Release  │
+│     - web:        release-it bumps package.json + tag + Release       │
+│  6. release.yml dispatches bump-manifest PR → clawket/clawket         │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─ clawket/clawket (plugin shell)  ─────────────────────────────────────┐
+│                                                                       │
+│  7. Auto-PR: "bump <component> to vX.Y.Z" (updates components.json)   │
+│  8. PR CI green? (skills-integrity / pre-tool-use.e2e / path-sep …)   │
+│  9. Merge to main                                                     │
+│  10. main CI green?                                                   │
+│  11. release.yml decides plugin bump from commit prefix:              │
+│      - chore(deps): … → no plugin release                             │
+│      - fix: … → plugin patch                                          │
+│      - feat: … → plugin minor                                         │
+│  12. (if released) plugin tag pushed + GitHub Release published       │
+│  13. release.yml dispatches `baseline-bumped` → clawket/landing       │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─ Verification (always, even when no plugin release fired) ───────────┐
+│                                                                       │
+│  14. git pull on the affected sub-repo + plugin (state sync)          │
+│  15. `gh release view --repo clawket/<sub-repo> vX.Y.Z` exists?       │
+│  16. `gh run list --repo clawket/<sub-repo> --branch main --limit 1`  │
+│      shows success?                                                   │
+│  17. (plugin) `gh release view --repo clawket/clawket vA.B.C` exists  │
+│      and components.json pins the new sub-repo tag?                   │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Step-by-step (sub-repo author perspective)
+
+1. **Sync first** — `git pull --rebase` on the sub-repo branch. Never edit on a stale tree; the auto-release workflow rejects diverged history.
+2. **Commit with intent** — Conventional Commit prefix decides the bump:
+   - `feat: …` → minor (new capability)
+   - `fix: …` → patch (bug fix)
+   - `chore: / docs: / refactor: / test: / style: / build:` → no release
+   - Append `!` or `BREAKING CHANGE:` in body for a major.
+3. **PR → review → merge** to the sub-repo's `main`. Do not skip CI (`--no-verify`); a failing pre-commit hook signals a real regression in the bump pipeline.
+4. **Auto-release fires on main** — release-it (cli/daemon use `cargo set-version` inside the same workflow; web uses release-it pure) bumps the version, tags, pushes, and creates the GitHub Release with auto-generated notes.
+5. **Bump-manifest PR opens against `clawket/clawket`** — title format: `chore(deps): bump <component> to vX.Y.Z`. The PR body lists the upstream release notes verbatim.
+6. **Verify the PR content** before merge:
+   - `components.json` diff shows exactly one key changed (`cli` / `daemon` / `web`) with the expected tag.
+   - No drive-by changes to `package.json` / `plugin.json` / `marketplace.json` (those bump on the *next* step, not in the manifest PR).
+   - CI green: `skills-integrity`, `pre-tool-use.e2e`, `path-separation.e2e`, `plugin-reinstall.e2e`, `data-loss-diagnostics.e2e`.
+7. **Merge the manifest PR** — let `release.yml` decide whether the resulting `chore(deps)` commit triggers a plugin bump. `chore(deps)` alone does **not** cut a plugin release (by design — manifest pin changes are no-op for users until paired with a `fix:` / `feat:` commit).
+8. **Verify main CI** after merge:
+   ```bash
+   gh run list --repo clawket/clawket --branch main --limit 1
+   gh run view <run-id> --repo clawket/clawket --log-failed   # if red
+   ```
+9. **Verify the upstream Release exists**:
+   ```bash
+   gh release view vX.Y.Z --repo clawket/<cli|daemon|web>
+   ```
+   If the tag exists but no Release page, the sub-repo's `release.yml` likely failed mid-flight — investigate before declaring the deployment done.
+10. **Verify plugin Release** (only if a plugin bump was expected):
+    ```bash
+    gh release view vA.B.C --repo clawket/clawket
+    git -C clawket/clawket pull --rebase
+    jq . clawket/clawket/components.json   # confirm new pin
+    ```
+
+### Invariants
+
+- **One sub-repo at a time** — coordinate multi-component releases via the `Cross-component release order` table above. Manifest PRs cannot stack safely if multiple sub-repos race their auto-release in the same window.
+- **Pull before edit** — every step that touches a local working copy starts with `git pull --rebase`. Stale state is the #1 cause of failed manifest PRs.
+- **No force-push, no revert** — if a Release is wrong, cut a new patch with the correct fix. Force-push and revert leave artifacts that confuse the install gate's `.clawket-version` marker reconciliation.
+- **Hands off the plugin repo for sub-repo bumps** — the plugin shell receives bump-manifest PRs only. Direct edits to `components.json` from a contributor's branch bypass the auto-release verification chain.
+- **Manifest PR is the contract** — if the auto-PR does not appear within ~5 minutes of the upstream Release being published, the dispatch failed (PAT scope / API hiccup). Re-run the upstream `release.yml` workflow's "dispatch bump" step rather than hand-crafting the PR.
+
+### `/clawket-release` skill
+
+The skill `/clawket-release` (when available) wraps steps 8–10 into a single check — it queries `gh release view` / `gh run list` for both the sub-repo and the plugin and reports a punch list of what is still pending. Used after every merge to confirm the deployment landed cleanly.
+
 ## Version pinning surfaces
 
 | Surface | What it pins | Editor |

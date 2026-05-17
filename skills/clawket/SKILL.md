@@ -41,7 +41,7 @@ clawket dashboard --cwd .
 #### `/clawket start`
 Mark a task as in-progress. Requires a task ID argument.
 
-PDD lifecycle gate (v3): the PreToolUse hook will deny mutating tools when
+PDD lifecycle gate: the PreToolUse hook will deny mutating tools when
 the in-progress task lacks a `cycle_id`. Always assign the task to an active
 cycle before starting it, otherwise edits/writes/bash will be blocked with
 `gate.no_cycle_assignment`.
@@ -80,7 +80,7 @@ either fails, abort with the explicit message shown — do not start the task.
 #### `/clawket done`
 Mark the current in-progress task as done with an optional comment.
 
-PDD lifecycle (v3): when the task transitions to done and its cycle's exit
+PDD lifecycle: when the task transitions to done and its cycle's exit
 gate is met, the daemon emits a `completion-possible` SSE event rather than
 silently auto-completing the cycle/plan. Operators must run
 `clawket cycle update <CYCLE-ID> --status completed` (and similarly for
@@ -95,7 +95,7 @@ clawket task update $TASK_ID --status done --comment "$COMMENT"
 #### `/clawket new`
 Create a new task in the active cycle. Prompts for title, unit, and priority.
 
-PDD lifecycle gate (v3): always pass `--cycle <CYCLE-ID>` so the new task
+PDD lifecycle gate: always pass `--cycle <CYCLE-ID>` so the new task
 inherits an active cycle. Tasks without a cycle assignment will be denied by
 the PreToolUse `gate.no_cycle_assignment` guard the moment they are started.
 
@@ -234,7 +234,7 @@ clawket doctor
 
 All commands return JSON by default. Use `--format table` for human-readable output.
 
-## PDD Lifecycle Reference (v3)
+## PDD Lifecycle Reference
 
 ```
 [1] Intent layer (immutable)
