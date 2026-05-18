@@ -72,13 +72,13 @@ test('plugin.json skillsList declares all 7 skills with path + description', () 
   }
 });
 
-test('plugin.json commands array exposes the 7 PDD slash commands', () => {
+test('plugin.json omits non-standard commands field', () => {
+  // Schema invariant: Claude Code's plugin schema rejects `commands` as an array
+  // of `{name, skill, description}` objects (validator error: "commands: Invalid input").
+  // Slash commands are auto-exposed from skillsList — `/pdd-plan` etc. resolve
+  // via the skill name. A redundant `commands` array breaks install.
   const manifest = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'plugin.json'), 'utf-8'));
-  assert.ok(Array.isArray(manifest.commands), 'commands must be an array');
-  const names = manifest.commands.map((c) => c.name);
-  for (const expected of ['/pdd-plan', '/scenario-author', '/qa-batch', '/discover-loop', '/scenario-refine', '/qa-fix', '/pdd-promote']) {
-    assert.ok(names.includes(expected), `commands missing ${expected}`);
-  }
+  assert.equal(manifest.commands, undefined, 'plugin.json#commands must be absent');
 });
 
 test('plugin.json skillsList exposes name + path + description per skill', () => {

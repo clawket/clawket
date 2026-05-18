@@ -53,42 +53,5 @@
       "path": "skills/qa-fix/SKILL.md",
       "description": "QA defect → fix task 처리 — 결함 해결 plan 의 Round R unit 에 fix task 등록 + 코드 수정. Use when QA finds defects that need code fixes in the next round."
     }
-  ],
-  "commands": [
-    {
-      "name": "/pdd-plan",
-      "skill": "pdd",
-      "description": "Create PDD Plan + Unit 사전 예비 설계."
-    },
-    {
-      "name": "/scenario-author",
-      "skill": "scenario-author",
-      "description": "Author atomic user scenarios for a domain."
-    },
-    {
-      "name": "/qa-batch",
-      "skill": "qa-batch",
-      "description": "Run a QA round via sub-agent batch dispatch."
-    },
-    {
-      "name": "/discover-loop",
-      "skill": "discover-loop",
-      "description": "Run the main discovery-convergence loop."
-    },
-    {
-      "name": "/scenario-refine",
-      "skill": "scenario-refine",
-      "description": "Refine scenario_error via atomic decomposition / intent redefinition / deletion."
-    },
-    {
-      "name": "/qa-fix",
-      "skill": "qa-fix",
-      "description": "Register fix tasks for QA defects."
-    },
-    {
-      "name": "/pdd-promote",
-      "skill": "pdd",
-      "description": "Confirm-prompt flow for promoting an EXPERIMENTAL skill RULE.md to STABLE plus optional cleanup of user-scope ~/.claude/skills/{pdd-plan,scenario-author,qa-batch,discover-loop,scenario-refine}/ + stub replacement of ~/.claude/rules/{pdd,scenario-authoring,qa-flow}.md (manual gate; requires explicit user confirmation)."
-    }
   ]
 }

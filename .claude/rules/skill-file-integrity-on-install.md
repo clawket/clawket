@@ -23,6 +23,7 @@
 - `verifyPddSkills` 가 `ok=false` 일 때 fast-path 에서 `skillsOk` 가 false 가 되어 재설치 트리거 — 하지만 `runSetup` 자체는 skills/ 를 재배포하지 않는다 (binary + web bundle 만)
 - `plugin.json#skillsList` 와 `verifyPddSkills` 의 hardcoded array 가 분리되어 있어 한쪽만 변경 가능 (현재 manual sync)
 - `plugin.json#skillsList` 는 install 시 정본. `marketplace.json` 에는 skills 배열을 **두지 않는다** (Claude Code marketplace schema 가 거부 → install 실패)
+- `plugin.json#commands` 도 **두지 않는다**. Claude Code plugin schema 는 `commands` 를 디렉터리 path (`"./commands/"`) 만 받고 `[{name, skill, description}]` 객체 배열 형태는 거부 (`commands: Invalid input`). 슬래시 커맨드는 `skillsList` entry 의 `name` 으로 자동 노출되므로 별도 `commands` 매핑은 redundant + harmful
 
 ## Rule body
 
@@ -39,4 +40,5 @@
 - `verifyPddSkills` 를 warn-only 로 다시 약화시키지 마라 (현재 fast-path 가 `skillsOk` 를 hard AND 로 사용) — 약화하면 partial install 이 다시 silent 통과
 - `skills/` 디렉터리에 SKILL.md / RULE.md 외 파일을 두지 마라 — 무결성 검사는 두 파일만 본다, 다른 파일은 release tarball 에서 임의로 dropped 될 수 있음
 - skill array 를 `Object.keys()` 같은 dynamic source 로 바꾸지 마라 — hardcoded array 는 의도된 fail-loud 장치
+- `plugin.json#commands` 를 다시 `[{name, skill, description}]` 형태로 두지 마라 — Claude Code schema 가 install 시점에 거부한다 (`commands: Invalid input`). 슬래시 커맨드는 `skillsList` entry 의 `name` 으로 이미 노출됨
 - `RULE.md` 본문에 `~/.claude/rules/` 또는 `~/.claude/skills/` cross-link 를 추가하지 마라 (`tests/skills-integrity.test.cjs:53-62` 가 deny)
