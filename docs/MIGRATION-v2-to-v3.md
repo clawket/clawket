@@ -67,12 +67,12 @@ Every timestamp field on every entity is now ISO 8601 (`2026-05-04T11:14:23.456Z
 
 ### Modified contracts
 
-- `POST /plans/:id/approve` and `PATCH /plans/:id` (`status=active`) — both check the single-active-plan invariant per project. A second active plan returns `409 Conflict` with `ALREADY_ACTIVE`. The previous active plan must be transitioned to `completed` or `draft` first.
+- `POST /plans/:id/approve` and `PATCH /plans/:id` (`status=active`) — both check the single-active-plan invariant per project. A second active plan returns `409 Conflict` with `PROJECT_HAS_ACTIVE_PLAN`. The previous active plan must be transitioned to `completed` or `draft` first.
 - `POST /knowledge` and `PATCH /knowledge/:id` — reject `scope` values of `reference` or `archive` with `SCOPE_DEPRECATED`. Allowed values: `rag` only (with future expansion).
 - `POST /knowledge` / `PATCH` — embedding generation is now synchronous. The HTTP response returns only after the embedding has been written to `vec_knowledge`. Latency increases by ~50–200 ms per write but RAG search consistency is now read-your-write.
 - `GET /knowledge/search` — response now includes `bm25_score`, `vector_score`, `hybrid_score` per hit and `meta.truncated: bool` at top level. The `project_id` filter traverses `artifact → plan/unit/task → project`, so artifacts attached to a unit/task are correctly filtered.
-- `PATCH /tasks/:id` — status transitions are wrapped in a single SQLite transaction: run lifecycle, audit log, and any cascading unit/plan completion are atomic. State-machine guards: `MISSING_CYCLE_ID` (400) when transitioning to `in_progress` without a cycle, `INVALID_TRANSITION` (400) for illegal transitions (e.g. `done → in_progress`), `BLOCKED_DEPENDENCIES` (409) when an upstream task is not yet done.
-- `PATCH /plans/:id` (`status=completed`) — rejected with `INCOMPLETE_PLAN` if any task in the plan is not in `done|cancelled` or any cycle is not in `completed`.
+- `PATCH /tasks/:id` — status transitions are wrapped in a single SQLite transaction: run lifecycle, audit log, and any cascading unit/plan completion are atomic. State-machine guards: `MISSING_CYCLE_ID` (400) when transitioning to `in_progress` without a cycle, `INVALID_TRANSITION` (400) for illegal transitions (e.g. `done → in_progress`), `BLOCKED_BY_DEPENDENCY` (409) when an upstream task is not yet done.
+- `PATCH /plans/:id` (`status=completed`) — rejected with `PLAN_HAS_ACTIVE_CYCLES` if any cycle in the plan is not yet `completed` (cascade complete returns 409 with the count of remaining active cycles).
 - `POST /units/:id/approve` — **removed**. Units no longer have approval semantics.
 - `unit.status` field — removed from all unit-shaped responses. Clients should not depend on it.
 - `POST /projects` — returns `409 TICKET_KEY_CONFLICT` when the ticket key is already claimed and `409 CWD_ALREADY_REGISTERED` when the cwd is already bound to another project.
