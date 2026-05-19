@@ -7,9 +7,14 @@
 <p align="center">Structured task contracts for LLM coding agents.</p>
 
 <p align="center">
-  <img src="assets/envelope-first-execute.gif"
-       width="720"
-       alt="30-second demo: clawket creates a structured task contract before any code runs" />
+  <video src="assets/hero.mp4"
+         poster="assets/hero-poster.png"
+         width="720"
+         controls muted loop playsinline>
+    <img src="assets/hero-poster.png"
+         width="720"
+         alt="12-second demo: clawket dashboard — Summary, Plans, Board, Backlog, Timeline, Wiki" />
+  </video>
 </p>
 
 Clawket is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, units, tasks, knowledge, and execution history across sessions via a local SQLite database and a lightweight daemon. Hook-based guardrails ensure the agent never works without a registered task — every action is tracked, every session has context.
@@ -78,17 +83,17 @@ Full semantics and routing table: [docs/VENDOR_POLICY.md](docs/VENDOR_POLICY.md)
 
 ### Bundled Skills & Slash Commands
 
-The plugin registers 7 skills (see `.claude-plugin/plugin.json::skillsList`) and 7 slash commands (`plugin.json::commands`):
+The plugin registers 7 skills (see `.claude-plugin/plugin.json::skillsList`) and exposes 6 slash commands (one per skill except `clawket-dashboard`, which is the default dashboard surface):
 
 | Skill | Slash command | Purpose |
 |---|---|---|
-| `clawket` | (no slash) | Read/update tasks, plans, units, cycles via the dashboard surface. |
-| `pdd` | `/pdd-plan`, `/pdd-promote` | PDD Plan + Unit pre-design (`/pdd-plan`); promote EXPERIMENTAL → STABLE skill RULE.md (`/pdd-promote`, manual confirmation gate). |
-| `scenario-author` | `/scenario-author` | Author atomic user scenarios (Given/When/Then) for a domain. Phase 0 of the discover-loop. |
-| `qa-batch` | `/qa-batch` | Sub-agent batch dispatch + TSV evidence + bulk sync transcription. PDD A8 operational interface. |
-| `discover-loop` | `/discover-loop` | Discover-converge main engine — Round R sub-agent dispatch, 3-way convergence judgment, next-round scheduling. |
-| `scenario-refine` | `/scenario-refine` | Handle `scenario_error`: atomic decomposition / intent redefinition / deletion 3-way branch. |
-| `qa-fix` | `/qa-fix` | QA defect → fix task registration for the next round. |
+| `clawket-dashboard` | (no slash) | Read/update tasks, plans, units, cycles via the dashboard surface. |
+| `clawket-plan-design` | `/clawket-plan-design` | Pre-design a Plan + Units — pin the Done proposition, decompose work into Units, declare the Unit dependency graph, and set the convergence condition. |
+| `clawket-scenario-author` | `/clawket-scenario-author` | Author atomic user scenarios in `As a / I want / So that` + `Given/When/Then` for a domain. |
+| `clawket-verify-batch` | `/clawket-verify-batch` | Sub-agent batch dispatch + per-batch 7-field TSV evidence + 16-worker ThreadPoolExecutor bulk sync transcription. |
+| `clawket-verify-loop` | `/clawket-verify-loop` | Run a verification round end-to-end — dispatch batches, collect evidence, judge 3-way convergence (defect / scenario_error / converged), and schedule the next round or close the loop. |
+| `clawket-scenario-refine` | `/clawket-scenario-refine` | Handle `scenario_error` rows: atomic split / intent redefinition / deletion 3-way disposition. |
+| `clawket-defect-fix` | `/clawket-defect-fix` | Register a fix task per defect row under the defect-resolution plan's Round R Unit, apply the code change there, and verify the Done proposition is externally checkable. |
 
 ## Installation
 

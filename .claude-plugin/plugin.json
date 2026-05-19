@@ -12,46 +12,44 @@
     "state-layer",
     "project-management",
     "mcp",
-    "rag",
-    "pdd",
-    "discover-loop"
+    "rag"
   ],
   "skills": "./skills/",
   "skillsList": [
     {
-      "name": "clawket",
-      "path": "skills/clawket/SKILL.md",
-      "description": "Manage work dashboard — view/update tasks, plans, units, cycles. Use when you need to check current work status, update task progress, create new tasks, or manage project workflow."
+      "name": "clawket-dashboard",
+      "path": "skills/clawket-dashboard/SKILL.md",
+      "description": "Use when checking work status, starting or finishing tasks, or creating tasks in the Clawket work board. Shows the current plan / unit / cycle / task view for the working directory and routes start / done / new sub-commands through the lifecycle gates."
     },
     {
-      "name": "pdd",
-      "path": "skills/pdd/SKILL.md",
-      "description": "PDD Plan + Unit 사전 예비 설계 — Done 명제, Unit 분해, 의존성 그래프, 수렴 조건 박기. 발견-수렴 루프의 Phase 1 진입점. Use when starting a new product plan or decomposing scenarios into units."
+      "name": "clawket-plan-design",
+      "path": "skills/clawket-plan-design/SKILL.md",
+      "description": "Use when designing a Clawket Plan + Units from authored scenarios — pins the Done proposition, decomposes scenarios into Units, declares the Unit dependency graph, and sets the convergence condition before any work begins."
     },
     {
-      "name": "scenario-author",
-      "path": "skills/scenario-author/SKILL.md",
-      "description": "Atomic 사용자 시나리오 작성 — Given/When/Then 형식 강제, 도메인별 artifact 산출. 발견-수렴 루프의 Phase 0 진입점. Use when authoring user scenarios for a new domain or menu area."
+      "name": "clawket-scenario-author",
+      "path": "skills/clawket-scenario-author/SKILL.md",
+      "description": "Use when authoring atomic user scenarios for a new domain or menu area — produces per-domain spec knowledge in the strict As-a / I-want / So-that + Given/When/Then format."
     },
     {
-      "name": "qa-batch",
-      "path": "skills/qa-batch/SKILL.md",
-      "description": "Sub-agent batch dispatch + TSV evidence emit + bulk sync transcription. 9000-태스크 자율 런 검증 패턴 캡슐화. PDD A8 운영 인터페이스. Use when running QA round dispatches with sub-agents."
+      "name": "clawket-verify-batch",
+      "path": "skills/clawket-verify-batch/SKILL.md",
+      "description": "Use during a verification round to dispatch sub-agent batches that reason scenarios against code, emit per-batch TSV evidence, then transcribe the TSV into Clawket tasks via a 16-worker ThreadPoolExecutor."
     },
     {
-      "name": "discover-loop",
-      "path": "skills/discover-loop/SKILL.md",
-      "description": "발견-수렴 루프 메인 엔진 — Round R sub-agent dispatch + 3-way 수렴 판정 + 다음 라운드 schedule. Use when running the main discovery-convergence loop autonomously."
+      "name": "clawket-verify-loop",
+      "path": "skills/clawket-verify-loop/SKILL.md",
+      "description": "Use to run a verification round end-to-end — dispatch sub-agent batches, collect 7-field TSV evidence, transcribe into Clawket tasks, render the 3-way convergence judgment, and either schedule the next round or close the loop."
     },
     {
-      "name": "scenario-refine",
-      "path": "skills/scenario-refine/SKILL.md",
-      "description": "scenario_error 처리 — atomic 분해 / 의도 재정의 / 삭제 3-way 분기. cancelled QA task comment + audit artifact 동시 기록. Use when QA flags scenario_error during a round."
+      "name": "clawket-scenario-refine",
+      "path": "skills/clawket-scenario-refine/SKILL.md",
+      "description": "Use when a verification round reports scenario_error rows — decide atomic-split / intent-redefinition / deletion for each scenario, then update the spec knowledge and the audit trail."
     },
     {
-      "name": "qa-fix",
-      "path": "skills/qa-fix/SKILL.md",
-      "description": "QA defect → fix task 처리 — 결함 해결 plan 의 Round R unit 에 fix task 등록 + 코드 수정. Use when QA finds defects that need code fixes in the next round."
+      "name": "clawket-defect-fix",
+      "path": "skills/clawket-defect-fix/SKILL.md",
+      "description": "Use when a verification round reports defect rows — register a fix task per defect under the defect-resolution plan's Round R Unit, apply the code change there (never in the QA plan), and verify the Done proposition is externally checkable."
     }
   ]
 }

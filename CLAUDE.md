@@ -51,7 +51,7 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 1. `components.json` 매니페스트 로드 (실패 시 stderr 경고 + `false`).
 2. Fast-path 검사 — `bin/clawket`, `daemon/bin/clawketd`, `web/dist/index.html`,
    `desktop/dl/<artifact>` 의 존재 + `.clawket-version` 마커가 핀된 버전과
-   일치하는지 + PDD 6 skill 무결성 (`verifyPddSkills`). 모두 OK 면 즉시
+   일치하는지 + 7 skill 무결성 (`verifySkills`). 모두 OK 면 즉시
    `true`. 단, `components.json#desktop` 이 `null` (v3.0.0 sentinel — desktop
    sub-repo / first release 미배포) 일 때는 desktop 체크가 항상 통과한다.
 3. 그렇지 않으면 `withInstallLock(() => runSetup())` — `runSetup` 은
@@ -113,17 +113,17 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 ## Skills (`skills/*`)
 
 `.claude-plugin/plugin.json#skillsList` 에 7개 등록. 각 skill 은 `skills/<name>/SKILL.md`
-와 동반 `RULE.md` 로 구성된다 (PDD skill 6개의 무결성을 install gate 가 검사).
+와 동반 `RULE.md` 로 구성되고, install gate 의 `verifySkills` 가 14 파일 (7 × 2) 무결성을 검사한다.
 
 | Skill | 진입점 | 역할 |
 |---|---|---|
-| `clawket` | 대시보드 매니지먼트 | task/plan/unit/cycle 조회·갱신 (`/clawket` 표면) |
-| `pdd` | `/pdd-plan`, `/pdd-promote` | PDD Plan + Unit 사전 설계 (발견-수렴 Phase 1) |
-| `scenario-author` | `/scenario-author` | atomic Given/When/Then 시나리오 작성 (Phase 0) |
-| `qa-batch` | `/qa-batch` | Sub-agent batch dispatch + TSV evidence + bulk sync transcription |
-| `discover-loop` | `/discover-loop` | 발견-수렴 루프 메인 엔진 (Round R 디스패치 + 3-way 수렴) |
-| `scenario-refine` | `/scenario-refine` | scenario_error 3-way 처리 (분해/재정의/삭제) |
-| `qa-fix` | `/qa-fix` | QA defect → fix task 등록 + 코드 수정 |
+| `clawket-dashboard` | `/clawket-dashboard` | task/plan/unit/cycle 조회·갱신 + `start`/`done`/`new` 라이프사이클 게이트 |
+| `clawket-plan-design` | `/clawket-plan-design` | Plan + Unit 사전 설계 (Done 명제, 분해, 의존성 그래프, 수렴 조건) |
+| `clawket-scenario-author` | `/clawket-scenario-author` | atomic Given/When/Then 시나리오 작성 (도메인별 spec knowledge) |
+| `clawket-verify-batch` | `/clawket-verify-batch` | Sub-agent batch dispatch + TSV evidence + bulk sync transcription |
+| `clawket-verify-loop` | `/clawket-verify-loop` | 검증 라운드 러너 (Round R 디스패치 + 3-way 수렴 + 회귀 감지) |
+| `clawket-scenario-refine` | `/clawket-scenario-refine` | scenario_error 3-way 처리 (atomic 분해 / 의도 재정의 / 삭제) |
+| `clawket-defect-fix` | `/clawket-defect-fix` | defect → fix task 등록 + 코드 수정 |
 
 ## 문서 라우팅 (`docs/`)
 

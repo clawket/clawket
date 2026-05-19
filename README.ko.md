@@ -7,9 +7,14 @@
 <p align="center">LLM 코딩 에이전트를 위한 구조화된 태스크 계약.</p>
 
 <p align="center">
-  <img src="assets/envelope-first-execute.gif"
-       width="720"
-       alt="30초 데모: 모든 코드 실행 전에 구조화된 태스크 계약을 만드는 clawket" />
+  <video src="assets/hero.mp4"
+         poster="assets/hero-poster.png"
+         width="720"
+         controls muted loop playsinline>
+    <img src="assets/hero-poster.png"
+         width="720"
+         alt="12초 데모: clawket 대시보드 — Summary, Plans, Board, Backlog, Timeline, Wiki" />
+  </video>
 </p>
 
 Clawket은 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + Confluence를 대체합니다. 프로젝트 계획, 유닛, 태스크, 산출물, 실행 이력을 로컬 SQLite + 경량 데몬으로 세션 간 영구 보존합니다. 훅 기반 가드레일이 에이전트가 등록된 태스크 없이 작업하지 못하게 보장합니다 — 모든 작업은 추적되고, 모든 세션은 컨텍스트를 가집니다.
@@ -78,17 +83,17 @@ Clawket v3 는 **Claude 모델 패밀리만 타겟**합니다. 태스크는 세 
 
 ### 번들된 스킬 & 슬래시 명령
 
-플러그인은 7개 스킬(`.claude-plugin/plugin.json::skillsList`) 과 7개 슬래시 명령(`plugin.json::commands`) 을 등록합니다:
+플러그인은 7개 스킬(`.claude-plugin/plugin.json::skillsList`) 과 6개 슬래시 명령을 등록합니다 (스킬당 1개, `clawket-dashboard` 만 슬래시 없이 대시보드 surface 로 노출):
 
 | 스킬 | 슬래시 명령 | 용도 |
 |---|---|---|
-| `clawket` | (슬래시 명령 없음) | 대시보드 surface 로 task / plan / unit / cycle 조회·갱신. |
-| `pdd` | `/pdd-plan`, `/pdd-promote` | PDD Plan + Unit 사전 설계 (`/pdd-plan`); EXPERIMENTAL → STABLE 스킬 RULE.md 승격 (`/pdd-promote`, 수동 확인 게이트). |
-| `scenario-author` | `/scenario-author` | 도메인 atomic 사용자 시나리오(Given/When/Then) 작성. discover-loop Phase 0. |
-| `qa-batch` | `/qa-batch` | Sub-agent batch dispatch + TSV evidence + bulk sync transcription. PDD A8 운영 인터페이스. |
-| `discover-loop` | `/discover-loop` | 발견-수렴 메인 엔진 — Round R sub-agent dispatch, 3-way 수렴 판정, 다음 라운드 schedule. |
-| `scenario-refine` | `/scenario-refine` | `scenario_error` 처리: atomic 분해 / 의도 재정의 / 삭제 3-way 분기. |
-| `qa-fix` | `/qa-fix` | QA 결함 → 다음 라운드 fix task 등록. |
+| `clawket-dashboard` | (슬래시 명령 없음) | 대시보드 surface 로 task / plan / unit / cycle 조회·갱신. |
+| `clawket-plan-design` | `/clawket-plan-design` | Plan + Unit 사전 설계 — Done 명제 박기, Unit 분해, 의존성 그래프, 수렴 조건 설정. |
+| `clawket-scenario-author` | `/clawket-scenario-author` | 도메인별 atomic 사용자 시나리오 작성 — `As a / I want / So that` + `Given/When/Then` 강제 포맷. |
+| `clawket-verify-batch` | `/clawket-verify-batch` | Sub-agent batch dispatch + 7-필드 TSV evidence + 16-worker ThreadPoolExecutor bulk sync transcription. |
+| `clawket-verify-loop` | `/clawket-verify-loop` | 검증 라운드 end-to-end 러너 — 배치 디스패치, evidence 수집, 3-way 수렴 판정 (defect / scenario_error / converged), 다음 라운드 schedule 또는 루프 종료. |
+| `clawket-scenario-refine` | `/clawket-scenario-refine` | `scenario_error` 처리 — atomic 분해 / 의도 재정의 / 삭제 3-way 분기. |
+| `clawket-defect-fix` | `/clawket-defect-fix` | defect 1건당 fix task 1개를 defect-resolution plan 의 Round R Unit 아래 등록, 거기서 코드 수정, Done 명제가 외부에서 검증 가능한지 확인. |
 
 ## 설치
 
