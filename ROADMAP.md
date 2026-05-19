@@ -36,7 +36,7 @@ breakdown lives in the plan body. Public-facing checkpoints:
 | M2 — Tree decomposition | `daemon`, `cli` | `decomposition_policy`, `atomic_size_hint`, PreToolUse split enforcement, infinite-depth task trees |
 | M3 — MCP integration | `cli` (absorbs `mcp`) | `clawket mcp` rmcp 1.5 stdio server with 5 read-only knowledge tools; `@clawket/mcp` npm deprecated |
 | M4 — Web envelope + tree UI | `web` | Envelope editor, tree visualization, Timeline Replay |
-| **M5 — Distribution & community** | **`landing`, `tap`, all repos** | **Homebrew tap, install.sh, Cloudflare Pages landing, CONTRIBUTING/CODE_OF_CONDUCT/ROADMAP, label strategy, i18n drift guard, launch posts** |
+| **M5 — Distribution & community** | **`landing`, `tap`, all repos** | **Homebrew tap, install.sh, Vercel landing, CONTRIBUTING/CODE_OF_CONDUCT/ROADMAP, label strategy, i18n drift guard, launch posts** |
 | M6 — SessionStart redesign | `clawket`, `daemon` | Tree + vector + 4 metrics + p95 < 500 ms + degraded mode |
 | M7 — Contract Compliance pipeline | `evals` (new repo) | Eval harness measuring how often a contract is enough for haiku to complete the task without escalation |
 | Addendum A — Web IA tier 1 | `web` | Sidebar 3-tier, Cmd-K global search, dashboard flow redesign |
@@ -59,7 +59,7 @@ batch once write access is in place.
   same envelope produces the same `verification_cmd` exit code across
   haiku / sonnet / opus on a 30-task fixture.
 - **Distribution**: `brew install clawket/tap/clawket` and
-  `curl -fsSL https://clawket.dev/install.sh | sh` both yield a working
+  `curl -fsSL https://landing-seungwoo321s-projects.vercel.app/install.sh | sh` both yield a working
   daemon + CLI in a clean VM.
 
 ## Next 3 versions (preview)

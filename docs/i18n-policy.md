@@ -26,7 +26,7 @@ The documentation axis (below) is intentionally **not** extended to Japanese —
 
 | Knowledge | Authoritative language | Translation | Drift policy |
 |---|---|---|---|
-| `landing/` (clawket.dev) | English | Korean (`/ko/` path or `*.ko.html`) | Translation must exist before launch. Drift > 14d warns, > 21d fails CI. |
+| `landing/` (Vercel LP) | English | Korean (`/ko/` path or `*.ko.html`) | Translation must exist before launch. Drift > 14d warns, > 21d fails CI. |
 | `*/README.md` | English | `*/README.ko.md` | Translation must exist for `clawket`, `cli`, `daemon`, `web`, `desktop` (the five user-facing repos). `mcp` is deprecated — README.ko optional. `landing`, `tap`, `evals` — translation optional. |
 | `*/CONTRIBUTING.md` | English | none required | Internal contributors are bilingual. No `.ko` sibling needed. |
 | `*/ROADMAP.md`, `*/CODE_OF_CONDUCT.md` | English | none required | Standard OSS docs in English only. |

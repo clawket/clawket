@@ -20,7 +20,7 @@ community channels operated under the Clawket name.
 
 ## Reporting
 
-To report a violation, contact the maintainers at **conduct@clawket.dev**.
+To report a violation, contact the maintainer at **seungwoo321@gmail.com**.
 
 If email is not practical, you may also open a private security advisory
 on the meta repository — even though the form is labeled "security", the
@@ -81,7 +81,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at conduct@clawket.dev (see the Reporting section above for alternatives). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the maintainer responsible for enforcement at seungwoo321@gmail.com (see the Reporting section above for alternatives). All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
