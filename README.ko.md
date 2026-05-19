@@ -9,7 +9,7 @@
 <p align="center">
   <img src="assets/hero.gif"
        width="720"
-       alt="Clawket 대시보드 데모 — Summary, Plans, Board, Backlog, Timeline, Wiki" />
+       alt="Clawket 대시보드 데모 — Summary, Board, Backlog, Timeline, Wiki" />
 </p>
 
 Clawket은 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + Confluence를 대체합니다. 프로젝트 계획, 유닛, 태스크, 산출물, 실행 이력을 로컬 SQLite + 경량 데몬으로 세션 간 영구 보존합니다. 훅 기반 가드레일이 에이전트가 등록된 태스크 없이 작업하지 못하게 보장합니다 — 모든 작업은 추적되고, 모든 세션은 컨텍스트를 가집니다.
@@ -32,7 +32,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 
 - **구조화된 워크플로우** — Project → Plan (approve) → Unit → Cycle (`--unit` 필수, activate) → Task
 - **라이프사이클 훅** — 6개 Claude Code 이벤트 + `PostToolUse:ExitPlanMode` matcher 가 각각 전용 핸들러에 연결됨 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStart, SubagentStop)
-- **웹 대시보드** — 요약, 계획, 보드(칸반), 백로그, 타임라인, 위키 6개 뷰
+- **웹 대시보드** — 요약, 보드(칸반), 백로그, 타임라인, 위키 5개 뷰 (계획 트리는 좌측 사이드바 상주)
 - **에이전트 Swimlane 타임라인** — 에이전트별 수평 바 차트로 동시 작업 시각화
 - **드래그 앤 드롭** — 칸반 DnD로 상태 변경, 백로그 DnD로 사이클 배정
 - **위키 + 로컬 RAG** — 파일 트리 내비게이션, knowledge 버전 관리, knowledge 에 대한 FTS5 키워드 + sqlite-vec 의미 검색 하이브리드
@@ -220,16 +220,17 @@ clawket/
 
 ## 웹 대시보드
 
-데몬 실행 중 `http://localhost:19400`에서 접근할 수 있습니다. 6개 뷰, SSE 실시간 반영.
+데몬 실행 중 `http://localhost:19400`에서 접근할 수 있습니다. 5개 최상위 뷰 + 좌측 사이드바의 상주 계획 트리, SSE 실시간 반영.
 
 | 뷰 | 설명 |
 |----|------|
 | **요약** | 프로젝트 진행률, 활성 에이전트, 유닛 상태 |
-| **계획** | 트리 뷰 — 인라인 편집, 일괄 액션, 체크박스 선택 |
 | **보드** | 칸반 보드 — 드래그 앤 드롭 상태 변경 |
 | **백로그** | 사이클별 그룹화 — 드래그 앤 드롭 배정 |
 | **타임라인** | 에이전트 Swimlane (Run 바 차트) + 활동 스트림 탭 |
 | **위키** | 파일 트리, Knowledge CRUD + 버전 이력, FTS5 + 의미 검색, GFM 테이블 |
+
+계획 트리 (인라인 편집, 일괄 액션, 체크박스 선택) 는 탭 대신 사이드바에 상주합니다 — 모든 뷰에서 바로 접근 가능합니다.
 
 ### 스크린샷
 

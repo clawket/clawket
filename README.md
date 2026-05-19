@@ -9,7 +9,7 @@
 <p align="center">
   <img src="assets/hero.gif"
        width="720"
-       alt="Clawket dashboard demo — Summary, Plans, Board, Backlog, Timeline, Wiki" />
+       alt="Clawket dashboard demo — Summary, Board, Backlog, Timeline, Wiki" />
 </p>
 
 Clawket is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, units, tasks, knowledge, and execution history across sessions via a local SQLite database and a lightweight daemon. Hook-based guardrails ensure the agent never works without a registered task — every action is tracked, every session has context.
@@ -32,7 +32,7 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 
 - **Structured Workflow** — Project → Plan (approve) → Unit → Cycle (`--unit` required, then activate) → Task
 - **Lifecycle Hooks** — 6 Claude Code events + `PostToolUse:ExitPlanMode` matcher wired to dedicated handlers (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStart, SubagentStop)
-- **Web Dashboard** — Summary, Plans, Board (Kanban), Backlog, Timeline, Wiki — 6 views
+- **Web Dashboard** — Summary, Board (Kanban), Backlog, Timeline, Wiki — 5 views (Plans tree lives in the left sidebar)
 - **Agent Swimlane Timeline** — Per-agent horizontal bar chart with concurrent work visualization
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for cycle assignment
 - **Wiki + Local RAG** — File-tree navigation, knowledge versioning, hybrid search (FTS5 keyword + sqlite-vec semantic) over knowledge entries
@@ -221,16 +221,17 @@ See `docs/COMPATIBILITY.md` for version range guarantees.
 
 ## Web Dashboard
 
-Access at `http://localhost:19400` when the daemon is running. Six views, real-time updates via SSE.
+Access at `http://localhost:19400` when the daemon is running. Five top-level views plus a persistent Plans tree in the left sidebar, real-time updates via SSE.
 
 | View | Description |
 |------|-------------|
 | **Summary** | Project overview with progress, active agents, unit progress |
-| **Plans** | Tree view with inline editing, bulk actions, checkbox selection |
 | **Board** | Kanban board with drag-and-drop status changes |
 | **Backlog** | Cycle-grouped backlog with drag-and-drop cycle assignment |
 | **Timeline** | Agent swimlane (run bars per agent) + activity stream tab |
 | **Wiki** | File-tree navigation, knowledge CRUD with version history, FTS5 + semantic search, GFM tables |
+
+The Plans tree (inline editing, bulk actions, checkbox selection) is rendered in the sidebar — accessible from every view rather than living behind a tab.
 
 ### Screenshots
 
