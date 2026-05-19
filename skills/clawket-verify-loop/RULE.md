@@ -1,20 +1,17 @@
-# QA 플로우 규칙 (Scenario-Based QA Flow)
+# 검증 플로우 규칙 (Scenario Verification Flow)
 
-> **참조**: 본 파일은 `skills/qa-batch/RULE.md` 와 동일한 qa-flow 룰 본체다.
-> `/discover-loop` skill 이 루프 엔진 역할을, `/qa-batch` skill 이 batch
-> dispatch 운영 인터페이스 역할을 각각 담당하므로 두 skill 모두 qa-flow 룰을
-> 정본으로 참조한다.
+> **상태: STABLE — Clawket plugin 정본.** `/clawket-verify-loop` skill 의 규칙
+> 본체. 루프 엔진 엔트리포인트 역할을 담당하며, batch dispatch 운영 인터페이스
+> (/clawket-verify-batch) 와 동일한 검증 플로우 룰 본체를 공유한다. plan-driven
+> workflow 의 수렴 루프와 통합 운영. scenario_error 처리는 §0 메인 수렴 메커니즘.
 
-> **상태: STABLE — Clawket plugin 정본.** PDD `skills/pdd/RULE.md` 의
-> 발견-수렴 루프와 통합 운영. scenario_error 처리는 §0 메인 수렴 메커니즘.
-
-시나리오 기반 QA 를 수행할 때 적용하는 글로벌 규칙. `skills/scenario-author/RULE.md`
-산출물 (시나리오 knowledge) 이 입력. PDD `skills/pdd/RULE.md` 와 한 쌍 —
-발견-수렴 루프 안에서 시나리오·코드 공진화 메커니즘을 담당한다.
+시나리오 기반 검증을 수행할 때 적용하는 글로벌 규칙. /clawket-scenario-author
+산출물 (시나리오 knowledge) 이 입력. plan-driven workflow 와 한 쌍 — 수렴 루프
+안에서 시나리오·코드 공진화 메커니즘을 담당한다.
 
 ## 핵심 철학
 
-**시나리오와 코드는 발견-수렴 루프 안에서 공진화한다.**
+**시나리오와 코드는 수렴 루프 안에서 공진화한다.**
 
 - 시나리오 ↔ 코드 차이 → defect (코드층) **또는** scenario_error (시나리오층)
 - defect = 코드가 시나리오를 만족 못함 → 코드 수정
@@ -23,7 +20,7 @@
 - QA 는 UI 두드리기 아니라 **시나리오와 코드의 논리적 비교 추론**
 - 시뮬레이터/실기기 수동 QA 는 코드 추론 QA 가 통과한 다음 단계 (별도 plan)
 
-## §0 발견-수렴 루프 (메인 메커니즘)
+## §0 수렴 루프 (메인 메커니즘)
 
 scenario_error 는 **예외가 아니라 수렴 신호**다. agent 가 시나리오를 보고
 "이건 한 시나리오에 두 가정이 섞였다, 분해해야 한다" 고 판정하면 그게 진보의
@@ -31,16 +28,16 @@ scenario_error 는 **예외가 아니라 수렴 신호**다. agent 가 시나리
 
 ```
 Round R 시작
-  ├─ Plan 자동 생성: "<도메인> Round R" (qa-flow §라운드별 새 plan 계승)
+  ├─ Plan 자동 생성: "<도메인> Round R" (라운드별 새 plan)
   ├─ Cycle 1개 활성화 (cross-unit 가능)
   ├─ Sub-agent dispatch:
-  │  ├─ N agents 병렬 (1 agent / 1 unit / ≤ 30 시나리오 — PDD A8 강제)
+  │  ├─ N agents 병렬 (1 agent / 1 unit / ≤ 30 시나리오 — A8 강제)
   │  ├─ 각 agent: scenario ↔ code reasoning (Given/When/Then 매핑)
   │  └─ TSV emit: scenario_id, status, reasoning, evidence, tier_used, batch_id
   ├─ Bulk sync TSV → DB task status (transcription only, ≠ reasoning)
   ├─ 수렴 판정 (3-way):
   │  ├─ defect > 0 → fix plan 의 Round R unit 으로 fix task 등록
-  │  ├─ scenario_error > 0 → /scenario-refine 처리:
+  │  ├─ scenario_error > 0 → /clawket-scenario-refine 처리:
   │  │   ├─ atomic 분해 (1 → N 시나리오)
   │  │   ├─ 의도 재정의 (knowledge 갱신, ID 보존)
   │  │   └─ 삭제 (ID 영구 비움)
@@ -58,22 +55,22 @@ Round R 시작
 ## §1 사이클 다이어그램
 
 ```
-시나리오 사전 예비 설계 (scenario-authoring.md, /scenario-author skill)
+시나리오 사전 예비 설계 (/clawket-scenario-author skill)
     │
     ▼
-PDD plan + Unit 사전 예비 설계 (pdd.md, /pdd-plan skill)
+plan + Unit 사전 예비 설계 (/clawket-plan-design skill)
     │
     ▼
-[발견-수렴 루프 (§0)]
+[수렴 루프 (§0)]
     │
     ▼
-Round R plan ── "<도메인> Round R" (라운드마다 새 plan, qa-flow §3 절대 규칙 #2)
-  ├─ 1 시나리오 = 1 task (qa-flow §3 절대 규칙 #3)
+Round R plan ── "<도메인> Round R" (라운드마다 새 plan, §3 절대 규칙 #2)
+  ├─ 1 시나리오 = 1 task (§3 절대 규칙 #3)
   ├─ Sub-agent batch dispatch (1 agent / 1 unit / ≤ 30 시나리오, A8)
   ├─ TSV evidence emit + bulk sync transcription
   └─ defect / scenario_error 분기:
      ├─ defect → 결함 해결 plan 의 "Round R" unit 에 fix task
-     └─ scenario_error → /scenario-refine 즉시 처리 (knowledge 갱신)
+     └─ scenario_error → /clawket-scenario-refine 즉시 처리 (knowledge 갱신)
     │
     ▼ (defect=0 + scenario_error=0 + 2 라운드 연속까지 반복)
     │
@@ -82,20 +79,20 @@ Round R plan ── "<도메인> Round R" (라운드마다 새 plan, qa-flow §3
 
 ## §2 Sub-agent Batch Dispatch
 
-PDD A8 운영 규약.
+A8 운영 규약.
 
 ### Dispatch 규약
 
-1. **1 agent / 1 unit / ≤ 30 시나리오** (PDD A8 강제)
+1. **1 agent / 1 unit / ≤ 30 시나리오** (A8 강제)
    - 30 초과 배치는 attention 분산 위험 (large unit 결과 신뢰도 저하 가능성)
    - 30 이하가 reasoning 품질 보장 임계 (보수적 임계)
 2. **TSV evidence 의무**
    - 모든 sub-agent 산출은 `qa-U##-r#.tsv` 형식 영속
    - 필드: `scenario_id, status, reasoning, evidence, tier_used, batch_id`
-   - `evidence` 빈 task = X8 anti-pattern (PDD)
+   - `evidence` 빈 task = Anti-pattern X8
 3. **Bulk sync ≠ reasoning**
    - Python ThreadPoolExecutor 16-worker 등 드라이버는 TSV → DB transcription 만
-   - reasoning 결정을 sync 코드에 끼워넣지 않는다 (X9 anti-pattern)
+   - reasoning 결정을 sync 코드에 끼워넣지 않는다 (Anti-pattern X9)
    - sync 는 status 매핑 (pass→done, defect→blocked, scenario_error→cancelled) 만
 4. **batch_id 추적**
    - 같은 batch 산출의 task 들은 `tasks.batch_id` 로 묶임
@@ -123,7 +120,7 @@ PDD A8 운영 규약.
    - (a) 현 라운드 QA task 에 **코멘트로 사유/근거 기록** — *왜 부적절했는지*
      영구 보존
    - (b) QA task `status=cancelled` (defect 와 구분, blocked 아님)
-   - (c) /scenario-refine skill 실행:
+   - (c) /clawket-scenario-refine skill 실행:
      - **atomic 분해**: 1 시나리오에 두 가정 섞임 → N 개 atomic 시나리오로
      - **의도 재정의**: 시나리오 ID 보존, 본문만 갱신
      - **삭제**: ID 영구 비움 (재사용 금지)
@@ -135,7 +132,7 @@ PDD A8 운영 규약.
      한 경우에 한해 amend / delete
    - 시간 / 코드 복잡도 / 영향 파일 수 / 토큰 비용은 amend 사유가 될 수 없다
    - 코드 영향이 큰 경우는 시나리오를 고치지 말고 **모든 영향 코드를 고치는
-     plan/task 등록** (PDD 원칙)
+     plan/task 등록** (plan-driven workflow 원칙)
    - 컴퓨터 결정론 원칙: 외부 PM 게이트 없이도 코드 reasoning 증거 강도 충분
      하면 진행. 약하면 `defect` 강등 + 시나리오 미수정.
 7. **증거 기록 의무**
@@ -154,13 +151,13 @@ PDD A8 운영 규약.
 - 결함 해결 unit: `Round N` (라운드별 unit 1개)
 - 수동 QA plan: `<도메인> 수동 QA` (시뮬/실기기 단계)
 
-## §5 QA task 산출물 형식 (TSV row 와 동일 스키마)
+## §5 검증 task 산출물 형식 (TSV row 와 동일 스키마)
 
 ```
 QA-<scenario-id>:
-  scenario_id: US-<DOMAIN>-<NNN>            (강제 — PDD T7)
+  scenario_id: US-<DOMAIN>-<NNN>            (강제 — T7)
   status: pass | defect | scenario_error
-  reasoning: 코드 추론 근거                   (모든 status 에 강제 — PDD T8)
+  reasoning: 코드 추론 근거                   (모든 status 에 강제 — T8)
   evidence: file:line                       (defect / scenario_error 시 강제)
   tier_used: opus | sonnet | haiku          (sub-agent 사용 모델)
   batch_id: BATCH-<ULID>                    (sub-agent invocation 식별)
@@ -222,7 +219,7 @@ QA-<scenario-id>:
 - [ ] QA task 수 == 시나리오 수 (라운드 plan 안에서)
 - [ ] 코드 수정이 0 건이다 (QA plan 내에서)
 
-### Sub-agent dispatch 시 (PDD A8)
+### Sub-agent dispatch 시 (A8)
 - [ ] 1 agent / 1 unit / ≤ 30 시나리오 강제
 - [ ] TSV 산출 형식 6 필드 (scenario_id, status, reasoning, evidence,
       tier_used, batch_id) 모두 채워짐
@@ -239,9 +236,9 @@ QA-<scenario-id>:
 - [ ] 회귀 라운드 plan 에서 통과 시나리오도 task 새로 만들어 재평가됐다
 - [ ] 최소 3 라운드 수행 (또는 결함=0 + scenario_error=0 + 2 라운드 연속 0)
 
-## §10 자율 Run 정책 (PDD O8 계승)
+## §10 자율 Run 정책 (O8 계승)
 
-발견-수렴 루프 자율 run 시 불가침 (사용자 명시 지시 시에만 우회):
+수렴 루프 자율 run 시 불가침 (사용자 명시 지시 시에만 우회):
 
 - 런타임 상태 수정 금지 (~/.local/share/clawket, ~/.cache, ~/.config,
   ~/.local/state, ~/.claude/plugins/clawket-*)
@@ -251,15 +248,15 @@ QA-<scenario-id>:
 - knowledge 갱신 시 "현재 의도" 만 (history 보존 금지 — 그건 task
   comment 와 audit knowledge 에 영구)
 
-## §11 PDD ↔ qa-flow 통합 매핑
+## §11 plan-driven workflow ↔ 검증 플로우 통합 매핑
 
-| PDD A5 (Red-Green-Refactor) | qa-flow 메커니즘 |
+| A5 (Red-Green-Refactor) | 검증 플로우 메커니즘 |
 |---|---|
 | Red | Round R 시작 직후 미충족 시나리오 |
 | Green | Round R 통과 + 수렴 조건 |
-| Refactor | scenario_error → /scenario-refine 처리 |
+| Refactor | scenario_error → /clawket-scenario-refine 처리 |
 
-| PDD axiom | qa-flow 운영 |
+| Axiom | 검증 플로우 운영 |
 |---|---|
 | A1 spec | scenario knowledge 가 spec |
 | A4 시나리오 환원 | tasks.scenario_id 강제 |
