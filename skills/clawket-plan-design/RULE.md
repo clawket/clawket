@@ -1,11 +1,11 @@
-# PDD 플로우 규칙 (Plan-Driven Development)
+# 플랜 설계 규칙 (Plan-Driven Workflow)
 
-> **상태: STABLE — Clawket plugin 정본.** `skills/pdd/RULE.md` 가 정본.
+> **상태: STABLE — Clawket plugin 정본.**
 
 솔로 프로덕트 오너(자기 제품을 자기가 만드는 1인 컨텍스트) 의 개발 방법론.
-`scenario-authoring.md` / `qa-flow.md` 와 한 쌍 — 시나리오는 의도, QA 는 검증,
-PDD 는 그 사이의 **실행 명세화** 를 담당한다. 셋은 단일 **발견-수렴 루프
-(Discovery-Convergence Loop)** 로 통합 운영된다.
+시나리오 작성 규칙 / 검증 플로우 규칙 과 한 쌍 — 시나리오는 의도, 검증은 검증,
+plan design 은 그 사이의 **실행 명세화** 를 담당한다. 셋은 단일 **수렴 루프
+(Convergence Loop)** 로 통합 운영된다.
 
 ## 핵심 철학
 
@@ -13,15 +13,15 @@ PDD 는 그 사이의 **실행 명세화** 를 담당한다. 셋은 단일 **발
 모두 1인에게 있을 때, Plan 의 명료성이 곧 산출물의 완성도 상한이다.
 
 - 일반 개발자(외부 요구사항 분리) → TDD 가 적합 (테스트가 spec 의 그릇)
-- 솔로 PO = 개발자(요구사항을 본인이 결정) → **PDD** (Plan 이 spec 의 그릇)
+- 솔로 PO = 개발자(요구사항을 본인이 결정) → plan-driven workflow (Plan 이 spec 의 그릇)
 
 ### 시나리오·코드 공진화 가설
 
 **시나리오와 코드는 공진화한다.** 시나리오는 사전-*완전* 이 아니라 사전-*예비*.
-발견-수렴 루프 안에서 시나리오는 atomic 까지 분해되고, 코드는 시나리오를
+수렴 루프 안에서 시나리오는 atomic 까지 분해되고, 코드는 시나리오를
 만족할 때까지 회귀한다. **두 layer 가 동시에 0 으로 수렴**할 때 종료.
 
-## 두 레이어 분리 (PDD 의 본질)
+## 두 레이어 분리 (plan-driven workflow 의 본질)
 
 | 레이어 | 대상 | 가변성 | 결정 시점 |
 |------|------|--------|----------|
@@ -30,8 +30,7 @@ PDD 는 그 사이의 **실행 명세화** 를 담당한다. 셋은 단일 **발
 
 **의도 레이어**: 큰 그림 + 도메인별 atomic 시나리오 초안은 사전 예비 설계로
 박는다. 라운드 안에서 scenario_error 발견 시 atomic 분해 / 의도 재정의 /
-삭제로 정련한다. 시나리오는 mutable 이지만 갱신 사유는 "의도 부적절" 에 한정
-(qa-flow.md §scenario_error 참조).
+삭제로 정련한다. 시나리오는 mutable 이지만 갱신 사유는 "의도 부적절" 에 한정.
 
 **실행 레이어**: Cycle 활성화 시점에 Cycle 의 task 를 batch 로 생성. sub-agent
 N 명이 1 unit 씩 분담해 시나리오를 reasoning 하고 TSV emit → 드라이버가
@@ -79,9 +78,9 @@ Task ───── 실행 단위 (Cycle 안에서 batch 생성)
   모든 Task → 정확히 1 시나리오(또는 sub-spec) 환원. 환원 불가 = 스펙 외, 거부.
   `tasks.scenario_id` 컬럼으로 schema 강제.
 - **A5. Red-Green-Refactor 매핑.**
-  - PDD Red = 라운드 R 의 미충족 시나리오 (cycle 활성 직후)
-  - PDD Green = 라운드 R 통과 + 수렴 조건 충족
-  - PDD Refactor = 시나리오 정련 (scenario_error → atomic 분해 / 의도 재정의 / 삭제)
+  - Red = 라운드 R 의 미충족 시나리오 (cycle 활성 직후)
+  - Green = 라운드 R 통과 + 수렴 조건 충족
+  - Refactor = 시나리오 정련 (scenario_error → atomic 분해 / 의도 재정의 / 삭제)
 - **A6. 진실 공급원 단일.**
   Clawket Plan/Unit/Cycle/Task = 진실. 보조 문서 (knowledge, plans/*.md) = 미러.
 - **A7. Tool-first, Automation-second.**
@@ -91,22 +90,22 @@ Task ───── 실행 단위 (Cycle 안에서 batch 생성)
   드라이버가 TSV → DB transcription 으로 분리. 두 단계는 명확히 구분되며
   sync 단계엔 evidence 가 동반되어야 한다.
 
-## 발견-수렴 루프 (Discovery-Convergence Loop)
+## 수렴 루프 (Convergence Loop)
 
-PDD lifecycle 의 본체. `qa-flow.md` 의 라운드 패턴과 통합되어 단일 루프로
+plan-driven workflow lifecycle 의 본체. 검증 라운드 패턴과 통합되어 단일 루프로
 운영된다.
 
 ```
-Phase 0. 시나리오 사전 예비 설계 (scenario-authoring.md, /scenario-author skill)
+Phase 0. 시나리오 사전 예비 설계 (/clawket-scenario-author skill)
    └─ 도메인별 시나리오 knowledge — atomic 초안
 
-Phase 1. PDD plan + Unit 사전 예비 설계 (/pdd-plan skill)
+Phase 1. plan + Unit 사전 예비 설계 (/clawket-plan-design skill)
    └─ Plan 1개 + Unit N개 (시나리오 그룹별)
    └─ Plan body 에 Done 명제 + 수렴 조건 명시
 
-Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
+Phase 2. clawket discover-loop 수렴 루프 (메인 엔진)
    └─ Round R 시작:
-      ├─ Plan 자동 생성: "<도메인> Round R" (qa-flow §라운드별 새 plan)
+      ├─ Plan 자동 생성: "<도메인> Round R" (라운드별 새 plan)
       ├─ Cycle 1개 활성화 (cross-unit 가능)
       ├─ Sub-agent dispatch:
       │  ├─ N agents 병렬 (1 agent / 1 unit, 시나리오 ≤ 30/agent — A8 강제)
@@ -114,8 +113,8 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
       │  └─ TSV emit: scenario_id, status, reasoning, evidence(file:line)
       ├─ Bulk sync TSV → DB task status (transcription only)
       ├─ 수렴 판정 (3-way):
-      │  ├─ defect > 0 → /qa-fix subagent → fix plan 의 Round R unit
-      │  ├─ scenario_error > 0 → /scenario-refine subagent
+      │  ├─ defect > 0 → /clawket-defect-fix subagent → fix plan 의 Round R unit
+      │  ├─ scenario_error > 0 → /clawket-scenario-refine subagent
       │  │   ├─ atomic 분해 (1 → N 시나리오)
       │  │   ├─ 의도 재정의 (knowledge 갱신, ID 보존)
       │  │   └─ 삭제 (ID 영구 비움)
@@ -128,7 +127,7 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
 
 - defect → 0 (코드가 시나리오를 만족)
 - scenario_error → 0 (시나리오가 더 이상 atomic 분해되지 않음)
-- 두 조건이 **2 라운드 연속** (qa-flow.md last-2-rounds-zero 룰 계승)
+- 두 조건이 **2 라운드 연속** (last-2-rounds-zero 룰)
 
 이 종점 이전엔 시나리오와 코드가 **공진화** 한다.
 
@@ -138,7 +137,7 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
    임계.
 2. **TSV evidence 의무**. 모든 sub-agent 산출은 `qa-U##-r#.tsv` 형식으로 영속.
    필드: `scenario_id, status, reasoning, evidence(file:line), tier_used,
-   batch_id`. evidence 빈 task = X3 anti-pattern.
+   batch_id`. evidence 빈 task = Anti-pattern X3.
 3. **Bulk sync ≠ reasoning**. ThreadPoolExecutor 등 병렬 드라이버는 TSV → DB
    transcription 만 수행. reasoning 결정을 sync 단계에 끼워넣지 않는다. sync
    코드는 TSV 의 status 를 그대로 옮겨야 한다.
@@ -197,11 +196,11 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
 - **X4**. Done 정의 = "구현 완료" 같은 자기참조 → 외부 검증 명제로 재정의
 - **X5**. 수렴 조건 부재 → 재분해
 - **X6**. 시간 기반 종료 조건 ("2주 후") → 산출물 기반 재정의
-- **X7**. **Reasoning batch size > 30 / agent** → A8 위반.
+- **X7**. **Reasoning batch size > 30 / agent** — A8 위반.
   attention 분산 위험. 분할 dispatch 강제.
-- **X8**. **TSV evidence 부재 sub-agent 산출** → A8 위반.
+- **X8**. **TSV evidence 부재 sub-agent 산출** — A8 위반.
   reasoning 흔적이 영속화 안 됨. 재실행.
-- **X9**. **Bulk sync 안에 reasoning 결정 끼워넣기** → A8 위반.
+- **X9**. **Bulk sync 안에 reasoning 결정 끼워넣기** — A8 위반.
   sync 코드는 TSV → DB 매핑만. status 결정은 agent reasoning 산출이어야 함.
 
 ## Operational Rules (Clawket 통합)
@@ -224,21 +223,21 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
 
 ```
 [1] Phase 0 — 시나리오 사전 예비 설계 (의도 레이어 초안)
-    ├─ /scenario-author skill (atomic 시나리오 작성)
+    ├─ /clawket-scenario-author skill (atomic 시나리오 작성)
     └─ 도메인별 knowledge
 
 [2] Phase 1 — Plan + Unit 사전 예비 설계 (의도 레이어 골격)
-    ├─ /pdd-plan skill (Plan 1개 + Unit N개 + 수렴 조건)
+    ├─ /clawket-plan-design skill (Plan 1개 + Unit N개 + 수렴 조건)
     └─ knowledge 미러
 
-[3] Phase 2 — 발견-수렴 루프 (메인 엔진)
-    ├─ /discover-loop skill (메인 루프 본체)
+[3] Phase 2 — 수렴 루프 (메인 엔진)
+    ├─ /clawket-verify-loop skill (메인 루프 본체)
     │  ├─ Round R cycle 활성화
-    │  ├─ /qa-batch sub-agent dispatch (1 agent / 1 unit / ≤ 30 시나리오)
+    │  ├─ /clawket-verify-batch sub-agent dispatch (1 agent / 1 unit / ≤ 30 시나리오)
     │  ├─ TSV → bulk sync transcription
     │  ├─ 3-way 수렴 판정
-    │  │  ├─ defect → /qa-fix
-    │  │  └─ scenario_error → /scenario-refine
+    │  │  ├─ defect → /clawket-defect-fix
+    │  │  └─ scenario_error → /clawket-scenario-refine
     │  └─ /loop ScheduleWakeup → R+1
     └─ 수렴 (defect=0 + scenario_error=0 + 2 라운드 연속) → Plan completed
 
@@ -248,19 +247,20 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
 
 ## EXPERIMENTAL → STABLE 승격 기준
 
-새 PDD 룰이 다음을 통과하면 Clawket plugin 정본 스킬로 승급한다:
+새 plan-driven workflow 룰이 다음을 통과하면 Clawket plugin 정본 스킬로 승급한다:
 
-- [ ] 1 프로젝트 이상에서 1개 Plan 전체 lifecycle 완주 (발견-수렴 루프 1 회 완주)
+- [ ] 1 프로젝트 이상에서 1개 Plan 전체 lifecycle 완주 (수렴 루프 1 회 완주)
 - [ ] Sub-agent batch dispatch 가 reasoning batch ≤ 30 강제 하에 완주
 - [ ] 모든 task 의 `scenario_id` + `evidence` 채워짐 (100%)
-- [ ] scenario_error 가 발견-수렴 루프 안에서 자연 발생 → /scenario-refine 자동
+- [ ] scenario_error 가 수렴 루프 안에서 자연 발생 → /clawket-scenario-refine 자동
       처리됨
 - [ ] anti-pattern X3 (scenario_id 부재) / X7 (batch > 30) / X8 (evidence 부재)
       / X9 (sync 안 reasoning) 가 hook 으로 차단됨
 
 승격 후 산출물:
-- `skills/pdd/`, `skills/scenario-author/`, `skills/qa-batch/`,
-  `skills/discover-loop/`, `skills/scenario-refine/`, `skills/qa-fix/`
+- `skills/clawket-plan-design/`, `skills/clawket-scenario-author/`,
+  `skills/clawket-verify-batch/`, `skills/clawket-verify-loop/`,
+  `skills/clawket-scenario-refine/`, `skills/clawket-defect-fix/`
   (Clawket plugin 정본 — 본 위치가 SSoT)
 - 룰 본체는 각 skill 의 `RULE.md` 가 정본
 - Clawket hook 으로 X3/X7/X8/X9 강제 (PreToolUse / SubagentStart / PostToolUse
@@ -293,7 +293,7 @@ Phase 2. /discover-loop 발견-수렴 루프 (메인 엔진)
 
 ## 운영 노트
 
-- PDD 는 솔로 PO 컨텍스트의 방법론.
+- plan-driven workflow 는 솔로 PO 컨텍스트의 방법론.
 - 시나리오 700~2000 개를 사전에 박는 것이 정상이지만, 라운드 안에서 정련된다.
 - Cycle 수가 Unit 별로 다른 것이 정상 (Unit A = 1 cycle, Unit B = 4 cycle).
   의도가 가변이 아니라, 실행 라운드가 가변.
