@@ -13,8 +13,8 @@ License: CC BY 4.0
 # Code of Conduct
 
 This document applies to all `@clawket` GitHub organization repositories
-(`clawket`, `cli`, `daemon`, `web`, `mcp`, `landing`, `tap`, and the
-upcoming `evals` repo) and to every space where the project communicates —
+(`clawket`, `cli`, `daemon`, `web`, `mcp`, `landing`) and to every
+space where the project communicates —
 issues, pull requests, discussions, release announcements, and any
 community channels operated under the Clawket name.
 

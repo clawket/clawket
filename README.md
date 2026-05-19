@@ -216,7 +216,6 @@ clawket/
 | [`clawket/web`](https://github.com/clawket/web) | React dashboard | GitHub Releases tarball |
 | [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app (renders the same SPA as `web`) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — pinned to `null` in v3.0.0 until first release |
 | [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Vercel |
-| [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formulas | Homebrew distribution channel |
 
 See `docs/COMPATIBILITY.md` for version range guarantees.
 

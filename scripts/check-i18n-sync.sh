@@ -22,7 +22,7 @@
 #
 # Repo classification (must-translate ⇒ README.ko.md required):
 #   clawket, cli, daemon, web    : must-translate
-#   landing, mcp, tap, evals     : optional
+#   landing, mcp                 : optional
 
 set -euo pipefail
 
@@ -60,8 +60,6 @@ case "$origin" in
   *clawket/web*)     repo_name="web" ;;
   *clawket/mcp*)     repo_name="mcp" ;;
   *clawket/landing*) repo_name="landing" ;;
-  *clawket/tap*)     repo_name="tap" ;;
-  *clawket/evals*)   repo_name="evals" ;;
   *) repo_name="(unknown)" ;;
 esac
 

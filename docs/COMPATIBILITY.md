@@ -14,7 +14,6 @@ the tested combination here.
 | `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
 | `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat` + `components.json.desktop` (`null` until first release) |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
-| `@clawket/evals` | `clawket/evals` | GitHub Pages JSON feed (`latest.json`); not installed | n/a — runtime-consumed by landing badge only |
 | `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived in plugin v11 U4** (final deprecation commit `542c397`) — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 
 ## Matrix
@@ -68,7 +67,7 @@ multiple cross-component contract breaks. See `MIGRATION-v2-to-v3.md` for the fu
 - **Web** — daemon health indicator, theme toggle, command palette, knowledge default for wiki;
   bundle size 588 kB.
 - **Distribution** — canonical asset names (`{cmd}-{os}-{arch}{.exe}`), SHA256SUMS published per
-  release, brew tap auto-update workflow.
+  release.
 
 ## v2 → v3 migration data path
 

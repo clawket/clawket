@@ -1,7 +1,7 @@
 # Cross-repo label standard
 
 Every `@clawket` repository (`clawket`, `cli`, `daemon`, `mcp`, `web`,
-`landing`, `evals`, `tap`) ships the same six issue/PR labels so that
+`landing`) ships the same six issue/PR labels so that
 contributors can move across repos without relearning the taxonomy.
 
 ## The six labels
@@ -58,13 +58,12 @@ The script is idempotent: existing labels with the same name are
 **created**. Labels not in `labels.yml` are left alone — the script
 never deletes labels.
 
-If a repo is missing (e.g. `clawket/evals` is not yet created at the
-time of writing), the script logs a `SKIP` line and continues.
+If a repo is missing, the script logs a `SKIP` line and continues.
 
 ## Verification
 
 ```bash
-for r in clawket cli daemon mcp web landing evals tap; do
+for r in clawket cli daemon mcp web landing; do
   echo "== $r =="
   gh label list --repo clawket/$r | grep -E '^(good-first-issue|help-wanted|bug|feat|docs|breaking)\b' || echo "  MISSING"
 done

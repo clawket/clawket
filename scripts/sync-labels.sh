@@ -2,7 +2,7 @@
 # Cross-repo label sync — Clawket org standard.
 #
 # Usage:
-#   bash scripts/sync-labels.sh                  # dry-run, all 8 repos
+#   bash scripts/sync-labels.sh                  # dry-run, all 6 repos
 #   bash scripts/sync-labels.sh --repo OWNER/REPO   # dry-run, single repo
 #   bash scripts/sync-labels.sh --apply           # actually write to GitHub
 #   bash scripts/sync-labels.sh --apply --repo OWNER/REPO
@@ -14,8 +14,7 @@
 #
 # Idempotent: existing labels are edited (color + description re-applied),
 # missing labels are created. Labels not in this list are NEVER deleted.
-# Missing repos (e.g. clawket/evals before creation) are skipped, not
-# fatal.
+# Missing repos are skipped, not fatal.
 #
 # Requires: gh CLI authenticated with write access to the clawket org.
 
@@ -28,8 +27,6 @@ REPOS=(
   clawket/mcp
   clawket/web
   clawket/landing
-  clawket/evals
-  clawket/tap
 )
 
 # Mirror of scripts/labels.yml. Format: name<TAB>color<TAB>description.

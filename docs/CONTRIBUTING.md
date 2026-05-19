@@ -35,12 +35,10 @@ Clawket lives across seven independent GitHub repositories under the `@clawket` 
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Axum daemon + SQLite + sqlite-vec | same |
 | [`clawket/web`](https://github.com/clawket/web) | React 19 dashboard | same |
 | [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | same |
-| [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formulas | same |
-| [`clawket/evals`](https://github.com/clawket/evals) | Contract compliance evaluation pipeline | same |
 
-The hero tagline is propagated verbatim across all seven repos; do not paraphrase it. The forbidden-language list (variants that lose meaning under compression) is recorded in the Clawket project's U1 decision knowledge — pull it via `clawket knowledge search "U1 Tagline decision"`.
+The hero tagline is propagated verbatim across all five repos; do not paraphrase it. The forbidden-language list (variants that lose meaning under compression) is recorded in the Clawket project's U1 decision knowledge — pull it via `clawket knowledge search "U1 Tagline decision"`.
 
-A wrapper that pins all seven locally for development lives at `lattice-mono/clawket/` (not a git repo itself).
+A wrapper that pins all five locally for development lives at `lattice-mono/clawket/` (not a git repo itself).
 
 ## Dev environment
 

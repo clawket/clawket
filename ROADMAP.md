@@ -1,7 +1,7 @@
 # Clawket Roadmap
 
 Cross-repo milestone view for the `@clawket` GitHub organization. Each repo
-(`clawket`, `cli`, `daemon`, `web`, `landing`, `tap`, `evals`)
+(`clawket`, `cli`, `daemon`, `web`, `landing`)
 ships independently — this document tracks the **shared milestones** that
 those repos coordinate around.
 
@@ -27,7 +27,7 @@ running the daemon.
 
 ## Active milestones (v11)
 
-v11 is split into nine milestones (M1–M7 + two web IA addenda). The cycle
+v11 is split into eight milestones (M1–M6 + two web IA addenda). The cycle
 breakdown lives in the plan body. Public-facing checkpoints:
 
 | Milestone | Scope | What ships |
@@ -36,9 +36,8 @@ breakdown lives in the plan body. Public-facing checkpoints:
 | M2 — Tree decomposition | `daemon`, `cli` | `decomposition_policy`, `atomic_size_hint`, PreToolUse split enforcement, infinite-depth task trees |
 | M3 — MCP integration | `cli` (absorbs `mcp`) | `clawket mcp` rmcp 1.5 stdio server with 5 read-only knowledge tools; `@clawket/mcp` npm deprecated |
 | M4 — Web envelope + tree UI | `web` | Envelope editor, tree visualization, Timeline Replay |
-| **M5 — Distribution & community** | **`landing`, `tap`, all repos** | **Homebrew tap, install.sh, Vercel landing, CONTRIBUTING/CODE_OF_CONDUCT/ROADMAP, label strategy, i18n drift guard, launch posts** |
+| **M5 — Distribution & community** | **`landing`, all repos** | **install.sh, Vercel landing, CONTRIBUTING/CODE_OF_CONDUCT/ROADMAP, label strategy, i18n drift guard, launch posts** |
 | M6 — SessionStart redesign | `clawket`, `daemon` | Tree + vector + 4 metrics + p95 < 500 ms + degraded mode |
-| M7 — Contract Compliance pipeline | `evals` (new repo) | Eval harness measuring how often a contract is enough for haiku to complete the task without escalation |
 | Addendum A — Web IA tier 1 | `web` | Sidebar 3-tier, Cmd-K global search, dashboard flow redesign |
 | Addendum B — Web IA tier 2 | `web`, `daemon` | Plan/Unit narrative model, virtualization, graph view, visual regression |
 
@@ -55,12 +54,8 @@ batch once write access is in place.
   json | envelope-coverage`).
 - **Decomposition discipline**: tasks above `atomic_size_hint` cannot be
   started — PreToolUse hook hard-blocks until the task has children.
-- **Reproducibility (side-effect)**: the M7 eval pipeline shows that the
-  same envelope produces the same `verification_cmd` exit code across
-  haiku / sonnet / opus on a 30-task fixture.
-- **Distribution**: `brew install clawket/tap/clawket` and
-  `curl -fsSL https://landing-seungwoo321s-projects.vercel.app/install.sh | sh` both yield a working
-  daemon + CLI in a clean VM.
+- **Distribution**: `curl -fsSL https://landing-seungwoo321s-projects.vercel.app/install.sh | sh`
+  yields a working daemon + CLI in a clean VM.
 
 ## Next 3 versions (preview)
 
