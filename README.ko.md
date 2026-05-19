@@ -31,7 +31,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 ## 주요 기능
 
 - **구조화된 워크플로우** — Project → Plan (approve) → Unit → Cycle (`--unit` 필수, activate) → Task
-- **라이프사이클 훅** — 7개 Claude Code 이벤트가 각각 전용 핸들러에 연결됨 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, ExitPlanMode, SubagentStart, SubagentStop)
+- **라이프사이클 훅** — 6개 Claude Code 이벤트 + `PostToolUse:ExitPlanMode` matcher 가 각각 전용 핸들러에 연결됨 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStart, SubagentStop)
 - **웹 대시보드** — 요약, 계획, 보드(칸반), 백로그, 타임라인, 위키 6개 뷰
 - **에이전트 Swimlane 타임라인** — 에이전트별 수평 바 차트로 동시 작업 시각화
 - **드래그 앤 드롭** — 칸반 DnD로 상태 변경, 백로그 DnD로 사이클 배정
@@ -44,7 +44,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 
 ### Claude 훅
 
-[`hooks/hooks.json`](hooks/hooks.json) 의 그대로 — 7개 이벤트, 각 1개 핸들러.
+[`hooks/hooks.json`](hooks/hooks.json) 의 그대로 — 6개 이벤트 + `PostToolUse:ExitPlanMode` matcher 분기.
 
 | 이벤트 | Matcher | Handler | 용도 |
 |---|---|---|---|
@@ -52,7 +52,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 | **UserPromptSubmit** | (all) | `user-prompt-submit.cjs` | 활성 태스크 컨텍스트 주입, 활성 태스크 없으면 경고. |
 | **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | 활성 태스크 없으면 변경 작업 차단. PDD anti-pattern 검사 (X3/X7/X8/X9). |
 | **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | 파일 변경을 활성 태스크에 기록. X3 scenario-id 검사. |
-| **ExitPlanMode** | (all) | `plan-sync.cjs` | Plan Mode 결과물을 Clawket plan 으로 등록하도록 안내. |
+| **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Plan Mode 결과물을 Clawket plan 으로 등록하도록 안내. Claude Code 가 plan-mode 종료를 hook event 가 아닌 tool 호출로 분류하므로 `ExitPlanMode` tool matcher 로 라우팅. |
 | **SubagentStart** | (all) | `subagent-start.cjs` | 서브에이전트를 배정된 태스크에 바인딩. X3/X7/X9 검사. |
 | **SubagentStop** | (all) | `subagent-stop.cjs` | 결과 요약 첨부, X8 evidence 검사, 성공 시 태스크 자동 완료. |
 
