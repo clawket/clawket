@@ -31,7 +31,7 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 ## Features
 
 - **Structured Workflow** — Project → Plan (approve) → Unit → Cycle (`--unit` required, then activate) → Task
-- **Lifecycle Hooks** — 7 Claude Code events wired to dedicated handlers (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, ExitPlanMode, SubagentStart, SubagentStop)
+- **Lifecycle Hooks** — 6 Claude Code events + `PostToolUse:ExitPlanMode` matcher wired to dedicated handlers (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStart, SubagentStop)
 - **Web Dashboard** — Summary, Plans, Board (Kanban), Backlog, Timeline, Wiki — 6 views
 - **Agent Swimlane Timeline** — Per-agent horizontal bar chart with concurrent work visualization
 - **Drag & Drop** — Kanban DnD for status changes, backlog DnD for cycle assignment
@@ -44,7 +44,7 @@ Clawket fixes this with a persistent database, local vector RAG, an MCP pull int
 
 ### Claude Hooks
 
-A literal projection of [`hooks/hooks.json`](hooks/hooks.json) — 7 event types, one handler each.
+A literal projection of [`hooks/hooks.json`](hooks/hooks.json) — 6 event types + the `PostToolUse:ExitPlanMode` matcher branch.
 
 | Event | Matcher | Handler | What it does |
 |---|---|---|---|
@@ -52,7 +52,7 @@ A literal projection of [`hooks/hooks.json`](hooks/hooks.json) — 7 event types
 | **UserPromptSubmit** | (all) | `user-prompt-submit.cjs` | Injects active-task context, warns when no active task is set. |
 | **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | Blocks mutating tools unless an active task exists; runs PDD anti-pattern checks (X3/X7/X8/X9). |
 | **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | Records file modifications to the active task; runs the X3 scenario-id check. |
-| **ExitPlanMode** | (all) | `plan-sync.cjs` | Prompts the agent to register the Plan Mode output as a Clawket plan. |
+| **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Prompts the agent to register the Plan Mode output as a Clawket plan. Routed via the `ExitPlanMode` tool matcher because Claude Code classifies plan-mode exit as a tool invocation, not a standalone hook event. |
 | **SubagentStart** | (all) | `subagent-start.cjs` | Binds the spawned sub-agent to its assigned task; runs X3/X7/X9 checks. |
 | **SubagentStop** | (all) | `subagent-stop.cjs` | Appends the result summary, runs the X8 evidence check, and auto-completes the task on success. |
 
@@ -215,7 +215,7 @@ clawket/
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust daemon (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases binary |
 | [`clawket/web`](https://github.com/clawket/web) | React dashboard | GitHub Releases tarball |
 | [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app (renders the same SPA as `web`) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — pinned to `null` in v3.0.0 until first release |
-| [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Cloudflare Pages |
+| [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Vercel |
 | [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formulas | Homebrew distribution channel |
 
 See `docs/COMPATIBILITY.md` for version range guarantees.

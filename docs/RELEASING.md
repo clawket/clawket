@@ -15,7 +15,7 @@ Each component has its own repo and its own auto-release workflow. When a coordi
 | 3 | `clawket/web`      | React dashboard | GitHub Releases tarball |
 | 4 | `clawket/desktop`  | Tauri 2 desktop app (depends on web bundle for renderer assets) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — `null`-pinned in `components.json` until first release |
 | 5 | `clawket/clawket`  | Plugin shell | Marketplace install (`marketplace.json` on `main` HEAD) + git tag |
-| 6 | `clawket/landing`  | Public landing page | Cloudflare Pages |
+| 6 | `clawket/landing`  | Public landing page | Vercel |
 
 `clawket/desktop` slots between `web` and the plugin shell because it consumes the `web` tarball at build time (Tauri bundles the SPA into the renderer). During the v3.0.0 window the desktop pin is `null` (sentinel — sub-repo + first release pending), and the install gate treats that as a no-op skip; the order step is enforced only when the pin becomes a string tag.
 
