@@ -7,8 +7,7 @@ Goal: from a fresh install, you'll have a registered project, an active plan, an
 You have the `clawket` CLI installed:
 
 ```sh
-brew install clawket/tap/clawket
-# or download from https://github.com/clawket/cli/releases
+# Download from https://github.com/clawket/cli/releases
 clawket --version
 ```
 

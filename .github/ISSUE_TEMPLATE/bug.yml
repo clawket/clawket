@@ -26,6 +26,6 @@ body:
     id: env
     attributes:
       label: Environment
-      description: OS, arch, install method (brew/install.sh/source). Output of `clawket doctor` if relevant.
+      description: OS, arch, install method (install.sh/source). Output of `clawket doctor` if relevant.
     validations:
       required: false

@@ -16,6 +16,6 @@ Clawket plugin shell sub-repo (`github.com/clawket/clawket`) 특화 가드레일
 
 ## 적용 범위
 
-이 룰들은 본 sub-repo cwd 에서의 모든 작업에 적용된다. 다른 sub-repo (`cli/`, `daemon/`, `web/`, `landing/`, `tap/`, `evals/`) 는 자체 `.claude/rules/` 를 보유하거나 보유 예정이며, 그 sub-repo 의 invariant 만 다룬다.
+이 룰들은 본 sub-repo cwd 에서의 모든 작업에 적용된다. 다른 sub-repo (`cli/`, `daemon/`, `web/`, `landing/`) 는 자체 `.claude/rules/` 를 보유하거나 보유 예정이며, 그 sub-repo 의 invariant 만 다룬다.
 
 새 룰 추가 / 기존 룰 수정 시 `clawket/CLAUDE.md` 의 AI 가드레일 섹션과 일관성 유지. 변경 이력은 본 README 본문에 남기지 않고 git 커밋 메시지 / ADR 로 분리한다 (SNAPSHOT-ONLY).

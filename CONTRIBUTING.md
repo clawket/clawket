@@ -52,7 +52,7 @@ generation easier later.
 
 See [`ROADMAP.md`](./ROADMAP.md) (or the [v11 plan in
 Clawket](https://github.com/clawket/clawket/blob/main/plans/v11-structured-task-contracts.md))
-for the cross-repo milestones (M5 distribution, M7 contract compliance).
+for the cross-repo milestones (M5 distribution, M6 SessionStart redesign).
 
 ## Code of Conduct
 

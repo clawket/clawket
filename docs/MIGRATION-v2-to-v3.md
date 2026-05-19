@@ -13,7 +13,7 @@ Clawket v3 is a coordinated breaking release across all components: plugin shell
 | CLI | Removed `execute`, `task envelope`; removed 4 v11 MCP tools; added `completions` subcommand | Pin v2 CLI binary |
 | Plugin shell | `schema_version: "v3"`, hooks added/removed, `/clawket` skill split into 7 sub-flows, locale chain, tier-mismatch policy gate | Pin plugin v2.3.12 |
 | Web | New header (health/theme/palette), reactive SSE state, scope=rag wiki default | Pin web v2 bundle |
-| Distribution | Canonical asset names, SHA256SUMS, brew tap auto-update | n/a (additive on release infra) |
+| Distribution | Canonical asset names, SHA256SUMS | n/a (additive on release infra) |
 
 ## Pre-flight checklist
 
@@ -241,7 +241,6 @@ Supported: `en`, `ko`, `ja`. Translation function `t(key, vars)` reads from `loc
 - **Asset names** — every release uses canonical names: `clawket-darwin-x64`, `clawket-darwin-arm64`, `clawket-linux-x64`, `clawket-linux-arm64`, `clawket-windows-x64.exe` (and analogously for `clawketd`). The setup gate reads `components.json` for the tag, then downloads `<cmd>-<os>-<arch>{.exe}`.
 - **SHA256SUMS** — every component release publishes a `SHA256SUMS` file alongside binaries. The plugin verifies download integrity against this file before accepting an install.
 - **Web bundle** — `clawket-web-v<tag>.tar.gz` is published on the web repo's release page. The setup gate extracts it under `~/.claude/plugins/clawket-*/web/`.
-- **Brew tap** — `clawket/tap` ships `clawket.rb` and `clawketd.rb` formulas. A `repository_dispatch` + daily cron `auto-update.yml` workflow rebumps the formula when a new release is detected upstream.
 
 ## Privacy and telemetry
 
@@ -259,7 +258,7 @@ Supported: `en`, `ko`, `ja`. Translation function `t(key, vars)` reads from `loc
 
 These are NOT addressed by automatic migration. Operators must take explicit action:
 
-1. **Custom shell completion files** — distributions (homebrew, AUR, etc.) that ship pre-baked completion files for v2 will see them collide with `clawket completions` output. Drop the pre-baked files and let users run `clawket completions <shell>` from their dotfiles instead.
+1. **Custom shell completion files** — distributions (AUR, etc.) that ship pre-baked completion files for v2 will see them collide with `clawket completions` output. Drop the pre-baked files and let users run `clawket completions <shell>` from their dotfiles instead.
 2. **CI scripts that call `clawket execute`** — must be rewritten to `clawket task update`.
 3. **Hooks that read `unit.status`** — the field is no longer in responses; switch to `/plans/:id/counts`.
 4. **External MCP clients that called `execute_task` etc.** — the four removed tools no longer appear in the `tools/list` response. The client error path should already handle "tool not found".

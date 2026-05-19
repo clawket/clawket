@@ -215,7 +215,6 @@ clawket/
 | [`clawket/web`](https://github.com/clawket/web) | React 대시보드 | GitHub Releases tarball |
 | [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 데스크톱 앱 (web 과 동일한 SPA 렌더) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — v3.0.0 에서는 `null` 핀, 첫 릴리즈 대기 중 |
 | [`clawket/landing`](https://github.com/clawket/landing) | 공개 랜딩 페이지 | Vercel |
-| [`clawket/tap`](https://github.com/clawket/tap) | Homebrew formula | Homebrew 배포 채널 |
 
 버전 호환 범위는 `docs/COMPATIBILITY.md` 참조.
 
