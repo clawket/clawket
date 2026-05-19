@@ -1,0 +1,33 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e7]
+        - generic [ref=e13]: Clawket
+        - generic [ref=e14]: v3.0
+        - button "Collapse sidebar" [ref=e15] [cursor=pointer]: ◀
+      - generic [ref=e16]:
+        - button "Demo Launch (LP hero capture)" [ref=e330] [cursor=pointer]:
+          - generic [ref=e19]: Demo Launch (LP hero capture)
+          - generic [ref=e20]: ▾
+        - button "Project settings" [ref=e21] [cursor=pointer]: ⚙
+    - region "Active context" [ref=e22]:
+      - paragraph [ref=e23]: Active
+      - paragraph [ref=e331]: No active plan
+    - navigation "Plan tree" [ref=e26]:
+      - generic [ref=e333]: Loading plans...
+    - separator "Resize sidebar" [ref=e70]
+  - generic [ref=e71]:
+    - banner [ref=e72]:
+      - tablist "Workspace views" [ref=e73]:
+        - tab "Summary" [selected] [ref=e74] [cursor=pointer]
+        - tab "Board" [active] [ref=e75] [cursor=pointer]
+        - tab "Backlog" [ref=e76] [cursor=pointer]
+        - tab "Timeline" [ref=e77] [cursor=pointer]
+        - tab "Wiki" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - button "daemon ok" [ref=e80]: daemon ok
+        - 'button "Theme: System (light) — click to cycle" [ref=e82] [cursor=pointer]': ◑
+        - button "Open command palette (Cmd+K)" [ref=e83] [cursor=pointer]: ⌘K
+    - main [ref=e84]:
+      - generic [ref=e334]: Loading summary...

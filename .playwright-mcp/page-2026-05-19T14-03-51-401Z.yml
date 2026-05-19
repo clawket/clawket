@@ -1,0 +1,161 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e7]
+        - generic [ref=e13]: Clawket
+        - generic [ref=e14]: v3.0
+        - button "Collapse sidebar" [ref=e15] [cursor=pointer]: ◀
+      - generic [ref=e16]:
+        - button "sdi" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: sdi
+          - generic [ref=e20]: ▾
+        - button "Project settings" [ref=e21] [cursor=pointer]: ⚙
+    - region "Active context" [ref=e22]:
+      - paragraph [ref=e23]: Active
+      - paragraph [ref=e24]: SDI gap closure (S1/S2/S3)
+      - paragraph [ref=e25]: No active cycle
+    - navigation "Plan tree" [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - heading "Plans" [level=2] [ref=e29]
+          - generic [ref=e30]:
+            - generic [ref=e31]: 5 plans
+            - button "Edit" [ref=e32] [cursor=pointer]
+            - button "+ New Plan" [ref=e33]
+        - generic [ref=e34]:
+          - generic "PLAN-01KS07RXGG1SP4EA4WQ2QMAMX3" [ref=e36] [cursor=pointer]:
+            - button "▶" [ref=e37]
+            - generic [ref=e38]:
+              - generic [ref=e39]: SDI gap closure (S1/S2/S3)
+              - generic [ref=e40]: Completed
+            - button "+" [ref=e41]
+          - generic "PLAN-01KRYY992ACERXSSK885Q95HGW" [ref=e43] [cursor=pointer]:
+            - button "▶" [ref=e44]
+            - generic [ref=e45]:
+              - generic [ref=e46]: v0.2 — D6 round mirror + sdi-web + sdi-desktop full implementation
+              - generic [ref=e47]: Completed
+            - button "+" [ref=e48]
+          - generic "PLAN-01KRYTH6Z4470JJK00YVZZDFEM" [ref=e50] [cursor=pointer]:
+            - button "▶" [ref=e51]
+            - generic [ref=e52]:
+              - generic [ref=e53]: "SDI v0.1 baseline: Phase 1 structural alignment + Phase 2 PRD §6 verification"
+              - generic [ref=e54]: Completed
+            - button "+" [ref=e55]
+          - generic "PLAN-01KRX6DJAQCCG7TQGZZY3J9FQW" [ref=e57] [cursor=pointer]:
+            - button "▶" [ref=e58]
+            - generic [ref=e59]:
+              - generic [ref=e60]: v0.1 — full implementation per PRD §6
+              - generic [ref=e61]: Completed
+            - button "+" [ref=e62]
+          - generic "PLAN-01KRX5GEGYKCBSE9NV7MF5QVXM" [ref=e64] [cursor=pointer]:
+            - button "▶" [ref=e65]
+            - generic [ref=e66]:
+              - generic [ref=e67]: v0.0 bootstrap — repo + workspace skeleton
+              - generic [ref=e68]: Completed
+            - button "+" [ref=e69]
+    - separator "Resize sidebar" [ref=e70]
+  - generic [ref=e71]:
+    - banner [ref=e72]:
+      - tablist "Workspace views" [ref=e73]:
+        - tab "Summary" [selected] [ref=e74] [cursor=pointer]
+        - tab "Board" [ref=e75] [cursor=pointer]
+        - tab "Backlog" [ref=e76] [cursor=pointer]
+        - tab "Timeline" [ref=e77] [cursor=pointer]
+        - tab "Wiki" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - button "daemon ok" [ref=e80]: daemon ok
+        - 'button "Theme: System (light) — click to cycle" [ref=e82] [cursor=pointer]': ◑
+        - button "Open command palette (Cmd+K)" [ref=e83] [cursor=pointer]: ⌘K
+    - main [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - heading "Summary" [level=2] [ref=e87]
+          - paragraph [ref=e88]: SDI gap closure (S1/S2/S3)
+        - region "Overall progress" [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]: Overall Progress
+            - generic [ref=e92]: 100.00%
+          - generic [ref=e95]:
+            - generic [ref=e96]: Closed 36
+            - generic [ref=e98]: Active 0
+            - generic [ref=e100]: Todo 0
+        - region "KPI strip" [ref=e102]:
+          - generic [ref=e103]:
+            - generic [ref=e104]: todo
+            - generic [ref=e105]: "0"
+          - generic [ref=e106]:
+            - generic [ref=e107]: in_progress
+            - generic [ref=e108]: "0"
+          - generic [ref=e109]:
+            - generic [ref=e110]: blocked
+            - generic [ref=e111]: "0"
+          - generic [ref=e112]:
+            - generic [ref=e113]: done
+            - generic [ref=e114]: "36"
+          - generic [ref=e115]:
+            - generic [ref=e116]: cancelled
+            - generic [ref=e117]: "0"
+        - generic [ref=e118]:
+          - region "Now active" [ref=e119]:
+            - heading "Now active" [level=3] [ref=e121]
+            - 'button "Active task · SDI-36 SDI S1+S2+S3 structural fix tier:med S1 daemon 측 project slug rename: crates/db/src/repo/project.rs + crates/daemon/src/router/project.rs:87-102. CLI crates/cli/src/commands/project.rs:56,59 의 reject 문구 제거. S2 hook matcher 3-way 동기화: docs/HOOK_ENFORCEMENT.md:22 + plugin/hooks/hooks.json:26 + plugin/adapters/shared/sdi-hooks.cjs:528 (Agent/Task/SendMessage gate 실제 구현). S3 ARCHITECTURE.md:25 ''skills/sdi/'' → 4개 sdi-* 스킬 반영. done unassigned evidence Updated 13m ago" [ref=e122] [cursor=pointer]':
+              - generic [ref=e123]:
+                - generic [ref=e124]:
+                  - paragraph [ref=e125]: Active task · SDI-36
+                  - heading "SDI S1+S2+S3 structural fix" [level=3] [ref=e126]
+                - generic [ref=e127]: tier:med
+              - paragraph [ref=e128]: "S1 daemon 측 project slug rename: crates/db/src/repo/project.rs + crates/daemon/src/router/project.rs:87-102. CLI crates/cli/src/commands/project.rs:56,59 의 reject 문구 제거. S2 hook matcher 3-way 동기화: docs/HOOK_ENFORCEMENT.md:22 + plugin/hooks/hooks.json:26 + plugin/adapters/shared/sdi-hooks.cjs:528 (Agent/Task/SendMessage gate 실제 구현). S3 ARCHITECTURE.md:25 'skills/sdi/' → 4개 sdi-* 스킬 반영."
+              - generic [ref=e129]:
+                - generic [ref=e130]: done
+                - generic [ref=e131]: unassigned
+                - generic "Evidence attached. 4 KiB cap enforced by daemon." [ref=e132]: evidence
+                - generic [ref=e133]: Updated 13m ago
+            - region "Other in-progress tasks"
+          - region "Recent activity" [ref=e134]:
+            - heading "Recent activity" [level=3] [ref=e135]
+            - list [ref=e136]:
+              - listitem [ref=e137]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]:
+                    - generic [ref=e141]: 13m ago
+                    - generic [ref=e142]: system
+                    - generic [ref=e143]: status_change
+                  - paragraph [ref=e144]: SDI S1+S2+S3 structural fix
+                  - paragraph [ref=e145]: in_progress → done
+              - listitem [ref=e146]:
+                - generic [ref=e148]:
+                  - generic [ref=e149]:
+                    - generic [ref=e150]: 13m ago
+                    - generic [ref=e151]: main
+                    - generic [ref=e152]: run_end
+                  - paragraph [ref=e153]: SDI S1+S2+S3 structural fix
+                  - paragraph [ref=e154]: success · 278s
+              - listitem [ref=e155]:
+                - generic [ref=e157]:
+                  - generic [ref=e158]:
+                    - generic [ref=e159]: 17m ago
+                    - generic [ref=e160]: system
+                    - generic [ref=e161]: status_change
+                  - paragraph [ref=e162]: SDI S1+S2+S3 structural fix
+                  - paragraph [ref=e163]: todo → in_progress
+              - listitem [ref=e164]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]:
+                    - generic [ref=e168]: 17m ago
+                    - generic [ref=e169]: main
+                    - generic [ref=e170]: run_start
+                  - paragraph [ref=e171]: SDI S1+S2+S3 structural fix
+              - listitem [ref=e172]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]:
+                    - generic [ref=e176]: 12h ago
+                    - generic [ref=e177]: system
+                    - generic [ref=e178]: status_change
+                  - paragraph [ref=e179]: D6 round.scenario_results mirror in /tasks/<id>/complete
+                  - paragraph [ref=e180]: in_progress → done
+  - generic "Notifications":
+    - alert [ref=e181]:
+      - generic [ref=e182]: ✓
+      - generic [ref=e183]: Daemon reconnected.
+      - button "Dismiss" [ref=e184] [cursor=pointer]: ✕

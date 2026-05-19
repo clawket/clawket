@@ -1,0 +1,122 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e7]
+        - generic [ref=e13]: Clawket
+        - generic [ref=e14]: v3.0
+        - button "Collapse sidebar" [ref=e15] [cursor=pointer]: ◀
+      - generic [ref=e16]:
+        - button "sdi" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: sdi
+          - generic [ref=e20]: ▾
+        - button "Project settings" [ref=e21] [cursor=pointer]: ⚙
+    - region "Active context" [ref=e22]:
+      - paragraph [ref=e23]: Active
+      - paragraph [ref=e24]: SDI gap closure (S1/S2/S3)
+      - paragraph [ref=e25]: No active cycle
+    - navigation "Plan tree" [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - heading "Plans" [level=2] [ref=e29]
+          - generic [ref=e30]:
+            - generic [ref=e31]: 5 plans
+            - button "Edit" [ref=e32] [cursor=pointer]
+            - button "+ New Plan" [ref=e33]
+        - generic [ref=e34]:
+          - generic "PLAN-01KS07RXGG1SP4EA4WQ2QMAMX3" [ref=e36] [cursor=pointer]:
+            - button "▶" [ref=e37]
+            - generic [ref=e38]:
+              - generic [ref=e39]: SDI gap closure (S1/S2/S3)
+              - generic [ref=e40]: Completed
+            - button "+" [ref=e41]
+          - generic "PLAN-01KRYY992ACERXSSK885Q95HGW" [ref=e43] [cursor=pointer]:
+            - button "▶" [ref=e44]
+            - generic [ref=e45]:
+              - generic [ref=e46]: v0.2 — D6 round mirror + sdi-web + sdi-desktop full implementation
+              - generic [ref=e47]: Completed
+            - button "+" [ref=e48]
+          - generic "PLAN-01KRYTH6Z4470JJK00YVZZDFEM" [ref=e50] [cursor=pointer]:
+            - button "▶" [ref=e51]
+            - generic [ref=e52]:
+              - generic [ref=e53]: "SDI v0.1 baseline: Phase 1 structural alignment + Phase 2 PRD §6 verification"
+              - generic [ref=e54]: Completed
+            - button "+" [ref=e55]
+          - generic "PLAN-01KRX6DJAQCCG7TQGZZY3J9FQW" [ref=e57] [cursor=pointer]:
+            - button "▶" [ref=e58]
+            - generic [ref=e59]:
+              - generic [ref=e60]: v0.1 — full implementation per PRD §6
+              - generic [ref=e61]: Completed
+            - button "+" [ref=e62]
+          - generic "PLAN-01KRX5GEGYKCBSE9NV7MF5QVXM" [ref=e64] [cursor=pointer]:
+            - button "▶" [ref=e65]
+            - generic [ref=e66]:
+              - generic [ref=e67]: v0.0 bootstrap — repo + workspace skeleton
+              - generic [ref=e68]: Completed
+            - button "+" [ref=e69]
+    - separator "Resize sidebar" [ref=e70]
+  - generic [ref=e71]:
+    - banner [ref=e72]:
+      - tablist "Workspace views" [ref=e73]:
+        - tab "Summary" [ref=e74] [cursor=pointer]
+        - tab "Board" [active] [selected] [ref=e75] [cursor=pointer]
+        - tab "Backlog" [ref=e76] [cursor=pointer]
+        - tab "Timeline" [ref=e77] [cursor=pointer]
+        - tab "Wiki" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - button "daemon ok" [ref=e80]: daemon ok
+        - 'button "Theme: System (light) — click to cycle" [ref=e82] [cursor=pointer]': ◑
+        - button "Open command palette (Cmd+K)" [ref=e83] [cursor=pointer]: ⌘K
+    - main [ref=e84]:
+      - generic [ref=e293]:
+        - generic [ref=e294]:
+          - combobox [ref=e295] [cursor=pointer]:
+            - option "C1 [Planning]" [selected]
+            - option "── Completed ──" [disabled]
+            - option "Bootstrap C1"
+            - option "A1"
+            - option "B1"
+            - option "D1"
+            - option "E1"
+            - option "F1"
+            - option "G1"
+            - 'option "C: daemon API"'
+            - option "v0.1 baseline"
+            - option "PRD §6 verification"
+            - option "PRD §6 verification (cont)"
+            - 'option "PRD §6 #4 disruption review"'
+            - 'option "PRD §6 #3 carry-over tightening"'
+            - option "SDI v0.2 Phase A — D6 mirror + E2E"
+            - 'option "R1: structural fixes"'
+          - button "+ New Cycle" [ref=e296] [cursor=pointer]
+          - generic [ref=e297]:
+            - button "Edit" [ref=e298] [cursor=pointer]
+            - generic [ref=e299]: Planning
+            - combobox [ref=e300] [cursor=pointer]:
+              - option "Planning" [selected]
+              - option "Active"
+        - generic [ref=e301]:
+          - heading "C1" [level=2] [ref=e302]
+          - paragraph [ref=e303]: Unit C delivery
+        - generic [ref=e304]:
+          - generic [ref=e305]:
+            - generic [ref=e306]:
+              - generic [ref=e307]: Todo
+              - generic [ref=e308]: "0"
+            - generic [ref=e310]: No tasks
+          - generic [ref=e311]:
+            - generic [ref=e312]:
+              - generic [ref=e313]: In Progress
+              - generic [ref=e314]: "0"
+            - generic [ref=e316]: No tasks
+          - generic [ref=e317]:
+            - generic [ref=e318]:
+              - generic [ref=e319]: Blocked
+              - generic [ref=e320]: "0"
+            - generic [ref=e322]: No tasks
+          - generic [ref=e323]:
+            - generic [ref=e324]:
+              - generic [ref=e325]: Done
+              - generic [ref=e326]: "0"
+            - generic [ref=e328]: No tasks
+        - status [ref=e329]
