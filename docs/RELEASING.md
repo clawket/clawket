@@ -138,8 +138,8 @@ The skill `/clawket-release` (when available) wraps steps 8–10 into a single c
 
 ### Required tokens for the landing dispatch chain
 
-- `clawket/clawket` secret `CLAWKET_RELEASE_PAT` — used by `release.yml` to call `repos/clawket/landing/dispatches`; the PAT must include `repository_dispatch:write` (or fine-grained `contents:write`) on `clawket/landing` in addition to its existing `clawket/clawket` scopes. If the dispatch step logs a permission error, the daily 06:00 UTC sweep on the landing side still catches up — no plugin release is blocked.
-- `clawket/landing` secret `GH_PAT` — used by `auto-update.yml` to checkout, push the `auto-update/<tag>` branch, open the PR, and (during sweep) read the latest `clawket/clawket` release tag.
+- `clawket/clawket` secret `CLAWKET_RELEASE_PAT` — used by `release.yml` to call `repos/clawket/landing/dispatches` and `repos/clawket/tap/dispatches`. This is a cross-repo write (firing `repository_dispatch` on a different repository) which the built-in `GITHUB_TOKEN` cannot authorize, so it requires a PAT. Required scopes: `repository_dispatch:write` (or fine-grained `contents:write`) on `clawket/landing` and `clawket/tap`, in addition to the existing `clawket/clawket` scopes. If a dispatch step logs a permission error, the daily 06:00 UTC sweep on the consumer side still catches up — no plugin release is blocked.
+- Consumer side (`clawket/landing` `auto-update.yml`, `clawket/tap` `auto-update.yml`) — **uses the workflow's default `GITHUB_TOKEN`**. Both workflows do only same-repo writes (checkout, push branch, open PR) and public-repo reads (release metadata on `clawket/clawket`, `clawket/cli`, `clawket/daemon`). The job-level `permissions: { contents: write, pull-requests: write }` block grants the necessary scopes. No PAT is required on consumer repos.
 
 `CLAWKET_CLI_VERSION` lives only as an env-var fallback inside `claude-hooks.cjs` for local dev; in normal flow `components.json` is the single pinning source.
 
