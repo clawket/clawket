@@ -1117,14 +1117,21 @@ function pingDaemonHealth(timeoutMs = 3000) {
 // session-start.cjs) MUST honor the return value and skip context injection
 // when `false` so a half-installed plugin does not produce confusing output.
 /**
- * v3.0 R2 fix (US-CKT-PROMOTE-018): verify the 6 PDD skill RULE.md/SKILL.md
- * files are intact. Returns true if all 12 files exist (6 skills × 2 files);
- * emits a stderr warning per missing file and returns false otherwise.
- *
- * Called from ensureInstalled fast-path; missing files trigger re-install.
+ * Verify the 7 skill SKILL.md/RULE.md files are intact. Returns true if all
+ * 14 files exist (7 skills × 2 files); emits a stderr warning per missing
+ * file and returns false otherwise. Called from ensureInstalled fast-path;
+ * missing files trigger re-install.
  */
-function verifyPddSkills(pluginRoot) {
-  const skills = ['pdd', 'scenario-author', 'qa-batch', 'discover-loop', 'scenario-refine', 'qa-fix'];
+function verifySkills(pluginRoot) {
+  const skills = [
+    'clawket-dashboard',
+    'clawket-plan-design',
+    'clawket-scenario-author',
+    'clawket-verify-batch',
+    'clawket-verify-loop',
+    'clawket-scenario-refine',
+    'clawket-defect-fix',
+  ];
   let ok = true;
   for (const s of skills) {
     for (const f of ['SKILL.md', 'RULE.md']) {
@@ -1171,12 +1178,11 @@ async function ensureInstalled(pluginRoot) {
     : fs.existsSync(path.resolve(pluginRoot, 'desktop', 'dl', desktopArtifactName(desktopPin)))
       && readInstalledVersion(desktopMarker) === desktopPin;
 
-  // v3.0 R2 fix (US-CKT-PROMOTE-018): verify the 6 PDD skill RULE.md +
-  // SKILL.md files are present in the plugin tree. A partial install (e.g.
-  // a release tarball that dropped the skills/ dir) should NOT be reported
-  // as healthy — the discover-loop / qa-batch / scenario-refine entrypoints
-  // would otherwise resolve to nothing at runtime.
-  const skillsOk = verifyPddSkills(pluginRoot);
+  // Verify the 7 skill SKILL.md + RULE.md files are present in the plugin
+  // tree. A partial install (e.g. a release tarball that dropped the skills/
+  // dir) should NOT be reported as healthy — the skill entrypoints would
+  // otherwise resolve to nothing at runtime.
+  const skillsOk = verifySkills(pluginRoot);
 
   if (cliOk && daemonOk && webOk && desktopOk && skillsOk) return true; // fast path — no lock needed
 

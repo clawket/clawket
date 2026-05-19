@@ -1,7 +1,7 @@
 # install-gate-idempotency
 
 ## Purpose
-`ensureInstalled` 은 매 SessionStart 마다 호출된다. 이미 핀된 버전이 설치되어 있고 PDD skill 무결성이 OK 이면 lock 도 잡지 않고 즉시 반환해야 한다 — 그렇지 않으면 사용자는 매 세션마다 GitHub Releases 재다운로드를 본다.
+`ensureInstalled` 은 매 SessionStart 마다 호출된다. 이미 핀된 버전이 설치되어 있고 skill 무결성이 OK 이면 lock 도 잡지 않고 즉시 반환해야 한다 — 그렇지 않으면 사용자는 매 세션마다 GitHub Releases 재다운로드를 본다.
 
 ## Prevents
 - 두 번째 SessionStart 가 binary 를 다시 받음
@@ -22,7 +22,7 @@
 ## Enforcement gap
 - 새 fast-path 분기 추가 시 마커 mismatch 시나리오 테스트가 강제되지 않는다
 - `runSetup` 호출 후 daemon `/health` 검증 누락 (`adapters/shared/claude-hooks.cjs:1104-1117`) 을 catch 하는 test 없음
-- `verifyPddSkills` 가 새 skill 추가 시 갱신되었는지 검사하는 lint 없음
+- `verifySkills` 가 새 skill 추가 시 갱신되었는지 검사하는 lint 없음
 
 ## Rule body
 
@@ -35,6 +35,6 @@
 ### DON'T
 - `ensureInstalled` 우회 install 진입점을 만들지 마라 — `scripts/setup.cjs` / `adapters/claude/setup.cjs` 도 같은 함수에 위임만 한다
 - 새 진입점 (예: CI script, /command) 에서 `ensureCliBinary` / `ensureDaemonBinary` 를 직접 호출하지 마라 — 항상 `ensureInstalled` 또는 `runSetup` 을 거친다
-- fast-path 의 `verifyPddSkills` 호출을 빼지 마라 — partial install 을 "healthy" 로 잘못 판정한다
+- fast-path 의 `verifySkills` 호출을 빼지 마라 — partial install 을 "healthy" 로 잘못 판정한다
 - post-install `/health` ping 실패 시 daemon 마커 무효화 (`fs.unlinkSync(daemonMarker)`) 를 생략하지 마라 — 다음 세션이 영원히 broken binary 를 trust 한다
 - `withInstallLock` 의 lock 파일 위치를 `cacheDir()` 외 (특히 pluginRoot 또는 사용자 데이터 경로) 로 옮기지 마라 — LM-8 경계 위반
