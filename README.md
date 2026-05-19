@@ -234,17 +234,17 @@ Access at `http://localhost:19400` when the daemon is running. Six views, real-t
 
 ### Screenshots
 
-| Summary | Plans |
-|---------|-------|
-| ![Summary](screenshots/01-summary.png) | ![Plans](screenshots/02-plans.png) |
+| Summary | Board (Kanban) |
+|---------|----------------|
+| ![Summary](screenshots/01-summary.png) | ![Board](screenshots/02-board.png) |
 
-| Board (Kanban) | Backlog |
-|----------------|---------|
-| ![Board](screenshots/03-board.png) | ![Backlog](screenshots/04-backlog.png) |
+| Backlog | Timeline |
+|---------|----------|
+| ![Backlog](screenshots/03-backlog.png) | ![Timeline](screenshots/04-timeline.png) |
 
-| Timeline | Wiki |
-|----------|------|
-| ![Timeline](screenshots/05-timeline.png) | ![Wiki](screenshots/06-wiki.png) |
+| Wiki | |
+|------|-|
+| ![Wiki](screenshots/05-wiki.png) | |
 
 ## Usage
 

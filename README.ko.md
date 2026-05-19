@@ -233,17 +233,17 @@ clawket/
 
 ### 스크린샷
 
-| 요약 | 계획 |
-|------|------|
-| ![Summary](screenshots/01-summary.png) | ![Plans](screenshots/02-plans.png) |
+| 요약 | 보드 (칸반) |
+|------|-------------|
+| ![Summary](screenshots/01-summary.png) | ![Board](screenshots/02-board.png) |
 
-| 보드 (칸반) | 백로그 |
-|-------------|--------|
-| ![Board](screenshots/03-board.png) | ![Backlog](screenshots/04-backlog.png) |
+| 백로그 | 타임라인 |
+|--------|----------|
+| ![Backlog](screenshots/03-backlog.png) | ![Timeline](screenshots/04-timeline.png) |
 
-| 타임라인 | 위키 |
-|----------|------|
-| ![Timeline](screenshots/05-timeline.png) | ![Wiki](screenshots/06-wiki.png) |
+| 위키 | |
+|------|-|
+| ![Wiki](screenshots/05-wiki.png) | |
 
 ## 사용법
 
