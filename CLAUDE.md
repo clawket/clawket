@@ -24,8 +24,9 @@ gate 가 `components.json` 의 핀에 따라 GitHub Releases 에서 바이너리
 
 ## Hook 라우팅 (`hooks/hooks.json`)
 
-7 표준 Claude Code 이벤트. 각 어댑터(`adapters/claude/*.cjs`)는 2-줄 shim 으로
-`adapters/shared/claude-hooks.cjs` 의 헬퍼에 위임한다.
+6 표준 Claude Code 이벤트 + `PostToolUse` 의 `ExitPlanMode` matcher 분기. 각 어댑터
+(`adapters/claude/*.cjs`)는 2-줄 shim 으로 `adapters/shared/claude-hooks.cjs` 의
+헬퍼에 위임한다.
 
 | 이벤트 | matcher | 핸들러 (`adapters/claude/`) | 위임 함수 |
 |---|---|---|---|
@@ -33,7 +34,7 @@ gate 가 `components.json` 의 핀에 따라 GitHub Releases 에서 바이너리
 | `UserPromptSubmit` | (all) | `user-prompt-submit.cjs` | `runUserPromptSubmit` — 활성 태스크 컨텍스트 주입, 미설정 시 경고 |
 | `PreToolUse` | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | `runPreToolUse` — 활성 태스크 게이트 + destructive 패턴 hard-block + PDD X3/X7/X8/X9 |
 | `PostToolUse` | `Edit\|Write` | `post-tool-use.cjs` | `runPostToolUse` — 파일 변경을 활성 태스크에 기록 + X3 |
-| `ExitPlanMode` | (all) | `plan-sync.cjs` | `runPlanSync` — Plan Mode 출력을 Clawket plan 으로 등록 prompt |
+| `PostToolUse` | `ExitPlanMode` | `plan-sync.cjs` | `runPlanSync` — Plan Mode 출력을 Clawket plan 으로 등록 prompt (Claude Code 가 `ExitPlanMode` 를 hook event 가 아닌 Tool 로 분류) |
 | `SubagentStart` | (all) | `subagent-start.cjs` | `runSubagentStart` — sub-agent 를 태스크에 바인딩 + X3/X7/X9 |
 | `SubagentStop` | (all) | `subagent-stop.cjs` | `runSubagentStop` — 결과 요약 append + X8 evidence 검증 + 자동 완료 |
 

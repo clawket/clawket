@@ -2458,7 +2458,7 @@ function runPlanSync() {
     // Hard-block: emit decision=block so Claude sees the failure.
     console.log(JSON.stringify({
       hookSpecificOutput: {
-        hookEventName: 'ExitPlanMode',
+        hookEventName: 'PostToolUse',
         additionalContext: strictGuideMessage(result.violation),
       },
       decision: 'block',
@@ -2511,7 +2511,7 @@ function runPlanSync() {
         : '';
       console.log(JSON.stringify({
         hookSpecificOutput: {
-          hookEventName: 'ExitPlanMode',
+          hookEventName: 'PostToolUse',
           additionalContext:
             `# Clawket: Plan 자동 등록 완료\n\n` +
             `Plan ID: ${planId}\nTitle: ${parsed.title}${unitsNote}\n\n` +
@@ -2527,7 +2527,7 @@ function runPlanSync() {
   const fileNote = planFile ? `\nExitPlanMode로 승인된 플랜 파일: \`${planFile}\`\n` : '';
   console.log(JSON.stringify({
     hookSpecificOutput: {
-      hookEventName: 'ExitPlanMode',
+      hookEventName: 'PostToolUse',
       additionalContext: `# Clawket: Plan Mode 종료 — 클라켓에 등록 필요
 ${fileNote}
 이 플랜을 클라켓에 등록하세요:
