@@ -7,14 +7,9 @@
 <p align="center">LLM 코딩 에이전트를 위한 구조화된 태스크 계약.</p>
 
 <p align="center">
-  <video src="assets/hero.mp4"
-         poster="assets/hero-poster.png"
-         width="720"
-         controls muted loop playsinline>
-    <img src="assets/hero-poster.png"
-         width="720"
-         alt="12초 데모: clawket 대시보드 — Summary, Plans, Board, Backlog, Timeline, Wiki" />
-  </video>
+  <img src="assets/hero.gif"
+       width="720"
+       alt="Clawket 대시보드 데모 — Summary, Plans, Board, Backlog, Timeline, Wiki" />
 </p>
 
 Clawket은 LLM 기반 개발을 위한 구조화된 상태 레이어로, Jira + Confluence를 대체합니다. 프로젝트 계획, 유닛, 태스크, 산출물, 실행 이력을 로컬 SQLite + 경량 데몬으로 세션 간 영구 보존합니다. 훅 기반 가드레일이 에이전트가 등록된 태스크 없이 작업하지 못하게 보장합니다 — 모든 작업은 추적되고, 모든 세션은 컨텍스트를 가집니다.

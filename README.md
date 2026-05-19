@@ -7,14 +7,9 @@
 <p align="center">Structured task contracts for LLM coding agents.</p>
 
 <p align="center">
-  <video src="assets/hero.mp4"
-         poster="assets/hero-poster.png"
-         width="720"
-         controls muted loop playsinline>
-    <img src="assets/hero-poster.png"
-         width="720"
-         alt="12-second demo: clawket dashboard — Summary, Plans, Board, Backlog, Timeline, Wiki" />
-  </video>
+  <img src="assets/hero.gif"
+       width="720"
+       alt="Clawket dashboard demo — Summary, Plans, Board, Backlog, Timeline, Wiki" />
 </p>
 
 Clawket is a structured state layer that replaces Jira + Confluence for LLM-driven development. It persists project plans, units, tasks, knowledge, and execution history across sessions via a local SQLite database and a lightweight daemon. Hook-based guardrails ensure the agent never works without a registered task — every action is tracked, every session has context.
