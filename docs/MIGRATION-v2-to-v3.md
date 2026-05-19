@@ -265,6 +265,74 @@ These are NOT addressed by automatic migration. Operators must take explicit act
 5. **Custom queries on `cycles.unit_id IS NULL`** — those rows no longer exist post-migration.
 6. **Embeddings cache** — if you have an external `vec_knowledge` mirror, it must be discarded; the embedding values changed.
 
+## Phase E — STABLE label transition and user-scope cleanup
+
+The seven Clawket skills (`clawket-dashboard`, `clawket-plan-design`, `clawket-scenario-author`, `clawket-verify-batch`, `clawket-verify-loop`, `clawket-scenario-refine`, `clawket-defect-fix`) ship in v3 with `상태: STABLE — Clawket plugin 정본.` in every `RULE.md`. v2 sites that staged the same flows under `~/.claude/skills/` with `상태: EXPERIMENTAL` headers need a one-time, manually-gated cleanup so the plugin remains the single source of truth. Phase E is that cleanup. It is **not automatic** — the operator must consent before any file is removed.
+
+### Pre-conditions
+
+Run Phase E only after the five v3 readiness checks succeed for the project:
+
+1. At least one full Plan lifecycle (`draft → active → completed`) has run on v3 without manual schema patches.
+2. The last two verification rounds emitted `defect = 0` rows. (`clawket task list --status done --since <round-start>` shows defect tasks all closed.)
+3. Every closed task carries `scenario_id` and `--evidence`. The daemon rejects `done` without `--evidence` (HTTP 400 `EVIDENCE_REQUIRED`); a sample query against `tasks` confirms 100 % coverage.
+4. `scenario_error` rows occurred organically in at least one round and were dispositioned via `clawket-scenario-refine` (atomic split / intent redefinition / deletion).
+5. `PreToolUse` hook enforcement is active (`hooks/hooks.json` matchers covering `Edit | Write | Bash | Agent | TeamCreate | SendMessage`) and the audit log contains at least one blocked call attributable to the active-task gate or the destructive-pattern guard.
+
+If any check fails, do not run Phase E. The skills remain STABLE in the plugin regardless; only the user-scope cleanup is gated.
+
+### Step 1 — STABLE label transition (informational)
+
+v3 ships with `상태: STABLE — Clawket plugin 정본.` already set in every shipped `skills/<name>/RULE.md`. Operators upgrading from a hand-edited v2 install where the RULE.md was patched to `상태: EXPERIMENTAL` should let the v3 install gate replace the file (the file is part of the plugin tree under `~/.claude/plugins/clawket-*/skills/`, which `/plugin install` overwrites). No manual edit is required.
+
+`tests/skills-integrity.test.cjs` enforces the STABLE label on every shipped `RULE.md` and rejects any reintroduction of `상태: EXPERIMENTAL`. A release tarball that ships with the experimental label fails the integrity test.
+
+### Step 2 — Cleanup confirmation prompt
+
+Before removing anything under `~/.claude/`, present the operator with this prompt verbatim and wait for an explicit response:
+
+```
+EXPERIMENTAL → STABLE promotion is complete in the plugin tree.
+Proceed with user-scope cleanup of the v2 staging copies?
+  - Remove ~/.claude/skills/{pdd-plan,scenario-author,qa-batch,discover-loop,scenario-refine}/
+  - Replace ~/.claude/rules/{pdd,scenario-authoring,qa-flow}.md with one-line stubs
+Proceed? [y/N]:
+```
+
+The default is `N` (skip). Only `y` / `yes` routes to Step 3. Any other input (empty, `n`, `no`, no response) routes to Step 4. Phase E is not run by autonomous sub-agents — the confirmation must come from an interactive session.
+
+### Step 3 — Confirmed branch (response = `y`)
+
+Once the plugin's STABLE skills are in place, the v2 staging copies under `~/.claude/` are duplicates of the plugin's canonical files. Run the following idempotent operations in order. Any step that finds the target already absent or already a stub is a no-op.
+
+1. Remove `~/.claude/skills/pdd-plan/` recursively.
+2. Remove `~/.claude/skills/scenario-author/` recursively.
+3. Remove `~/.claude/skills/qa-batch/` recursively.
+4. Remove `~/.claude/skills/discover-loop/` recursively.
+5. Remove `~/.claude/skills/scenario-refine/` recursively.
+6. Replace `~/.claude/rules/pdd.md` with the one-line stub:
+   `# moved to plugin: clawket/skills/clawket-plan-design/RULE.md`
+7. Replace `~/.claude/rules/scenario-authoring.md` with the one-line stub:
+   `# moved to plugin: clawket/skills/clawket-scenario-author/RULE.md`
+8. Replace `~/.claude/rules/qa-flow.md` with the one-line stub:
+   `# moved to plugin: clawket/skills/clawket-verify-batch/RULE.md`
+
+Cleanup is restricted to `~/.claude/skills/` and `~/.claude/rules/`. The user data trees (`~/.local/share/clawket/`, `~/.cache/clawket/`, `~/.config/clawket/`, `~/.local/state/clawket/`) are **never** touched — this matches the LM-8 path separation invariant enforced at runtime by the daemon's `paths::ensure_no_plugin_overlap` and by `clawket doctor`.
+
+### Step 4 — Skip branch (response ≠ `y`)
+
+Leave `~/.claude/skills/*` and `~/.claude/rules/*.md` untouched. The plugin's STABLE skills are already active because Claude Code's skill resolution prefers plugin-scope over user-scope, but the user-scope copies will diverge from the plugin canon over time. Surface this once and move on:
+
+```
+Cleanup skipped. The user-scope copies under ~/.claude/skills/ and ~/.claude/rules/
+may drift from the plugin canon. Re-run Phase E in a later session, or delete the
+staging files manually when convenient.
+```
+
+### Why Phase E is manual
+
+Phase E mutates files outside the plugin tree (`~/.claude/skills/`, `~/.claude/rules/`). The plugin install gate (`adapters/shared/claude-hooks.cjs::ensureInstalled`) deliberately writes only under `pluginRoot` (`~/.claude/plugins/clawket-*/`) — the LM-8 invariant. Step 3 crosses that boundary on the operator's behalf, so it is gated behind an explicit confirm and is not invoked by any hook, sub-agent, or CI script. The autonomous-run policy mirrors the broader Clawket guardrail: no commit, push, tag, release, or user-scope mutation without explicit user instruction.
+
 ## Rollback
 
 Stop the v3 daemon, restore the pre-upgrade backup, downgrade binaries:
