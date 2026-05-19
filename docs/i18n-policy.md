@@ -11,22 +11,26 @@ This policy fixes the drift problem at the knowledge level (which file is
 authoritative in which language) and at the timing level (how long a
 mismatch is allowed to live before CI complains).
 
-## Two axes: documentation vs runtime strings
+## Three axes: documentation, CLI runtime, landing runtime
 
-This policy has two independent scopes:
+This policy has three independent scopes:
 
-1. **Documentation translation** (`*.md`, landing pages) — bilingual **English + Korean** only. Tracks drift via the `i18n-sync` workflow.
-2. **Runtime locale strings** (CLI output, hook messages, daemon errors) — trilingual **English + Korean + Japanese**, resolved per-invocation through the `CLAWKET_LOCALE` env var with chained fallback. Not tracked for drift in the same way as documentation; missing keys fall back to the next locale in the chain.
+1. **Documentation translation** (`*.md` files in any repo) — bilingual **English + Korean** only. Tracks drift via the `i18n-sync` workflow.
+2. **CLI runtime locale strings** (CLI output, hook messages, daemon errors) — trilingual **English + Korean + Japanese**, resolved per-invocation through the `CLAWKET_LOCALE` env var with chained fallback. Not tracked for drift in the same way as documentation; missing keys fall back to the next locale in the chain.
+3. **Landing runtime locale strings** (the public Vercel LP) — **20 locales** co-located in a single TypeScript dictionary, resolved per-visit through URL `?lang=` → `localStorage` → `navigator.language` → `'en'`. No file-based drift mechanism applies because every locale ships in the same commit; per-locale completeness is enforced by `landing/src/i18n/dict.test.ts` (TypeScript `Record<Locale, Dict>` makes a missing key a compile error, and the test suite asserts no blank values + matching `<code>` region counts across locales).
 
-The runtime axis lives in `clawket/locales/{en,ko,ja}.json`, `clawket/adapters/shared/locale.cjs`, and `clawket/destructive-patterns.json` (per-locale phrase tables). Adding a fourth runtime locale is a code change (add the JSON bundle + extend `SUPPORTED`), not a documentation change.
+The CLI runtime axis lives in `clawket/locales/{en,ko,ja}.json`, `clawket/adapters/shared/locale.cjs`, and `clawket/destructive-patterns.json` (per-locale phrase tables). Adding a fourth CLI runtime locale is a code change (add the JSON bundle + extend `SUPPORTED`), not a documentation change.
+
+The landing runtime axis lives in `landing/src/i18n/dict.ts` (typed dictionary) + `landing/src/i18n/locales.ts` (BCP47 codes, native names, text direction) + `landing/src/i18n/context.tsx` (provider + `useT` hook + `Trans` component for `<code>` regions). Locales shipped: `en` (source), `ko`, `ja`, `zh-Hans`, `zh-Hant`, `es`, `fr`, `de`, `pt-BR`, `ru`, `it`, `ar` (RTL), `hi`, `id`, `tr`, `vi`, `th`, `pl`, `nl`, `sv`. Adding a 21st locale is a `dict.ts` + `locales.ts` extension; `dict.test.ts` enforces completeness on the next CI run.
 
 The documentation axis (below) is intentionally **not** extended to Japanese — there is no `*.ja.md` sibling track and no maintainer commitment to keep one in sync.
 
 ## Policy by knowledge (documentation axis)
 
+The `landing/` Vercel LP is intentionally absent from this table — it is no longer translated as a `*.ko.html` sibling. The 20-locale runtime dictionary (axis 3 above) replaces the file-pair model for the LP, so the documentation-axis drift policy does not apply to it.
+
 | Knowledge | Authoritative language | Translation | Drift policy |
 |---|---|---|---|
-| `landing/` (Vercel LP) | English | Korean (`/ko/` path or `*.ko.html`) | Translation must exist before launch. Drift > 14d warns, > 21d fails CI. |
 | `*/README.md` | English | `*/README.ko.md` | Translation must exist for `clawket`, `cli`, `daemon`, `web`, `desktop` (the five user-facing repos). `mcp` is deprecated — README.ko optional. `landing`, `tap`, `evals` — translation optional. |
 | `*/CONTRIBUTING.md` | English | none required | Internal contributors are bilingual. No `.ko` sibling needed. |
 | `*/ROADMAP.md`, `*/CODE_OF_CONDUCT.md` | English | none required | Standard OSS docs in English only. |
