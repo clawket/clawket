@@ -243,10 +243,6 @@ The Plans tree (inline editing, bulk actions, checkbox selection) is rendered in
 |---------|----------|
 | ![Backlog](screenshots/03-backlog.png) | ![Timeline](screenshots/04-timeline.png) |
 
-| Wiki | |
-|------|-|
-| ![Wiki](screenshots/05-wiki.png) | |
-
 ## Usage
 
 Clawket enforces a structured workflow. The agent cannot start mutating work until a project, an active plan, and an active task all exist. The PreToolUse hook blocks all mutating tools (Edit, Write, Bash, Agent, TeamCreate, SendMessage) until an active task exists.

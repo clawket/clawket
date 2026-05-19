@@ -242,10 +242,6 @@ clawket/
 |--------|----------|
 | ![Backlog](screenshots/03-backlog.png) | ![Timeline](screenshots/04-timeline.png) |
 
-| 위키 | |
-|------|-|
-| ![Wiki](screenshots/05-wiki.png) | |
-
 ## 사용법
 
 Clawket은 구조화된 워크플로우를 강제합니다. 프로젝트 + 활성 플랜 + 활성 태스크가 모두 존재해야 에이전트가 변경 작업을 시작할 수 있습니다. PreToolUse 훅이 활성 태스크 없이 Edit/Write/Bash/Agent/TeamCreate/SendMessage 호출을 차단합니다.
