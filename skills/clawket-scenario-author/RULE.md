@@ -1,13 +1,13 @@
 # 시나리오 작성 규칙 (User Scenario Authoring)
 
-> **상태: STABLE — Clawket plugin 정본.** PDD `skills/pdd/RULE.md` 발견-수렴
-> 루프와 통합. atomic 분해는 결과물(작성 시점에 끝내는 것)이 아니라 과정(루프
+> **상태: STABLE — Clawket plugin 정본.** plan-driven workflow 의 수렴 루프와
+> 통합 운영. atomic 분해는 결과물(작성 시점에 끝내는 것)이 아니라 과정(루프
 > 안에서 진행되는 것). 시나리오는 사전-*완전* 이 아니라 사전-*예비* + 라운드
 > 내 정련.
 
-사용자 시나리오 / 사용자 스토리를 작성할 때 적용하는 글로벌 규칙. `pdd.md` /
-`qa-flow.md` 와 한 쌍 — 시나리오는 의도, PDD 는 실행 명세화, qa-flow 는 검증.
-세 룰은 단일 발견-수렴 루프 안에서 통합 운영된다.
+사용자 시나리오 / 사용자 스토리를 작성할 때 적용하는 글로벌 규칙. 시나리오는
+의도, plan design 은 실행 명세화, 검증 플로우는 검증 — 세 룰은 단일 수렴 루프
+안에서 통합 운영된다.
 
 ## 핵심 철학
 
@@ -23,8 +23,7 @@
 
 시나리오는 사전-*완전* 이 아니다. **사전-예비 (큰 그림 + atomic 시나리오 초안)**
 + **라운드 내 정련 (scenario_error 처리)** 의 두 단계로 구성된다. 시나리오
-mutability 의 갱신 사유는 **"의도 부적절"** 에 한정 (qa-flow.md §3 규칙 #6
-참조).
+mutability 의 갱신 사유는 **"의도 부적절"** 에 한정 (아래 갱신 가능 기준 참조).
 
 ## 출처 규칙 (Source of Truth)
 
@@ -57,7 +56,7 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 ## 입자 규칙 (Atomicity — 결과물이 아니라 과정)
 
 **1 시나리오 = 1 testable assertion.** atomic 분해는 *작성 시점에 끝내야 하는
-결과물* 이 아니라 *발견-수렴 루프 안에서 도달하는 과정*.
+결과물* 이 아니라 *수렴 루프 안에서 도달하는 과정*.
 
 ### 작성 시점 (사전 예비)
 
@@ -70,10 +69,10 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 
 ### 라운드 내 정련
 
-- 작성 시점에 atomic 이 보장 안 되도 OK — 발견-수렴 루프의 sub-agent 가
+- 작성 시점에 atomic 이 보장 안 되도 OK — 수렴 루프의 sub-agent 가
   reasoning 중 비-atomic 시나리오 (한 시나리오에 두 가정 섞임) 발견 시
   `scenario_error` 로 마킹
-- /scenario-refine skill 이 처리:
+- /clawket-scenario-refine skill 이 처리:
   - **atomic 분해**: 1 → N 시나리오 (새 ID 부여)
   - **의도 재정의**: 시나리오 ID 보존, 본문만 갱신
   - **삭제**: ID 영구 비움
@@ -82,7 +81,7 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 ## 금지 사항
 
 - **file:line 인용 금지.** 시나리오는 의도 레벨 — 코드 매뉴얼이 아니다.
-  (file:line 은 QA 단계의 결함 task 산출물로만 등장 — qa-flow.md §5)
+  (file:line 은 검증 단계의 결함 task 산출물로만 등장)
 - **모호 표현 금지.** "구현됨", "동작한다", "처리된다", "정상 표시된다" 등
   검증 불가능한 동사 사용 금지. 관찰 가능한 사실로 서술.
 - **결함 / 알려진 버그 언급 금지.** 시나리오 본문에 "현재 X 가 안 된다" 같은
@@ -98,13 +97,13 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 - 한 메뉴 / 한 화면 / 한 기능 단위당 1 knowledge (시나리오 모음)
 - 결함 task / QA 산출물과는 별개 knowledge 로 분리
 
-## 갱신 규칙 (/scenario-refine 인터페이스)
+## 갱신 규칙 (/clawket-scenario-refine 인터페이스)
 
 **knowledge 는 항상 *현재 의도* 만 담는다 — 히스토리/변경 로그 보존 금지.**
 
-### /scenario-refine 처리 절차 (qa-flow.md §3 규칙 #5 와 동기화)
+### /clawket-scenario-refine 처리 절차
 
-1. QA 라운드 중 sub-agent 가 `scenario_error` 마킹 → /scenario-refine skill
+1. 검증 라운드 중 sub-agent 가 `scenario_error` 마킹 → /clawket-scenario-refine skill
    호출
 2. 3-way 분기:
    - **atomic 분해**: 새 ID `US-<DOMAIN>-<NNN+1>`, `US-<DOMAIN>-<NNN+2>` 등
@@ -114,10 +113,9 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
    - **삭제**: ID 영구 비움 (재사용 금지). cancelled QA task comment 에 삭제
      사유 흔적 남김.
 3. knowledge 갱신 — 현재 의도만 보존
-4. 변경의 *역사* 는 그 시나리오를 cancelled 처리한 QA task 의 코멘트 (qa-flow.md
-   §3 규칙 #5) + audit 보고서 knowledge (`type=note, title=
-   scenario_error audit log <도메인>`) 양쪽에 영구 보존 — 두 곳에 두고 knowledge
-   에는 두지 않는다.
+4. 변경의 *역사* 는 그 시나리오를 cancelled 처리한 검증 task 의 코멘트 + audit
+   보고서 knowledge (`type=note, title=scenario_error audit log <도메인>`) 양쪽에
+   영구 보존 — 두 곳에 두고 knowledge 에는 두지 않는다.
 
 ### ID 무결성
 
@@ -127,7 +125,7 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
   추적 무결성을 위해
 - atomic 분해 시 새 ID 부여 (NNN+1, NNN+2 식으로 연속 번호)
 
-### 갱신 가능 기준 (qa-flow.md §3 규칙 #6 동기화)
+### 갱신 가능 기준
 
 시장-정합 아키텍처 / 제품 완성도 관점에서 시나리오의 **의도 자체가 부적절**
 한 경우에 한해 amend / delete:
@@ -140,7 +138,7 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 - ❌ 불가: "지금 라운드 안에 시간이 부족 — 시나리오 수 줄이자"
 
 코드 영향이 크면 시나리오를 고치지 말고 **모든 영향 코드를 고치는 plan/task
-를 등록** (PDD 원칙).
+를 등록** (plan-driven workflow 원칙).
 
 ## 작성자 자기 점검 (체크리스트)
 
@@ -153,7 +151,7 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 - [ ] 알려진 버그를 의도된 형태로 적었다 (현 동작 받아쓰기 안 했다)
 - [ ] 모든 ID 가 unique 이다
 
-### 라운드 내 정련 시 (/scenario-refine 호출 시)
+### 라운드 내 정련 시 (/clawket-scenario-refine 호출 시)
 - [ ] 갱신 사유가 "의도 부적절" 이다 (시간/비용/복잡도 사유 아님)
 - [ ] cancelled QA task comment 에 사유 영구 기록
 - [ ] audit 보고서 knowledge 에 누적 기록
@@ -161,9 +159,9 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 - [ ] 삭제된 ID 는 비워둠 (재사용 금지)
 - [ ] atomic 분해 시 새 ID 부여 (연속 번호)
 
-## /scenario-author skill 인터페이스
+## /clawket-scenario-author skill 인터페이스
 
-본 룰은 Clawket plugin 정본 skill `skills/scenario-author/` 의 RULE 본체. skill 은
+본 룰은 Clawket plugin 정본 skill `skills/clawket-scenario-author/` 의 RULE 본체. skill 은
 다음 입력으로 호출된다:
 
 - 도메인 명 (e.g., "Chess 학습", "Daemon API")
@@ -178,8 +176,8 @@ US-<DOMAIN>-<NNN>: <한 줄 요약>
 
 - 시나리오층과 코드층은 시간차로 안정화되는 게 자연 패턴 — 시나리오층 정련이
   먼저 수렴하고, 코드층은 그 후 라운드를 통해 수렴
-- atomic 분해 결과물이 작성 시점에 보장 안 돼도 정상. 발견-수렴 루프가 보장
+- atomic 분해 결과물이 작성 시점에 보장 안 돼도 정상. 수렴 루프가 보장
 - "메뉴 1개당 50~수백 시나리오" 는 사전 예비 시점 가이드. 라운드 내 정련을
   거치면 늘어나거나 줄어듦
-- /scenario-refine 호출 빈도가 라운드를 거치며 줄어드는 게 시나리오층 수렴
+- /clawket-scenario-refine 호출 빈도가 라운드를 거치며 줄어드는 게 시나리오층 수렴
   신호
