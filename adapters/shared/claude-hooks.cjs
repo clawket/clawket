@@ -1116,6 +1116,23 @@ function pingDaemonHealth(timeoutMs = 3000) {
 // daemon health confirmed), `false` on install failure. Callers (e.g.
 // session-start.cjs) MUST honor the return value and skip context injection
 // when `false` so a half-installed plugin does not produce confusing output.
+// 3-way lock-step skill manifest. This array is the single source consumed by
+// verifySkills(); plugin.json#skillsList and tests/skills-integrity.test.cjs
+// each maintain their own copy by design (fail-loud invariant — see
+// .claude/rules/skill-file-integrity-on-install.md). The cross-source equality
+// is enforced by tests/skills-integrity.test.cjs which imports SKILLS_LIST
+// via __test__ and asserts identity with the test-side SKILLS array and the
+// plugin.json entries.
+const SKILLS_LIST = [
+  'clawket-dashboard',
+  'clawket-plan-design',
+  'clawket-scenario-author',
+  'clawket-verify-batch',
+  'clawket-verify-loop',
+  'clawket-scenario-refine',
+  'clawket-defect-fix',
+];
+
 /**
  * Verify the 7 skill SKILL.md/RULE.md files are intact. Returns true if all
  * 14 files exist (7 skills × 2 files); emits a stderr warning per missing
@@ -1123,17 +1140,8 @@ function pingDaemonHealth(timeoutMs = 3000) {
  * missing files trigger re-install.
  */
 function verifySkills(pluginRoot) {
-  const skills = [
-    'clawket-dashboard',
-    'clawket-plan-design',
-    'clawket-scenario-author',
-    'clawket-verify-batch',
-    'clawket-verify-loop',
-    'clawket-scenario-refine',
-    'clawket-defect-fix',
-  ];
   let ok = true;
-  for (const s of skills) {
+  for (const s of SKILLS_LIST) {
     for (const f of ['SKILL.md', 'RULE.md']) {
       const p = path.resolve(pluginRoot, 'skills', s, f);
       if (!fs.existsSync(p)) {
@@ -2946,5 +2954,6 @@ module.exports = {
     detectCliTarget,
     fetchSha256Sums,
     parseSha256Sums,
+    SKILLS_LIST,
   },
 };

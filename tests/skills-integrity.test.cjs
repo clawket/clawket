@@ -107,3 +107,26 @@ test('marketplace.json plugins[0] omits non-standard skills field', () => {
   const market = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'marketplace.json'), 'utf-8'));
   assert.equal(market.plugins[0].skills, undefined, 'marketplace.json plugins[0].skills must be absent');
 });
+
+test('adapters/shared/claude-hooks.cjs SKILLS_LIST matches the test SKILLS array (3-way lock-step)', () => {
+  // The skill registry is intentionally triplicated as a fail-loud invariant
+  // (.claude/rules/skill-file-integrity-on-install.md): plugin.json#skillsList
+  // is the manifest, claude-hooks.cjs::SKILLS_LIST drives verifySkills, and
+  // this test's SKILLS array is the audit reference. If they drift, partial
+  // installs slip through silent. Asserting identity here makes a single
+  // forgotten edit fail loudly on `pnpm test`.
+  const { __test__ } = require(path.resolve(PLUGIN_ROOT, 'adapters', 'shared', 'claude-hooks.cjs'));
+  assert.ok(Array.isArray(__test__.SKILLS_LIST), 'claude-hooks.cjs must export SKILLS_LIST via __test__');
+  assert.deepEqual(
+    [...__test__.SKILLS_LIST].sort(),
+    [...SKILLS].sort(),
+    'claude-hooks.cjs::SKILLS_LIST drifted from tests/skills-integrity.test.cjs::SKILLS — update both',
+  );
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(PLUGIN_ROOT, '.claude-plugin', 'plugin.json'), 'utf-8'));
+  const manifestNames = manifest.skillsList.map((e) => e.name).sort();
+  assert.deepEqual(
+    manifestNames,
+    [...__test__.SKILLS_LIST].sort(),
+    'plugin.json#skillsList drifted from claude-hooks.cjs::SKILLS_LIST — update both',
+  );
+});
