@@ -1,28 +1,62 @@
-# MCP-based Hook Enforcement
+# MCP-based Hook Enforcement (Considered, Not Adopted)
 
-## Motivation
+> **Status:** Considered design captured for the record. **Not adopted.** The
+> deliberate single source of truth for hook enforcement in v3 is
+> `plugin/adapters/shared/claude-hooks.cjs` (the cjs "fat handler" layer). This
+> document describes the alternative MCP-tool design that was evaluated and
+> deferred; nothing here is a roadmap commitment. The current cjs layer is
+> pinned by the install gate, the skill integrity test, and the hook regression
+> tests under `plugin/tests/`.
 
-Claude Code currently runs enforcement hooks (PreToolUse, PostToolUse, SessionStart,
-UserPromptSubmit, Stop, SubagentStart/Stop) via `cjs` scripts in
-`adapters/shared/claude-hooks.cjs`. Each invocation spawns Node, loads the daemon port,
-and performs an HTTP round-trip.
+## Today's enforcement layout
 
-Two issues:
+Hook events from Claude Code (`SessionStart`, `UserPromptSubmit`, `PreToolUse`,
+`PostToolUse`, `SubagentStart`, `SubagentStop`, plus the `PostToolUse +
+ExitPlanMode` plan-sync branch) route through 2-line shims under
+`plugin/adapters/claude/` into one of seven handlers in
+`plugin/adapters/shared/claude-hooks.cjs`. Each handler is the **sole**
+enforcement site for its gate; the daemon does not duplicate these checks.
 
-1. **Slow cold-start.** A PreToolUse firing on every `Bash` call costs ~60–150 ms on
-   laptops. Compounds during long agent turns.
-2. **Duplicated logic.** The same "is there an active task?" check lives in both the
-   hook `cjs` and the daemon API. Rules drift.
+| Gate | Enforced in | Daemon's role |
+|---|---|---|
+| Active-task gate (PreToolUse) | cjs `runPreToolUse` | none (cjs queries `task list`) |
+| Destructive-command guard (LM-8 boundary) | cjs `detectDestructive` | none |
+| PDD X3 / X7 / X8 / X9 (scenario_id, batch size, evidence, sync reasoning) | cjs helpers (`checkX3…`–`checkX9…`) | none |
+| Tier gate (G2/G3) | cjs (writes `CLAWKET_TIER_USED`) | advisory only |
+| Plan-strict validation (ExitPlanMode) | cjs `validateStrictPlan` (curl `/plans/import/strict`) | validates strict-plan shape |
+| `task done` evidence | — | daemon `EVIDENCE_REQUIRED` (HTTP 400) |
+| Cycle / plan / project invariants (FK, single-active, unit_id parity) | — | daemon DB constraints + `repo/*` `bail!`s |
 
-## Target
+The cjs and daemon layers are **complementary**, not duplicative. cjs decides
+*whether a tool call may proceed* using read-only daemon queries; the daemon
+enforces *whether a state mutation may persist*. Each gate lives in exactly one
+place.
 
-Move enforcement into the MCP server. Claude Code invokes a single MCP tool
-(`clawket.enforce`) on each hook event; the MCP process stays warm across the session
-and shares the daemon connection.
+## Why this design (MCP `clawket.enforce`) was considered
 
-## Design
+A migration to a single MCP tool was sketched on the assumption that two
+problems existed:
 
-### New MCP tool: `clawket.enforce`
+1. **Per-event cold start.** Each PreToolUse spawns Node and runs the handler.
+2. **Duplicated gate logic** between cjs and the daemon.
+
+On evaluation neither held up as written. (1) is real but the dominant cost is
+not Node startup — it is the 3–5 `exec(${clawket} ...)` subprocess calls inside
+the handler. A warm MCP process removes Node startup (~30–50 ms) but does not
+remove the CLI exec cost; the same speedup is reachable by replacing the CLI
+exec calls with direct HTTP from cjs, which is a much smaller change. (2) is
+not the case: the table above shows each gate has exactly one home.
+
+The MCP-tool path was therefore **deferred** in favor of preserving the cjs
+layer as the deliberate single source of truth.
+
+## Sketched design (for future reference)
+
+The remainder of this document records the MCP design that was sketched, so a
+future evaluation does not have to start from scratch. None of this is wired
+today.
+
+### Proposed MCP tool: `clawket.enforce`
 
 ```jsonc
 {
@@ -53,12 +87,11 @@ Return shape:
 }
 ```
 
-### Plugin hook adapter becomes a thin shim
+### Sketched shim shape
 
-`adapters/shared/claude-hooks.cjs` reduces to:
+If adopted, `plugin/adapters/claude/pre-tool-use.cjs` would reduce to:
 
 ```js
-// pre-tool-use.cjs
 const mcp = require('./mcp-client');
 module.exports = async function preToolUse(evt) {
   const r = await mcp.call('clawket.enforce', { event: 'PreToolUse', ...evt });
@@ -69,10 +102,10 @@ module.exports = async function preToolUse(evt) {
 };
 ```
 
-The MCP client keeps a unix-socket / stdio bridge open for the session, eliminating
-cold-start per event.
+The MCP client would keep a stdio bridge open for the session, eliminating
+Node startup per event.
 
-### State ownership
+### State ownership (proposed)
 
 | State | Owner | Accessed by |
 |---|---|---|
@@ -82,20 +115,63 @@ cold-start per event.
 | Project cwd binding | daemon SQLite | MCP (read) |
 | Agent binding | MCP process memory | MCP (read/write) |
 
-## Migration path
+### Migration path (if ever revisited)
 
-1. Ship MCP `clawket.enforce` alongside existing `cjs` hooks (double-gate, same outcome).
-2. Ship thin `cjs` shims that consult MCP. Roll out with a feature flag
-   (`CLAWKET_MCP_ENFORCE=1`).
-3. After one release cycle of no regressions, delete the fat `cjs` paths.
-4. Phase 6 — MCP rewrites in Rust; `cjs` shim becomes a few lines that exec the Rust
-   binary.
+Big-bang replacement is rejected — the hook layer is on the critical path of
+every session and a regression bricks the user. Incremental per-event rollout
+is the only acceptable shape:
 
-## Risks
+1. Pilot on **PostToolUse** first. It is audit-only, has no `permissionDecision`,
+   and a regression cannot deny tool calls.
+2. Move PreToolUse last. Its 490-LOC handler is the largest blast radius and
+   should only be migrated after every other handler has been observed stable
+   for at least one plugin patch release.
+3. Each migrated handler ships dual-path behind a feature flag
+   (`CLAWKET_MCP_ENFORCE=<event>`) until its corresponding regression tests
+   under `plugin/tests/` are rewritten against the MCP boundary.
+4. The fat cjs path stays in the tree for one full minor release after each
+   handler is migrated, so rollback is a flag flip rather than a redeploy.
 
-- **MCP process lifecycle** tied to Claude Code session; if Claude restarts mid-session
-  the warm state is lost. Mitigate by making the shim tolerate a cold MCP start.
-- **Daemon unavailable** — enforcement must fail-closed (block tool) with a clear
-  "daemon not reachable" message so users know to `clawket daemon start`.
-- **Schema drift** — the enforce tool's input schema is versioned per plugin release and
-  pinned by the `compat` matrix.
+The `Phase 6 — MCP rewrites in Rust` step from the original sketch is dropped
+as out of scope; the cli MCP server (`crates/cli/src/mcp.rs`, rmcp 1.5) already
+runs Rust.
+
+## Risks (if adopted)
+
+- **MCP process lifecycle** is tied to the Claude Code session; if Claude
+  restarts mid-session the warm state is lost. The shim must tolerate a cold
+  MCP start.
+- **Daemon unavailable** — enforcement would fail-closed (block tool) with a
+  clear "daemon not reachable" message so users know to `clawket daemon start`.
+  This is a behavior change from the current cjs layer, which fails-open with a
+  stderr warning on daemon outages.
+- **Schema drift** — the enforce tool's input schema must be versioned per
+  plugin release and pinned by the `compat` matrix in
+  [COMPATIBILITY.md](./COMPATIBILITY.md). Today the cjs handler is part of
+  `pluginRoot` and is rebuilt by the install gate on every plugin bump; the MCP
+  path would couple hook semantics to daemon release cadence instead.
+- **LM-8 boundary** — moving gate logic from `pluginRoot` (cjs, deletable +
+  rebuildable by install gate) into the daemon (user-data domain,
+  schema-versioned, harder to roll back) inverts where the gate's "owner of
+  truth" lives. The current placement is the safer side of LM-8.
+
+## Reference
+
+- Current SSoT: `plugin/adapters/shared/claude-hooks.cjs` (handlers
+  `runSessionStart`, `runUserPromptSubmit`, `runPreToolUse`, `runPostToolUse`,
+  `runPlanSync`, `runSubagentStart`, `runSubagentStop`).
+- Existing MCP server: `crates/cli/src/mcp.rs` — 5 read-only tools
+  (`clawket_search_knowledge`, `clawket_search_tasks`,
+  `clawket_find_similar_tasks`, `clawket_get_task_context`,
+  `clawket_get_recent_decisions`). No `clawket.enforce` tool today.
+- Daemon enforcement endpoints: `EVIDENCE_REQUIRED` at `daemon/src/repo/tasks.rs`,
+  `PROJECT_HAS_ACTIVE_PLAN` / `PLAN_HAS_ACTIVE_CYCLES` at
+  `daemon/src/routes/plans.rs`, cycle invariants at `daemon/src/repo/cycles.rs`.
+- Regression tests pinning today's enforcement:
+  `plugin/tests/pre-tool-use.e2e.test.cjs`,
+  `plugin/tests/destructive-patterns.test.cjs`,
+  `plugin/tests/exit-plan-mode-strict.test.cjs`,
+  `plugin/tests/disabled-project-bypass.test.cjs`,
+  `plugin/tests/skills-integrity.test.cjs`,
+  `plugin/tests/data-loss-diagnostics.e2e.test.cjs`,
+  `plugin/tests/plugin-reinstall.e2e.test.cjs`.
