@@ -128,6 +128,31 @@ function isProjectDisabled(clawket, cwd) {
   return proj.enabled === 0;
 }
 
+// `plan list` / `cycle list` accept `--project <id>`, NOT `--cwd` — only
+// `dashboard` and `project resolve` accept `--cwd`. Earlier PreToolUse gates
+// passed `--cwd "${cwd}"` directly and silently treated the CLI's
+// `error: unexpected argument` (empty stdout) as "zero active plans / cycles",
+// which fired Gate 1 even when an active plan was present in the project.
+// Resolve the project once here so the gates can use the supported flag.
+//
+// Returns the project id string, or '' when no project is registered for
+// cwd (or the daemon is unreachable). The dashboard-empty allow() check
+// earlier in PreToolUse already short-circuits the truly-no-project path,
+// so an empty return here means the project resolved but had no `id` field
+// (defensive); callers fall back to global listing.
+function resolveProjectIdFromCwd(clawket, cwd) {
+  if (!cwd) return '';
+  const out = exec(`${clawket} project resolve --cwd "${cwd}" --format json`);
+  if (!out) return '';
+  try {
+    const proj = JSON.parse(out);
+    if (proj && typeof proj === 'object' && typeof proj.id === 'string') {
+      return proj.id;
+    }
+  } catch {}
+  return '';
+}
+
 // destructive-patterns.json catalog — loaded once, regex compiled once. Single
 // source of truth for shell hard-block rules (LM-7). See SSoT artifact for the
 // post-incident analysis that motivated each entry.
@@ -1700,6 +1725,7 @@ function checkV2ToV3Migration(pluginRoot) {
 
 async function runSessionStart() {
   recordHookEvent('SessionStart');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   checkV2ToV3Migration(pluginRoot);
   // ensureInstalled throws on any component failure (FIX-PLUGIN-008). It also
@@ -1782,6 +1808,7 @@ async function runSessionStart() {
 
 function runUserPromptSubmit() {
   recordHookEvent('UserPromptSubmit');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const hookInput = readHookInput();
@@ -1815,6 +1842,7 @@ function runUserPromptSubmit() {
 
 function runPreToolUse() {
   recordHookEvent('PreToolUse');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const hookInput = readHookInput();
@@ -2057,7 +2085,12 @@ function runPreToolUse() {
   // CLI returns nothing parseable we treat it as "active plan unknown" and
   // deny. Exit code 2 surfaces the deny to outer harnesses that read exit
   // codes (Claude Code uses the JSON decision regardless of code).
-  const plansJson = exec(`${clawket} plan list --cwd "${cwd}" --status active --format json`);
+  //
+  // `plan list` / `cycle list` accept `--project`, not `--cwd` — resolve the
+  // project from cwd first (see resolveProjectIdFromCwd docstring).
+  const projectId = resolveProjectIdFromCwd(clawket, cwd);
+  const projectFilter = projectId ? `--project "${projectId}" ` : '';
+  const plansJson = exec(`${clawket} plan list ${projectFilter}--status active --format json`);
   let activePlans = [];
   let plansParsed = false;
   try { activePlans = JSON.parse(plansJson || '[]'); plansParsed = true; } catch {}
@@ -2073,7 +2106,7 @@ function runPreToolUse() {
   }
 
   // Gate 2: active cycle
-  const cyclesJson = exec(`${clawket} cycle list --cwd "${cwd}" --status active --format json`);
+  const cyclesJson = exec(`${clawket} cycle list ${projectFilter}--status active --format json`);
   let activeCycles = [];
   try { activeCycles = JSON.parse(cyclesJson || '[]'); } catch {}
   if (cyclesJson !== '' && activeCycles.length === 0) {
@@ -2305,6 +2338,7 @@ function runPreToolUse() {
 
 function runPostToolUse() {
   recordHookEvent('PostToolUse');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const sessionId = process.env.CLAUDE_SESSION_ID || '';
@@ -2430,6 +2464,7 @@ function strictGuideMessage(violation) {
 
 function runPlanSync() {
   recordHookEvent('ExitPlanMode');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const hookInput = readHookInput();
@@ -2569,6 +2604,7 @@ ${fileNote}
 // Clawket-registered parent), we gracefully skip — no orphan tasks created.
 function runSubagentStart() {
   recordHookEvent('SubagentStart');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const hookInput = readHookInput();
@@ -2707,6 +2743,7 @@ function runSubagentStart() {
 
 function runSubagentStop() {
   recordHookEvent('SubagentStop');
+  try { ensureXdgDirs(); } catch {}
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
   const hookInput = readHookInput();
