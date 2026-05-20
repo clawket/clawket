@@ -129,18 +129,38 @@ jobs:
             }
           " "$NEXT"
 
-          # Append COMPATIBILITY.md row (best-effort idempotent).
+          # Append COMPATIBILITY.md row, deriving every cell from
+          # components.json (exact pins) and package.json#compat
+          # (SemVer ranges) — the two pinning surfaces that are the
+          # actual source of truth. Copying the previous row was the
+          # v3.0.4–v3.1.2 stale-row regression: the matrix drifted
+          # from components.json silently on every release.
           node -e '
             const fs = require("fs");
             const next = process.argv[1];
             const file = "docs/COMPATIBILITY.md";
+            const components = JSON.parse(fs.readFileSync("components.json", "utf-8"));
+            const compat = JSON.parse(fs.readFileSync("package.json", "utf-8")).compat || {};
+            const pinCell = (key) => {
+              const pin = components[key];
+              const range = compat["@clawket/" + key] || "";
+              if (pin === null || pin === undefined) {
+                return "`" + range + "` (pin: `null` — first release pending)";
+              }
+              return "`" + range + "` (pin: `" + pin + "`)";
+            };
+            const row = "| `" + next + "` | "
+              + pinCell("daemon") + " | "
+              + pinCell("cli") + " | "
+              + pinCell("web") + " | "
+              + pinCell("desktop") + " | "
+              + "dropped (legacy MCP fully removed) |";
             let lines = fs.readFileSync(file, "utf-8").split("\n");
             if (lines.some(l => l.startsWith("| `" + next + "`"))) process.exit(0);
             let lastIdx = -1;
             for (let i = 0; i < lines.length; i++) if (/^\| `\d/.test(lines[i])) lastIdx = i;
             if (lastIdx < 0) process.exit(0);
-            const newRow = lines[lastIdx].replace(/^\| `[\d.]+`/, "| `" + next + "`");
-            lines.splice(lastIdx + 1, 0, newRow);
+            lines.splice(lastIdx + 1, 0, row);
             fs.writeFileSync(file, lines.join("\n"));
           ' "$NEXT"
 
