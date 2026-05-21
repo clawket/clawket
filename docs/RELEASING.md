@@ -15,11 +15,11 @@ Each component has its own repo and its own auto-release workflow. When a coordi
 | 3 | `clawket/web`      | React dashboard | GitHub Releases tarball |
 | 4 | `clawket/desktop`  | Tauri 2 desktop app (depends on web bundle for renderer assets) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — `null`-pinned in `components.json` until first release |
 | 5 | `clawket/clawket`  | Plugin shell | Marketplace install (`marketplace.json` on `main` HEAD) + git tag |
-| 6 | `clawket/landing`  | Public landing page | Vercel |
+| 6 | `clawket/landing`  | Public landing page | Cloudflare/GitHub Pages |
 
 `clawket/desktop` slots between `web` and the plugin shell because it consumes the `web` tarball at build time (Tauri bundles the SPA into the renderer). During the v3.0.0 window the desktop pin is `null` (sentinel — sub-repo + first release pending), and the install gate treats that as a no-op skip; the order step is enforced only when the pin becomes a string tag.
 
-`clawket/mcp` (legacy Node MCP server) is no longer part of the release chain — removed from plugin dependencies in v2.3.2 and **archived** in plugin v11 U4 (final deprecation commit `542c397`; the local working copy was removed, the GitHub repo is read-only and remains as the npm replacement pointer).
+`clawket/mcp` (legacy Node MCP server) is no longer part of the release chain — removed from plugin dependencies in v2.3.2 and archived (the GitHub repo is read-only and remains as the npm replacement pointer).
 
 `clawket/landing` is downstream of the plugin tag, not the binary components. The plugin `release.yml` dispatches `repository_dispatch{event_type: baseline-bumped, client_payload.tag: vX.Y.Z}` to `clawket/landing` after each successful tag (see `Notify clawket/landing of baseline bump` step). The landing repo's `.github/workflows/auto-update.yml` consumes that event, derives the hero label as `vMAJOR.MINOR`, runs `scripts/update-version-label.sh`, and opens an `auto-update/<tag>` PR. A daily `0 6 * * *` cron sweep on the landing side fetches the latest `clawket/clawket` release tag as a fallback if the dispatch was lost (PAT scope, transient API failure, etc.); `workflow_dispatch` with `dry_run=true` produces a diff-only preview. Landing builds remain deterministic and offline — the version is propagated by PR, not by build-time fetch.
 
@@ -121,10 +121,6 @@ The end-to-end loop a contributor follows when shipping a sub-repo (`cli` / `dae
 - **No force-push, no revert** — if a Release is wrong, cut a new patch with the correct fix. Force-push and revert leave artifacts that confuse the install gate's `.clawket-version` marker reconciliation.
 - **Hands off the plugin repo for sub-repo bumps** — the plugin shell receives bump-manifest PRs only. Direct edits to `components.json` from a contributor's branch bypass the auto-release verification chain.
 - **Manifest PR is the contract** — if the auto-PR does not appear within ~5 minutes of the upstream Release being published, the dispatch failed (PAT scope / API hiccup). Re-run the upstream `release.yml` workflow's "dispatch bump" step rather than hand-crafting the PR.
-
-### `/clawket-release` skill
-
-The skill `/clawket-release` (when available) wraps steps 8–10 into a single check — it queries `gh release view` / `gh run list` for both the sub-repo and the plugin and reports a punch list of what is still pending. Used after every merge to confirm the deployment landed cleanly.
 
 ## Version pinning surfaces
 

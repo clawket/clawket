@@ -132,13 +132,9 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 | 호환성 매트릭스 (plugin × cli × daemon × web) | `docs/COMPATIBILITY.md` |
 | 릴리즈 순서·체크리스트·태그 규칙 | `docs/RELEASING.md` |
 | Hook MCP enforcement 설계 | `docs/HOOK_ENFORCEMENT.md` |
-| v2 → v3 마이그레이션 (변경 이력은 여기) | `docs/MIGRATION-v2-to-v3.md` |
-| Vendor / tier 정책 | `docs/VENDOR_POLICY.md` |
 | i18n / 번역 drift 정책 | `docs/i18n-policy.md` |
 | 기여 워크플로 (decompose / contract / execute) | `docs/CONTRIBUTING.md` (cross-repo 정본) |
 | GitHub label 정의 | `docs/labels.md` |
-| ADR | `docs/adr/` |
-| Tutorial | `docs/tutorial/` |
 | End-user 설치·기능 | `README.md`, `README.ko.md` |
 | 어댑터 내부 (hook 라우팅 + destructive guardrail) | `adapters/claude/README.md` |
 

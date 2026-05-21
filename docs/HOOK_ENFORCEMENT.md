@@ -2,19 +2,19 @@
 
 > **Status:** Considered design captured for the record. **Not adopted.** The
 > deliberate single source of truth for hook enforcement in v3 is
-> `plugin/adapters/shared/claude-hooks.cjs` (the cjs "fat handler" layer). This
+> `adapters/shared/claude-hooks.cjs` (the cjs "fat handler" layer). This
 > document describes the alternative MCP-tool design that was evaluated and
 > deferred; nothing here is a roadmap commitment. The current cjs layer is
 > pinned by the install gate, the skill integrity test, and the hook regression
-> tests under `plugin/tests/`.
+> tests under `tests/`.
 
 ## Today's enforcement layout
 
 Hook events from Claude Code (`SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 `PostToolUse`, `SubagentStart`, `SubagentStop`, plus the `PostToolUse +
 ExitPlanMode` plan-sync branch) route through 2-line shims under
-`plugin/adapters/claude/` into one of seven handlers in
-`plugin/adapters/shared/claude-hooks.cjs`. Each handler is the **sole**
+`adapters/claude/` into one of seven handlers in
+`adapters/shared/claude-hooks.cjs`. Each handler is the **sole**
 enforcement site for its gate; the daemon does not duplicate these checks.
 
 | Gate | Enforced in | Daemon's role |
@@ -89,7 +89,7 @@ Return shape:
 
 ### Sketched shim shape
 
-If adopted, `plugin/adapters/claude/pre-tool-use.cjs` would reduce to:
+If adopted, `adapters/claude/pre-tool-use.cjs` would reduce to:
 
 ```js
 const mcp = require('./mcp-client');
@@ -128,12 +128,12 @@ is the only acceptable shape:
    for at least one plugin patch release.
 3. Each migrated handler ships dual-path behind a feature flag
    (`CLAWKET_MCP_ENFORCE=<event>`) until its corresponding regression tests
-   under `plugin/tests/` are rewritten against the MCP boundary.
+   under `tests/` are rewritten against the MCP boundary.
 4. The fat cjs path stays in the tree for one full minor release after each
    handler is migrated, so rollback is a flag flip rather than a redeploy.
 
 The `Phase 6 — MCP rewrites in Rust` step from the original sketch is dropped
-as out of scope; the cli MCP server (`crates/cli/src/mcp.rs`, rmcp 1.5) already
+as out of scope; the cli MCP server (rmcp 1.5, in the `clawket/cli` sub-repo) already
 runs Rust.
 
 ## Risks (if adopted)
@@ -157,10 +157,10 @@ runs Rust.
 
 ## Reference
 
-- Current SSoT: `plugin/adapters/shared/claude-hooks.cjs` (handlers
+- Current SSoT: `adapters/shared/claude-hooks.cjs` (handlers
   `runSessionStart`, `runUserPromptSubmit`, `runPreToolUse`, `runPostToolUse`,
   `runPlanSync`, `runSubagentStart`, `runSubagentStop`).
-- Existing MCP server: `crates/cli/src/mcp.rs` — 5 read-only tools
+- Existing MCP server (in `clawket/cli` sub-repo) — 5 read-only tools
   (`clawket_search_knowledge`, `clawket_search_tasks`,
   `clawket_find_similar_tasks`, `clawket_get_task_context`,
   `clawket_get_recent_decisions`). No `clawket.enforce` tool today.
@@ -168,10 +168,10 @@ runs Rust.
   `PROJECT_HAS_ACTIVE_PLAN` / `PLAN_HAS_ACTIVE_CYCLES` at
   `daemon/src/routes/plans.rs`, cycle invariants at `daemon/src/repo/cycles.rs`.
 - Regression tests pinning today's enforcement:
-  `plugin/tests/pre-tool-use.e2e.test.cjs`,
-  `plugin/tests/destructive-patterns.test.cjs`,
-  `plugin/tests/exit-plan-mode-strict.test.cjs`,
-  `plugin/tests/disabled-project-bypass.test.cjs`,
-  `plugin/tests/skills-integrity.test.cjs`,
-  `plugin/tests/data-loss-diagnostics.e2e.test.cjs`,
-  `plugin/tests/plugin-reinstall.e2e.test.cjs`.
+  `tests/pre-tool-use.e2e.test.cjs`,
+  `tests/destructive-patterns.test.cjs`,
+  `tests/exit-plan-mode-strict.test.cjs`,
+  `tests/disabled-project-bypass.test.cjs`,
+  `tests/skills-integrity.test.cjs`,
+  `tests/data-loss-diagnostics.e2e.test.cjs`,
+  `tests/plugin-reinstall.e2e.test.cjs`.

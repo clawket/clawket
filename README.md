@@ -74,8 +74,6 @@ When a task transitions to `done`/`cancelled`, the daemon auto-cascades completi
 
 Clawket v3 targets the **Claude model family exclusively**. Tasks carry one of three tier labels — `low` (Haiku-class), `med` (Sonnet-class), or `high` (Opus-class) — and the agent spawner routes each task to a model that meets or exceeds the required tier. Downgrading is advisory in v3 (warning only) and will be hard-enforced in v4+ alongside a vendor-agnostic adapter layer.
 
-Full semantics and routing table: [docs/VENDOR_POLICY.md](docs/VENDOR_POLICY.md).
-
 ### Bundled Skills & Slash Commands
 
 The plugin registers 7 skills (see `.claude-plugin/plugin.json::skillsList`) and exposes 6 slash commands (one per skill except `clawket-dashboard`, which is the default dashboard surface):

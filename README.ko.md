@@ -74,8 +74,6 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 
 Clawket v3 는 **Claude 모델 패밀리만 타겟**합니다. 태스크는 세 가지 tier 중 하나를 가지며 — `low` (Haiku 급), `med` (Sonnet 급), `high` (Opus 급) — 에이전트 spawner 가 각 태스크를 요구 tier 이상의 모델로 라우팅합니다. v3 에서 다운그레이드는 advisory (경고만), v4+ 에서 vendor-agnostic 어댑터 레이어와 함께 hard-enforce 됩니다.
 
-전체 시맨틱과 라우팅 표: [docs/VENDOR_POLICY.md](docs/VENDOR_POLICY.md).
-
 ### 번들된 스킬 & 슬래시 명령
 
 플러그인은 7개 스킬(`.claude-plugin/plugin.json::skillsList`) 과 6개 슬래시 명령을 등록합니다 (스킬당 1개, `clawket-dashboard` 만 슬래시 없이 대시보드 surface 로 노출):

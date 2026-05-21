@@ -66,8 +66,7 @@ The script exits with:
 The current numbers are first-cut defaults. They will be revised after
 M6 (post-launch) when we have observed actual drift patterns and can
 pick a number based on data instead of intuition. The decision will be
-recorded in an ADR in `daemon/docs/adr/` (since the daemon is the only
-repo with an ADR home today).
+recorded as a Clawket knowledge artifact (`type=decision, scope=rag`).
 
 | Signal | Warning | Fail |
 |---|---|---|

@@ -14,7 +14,7 @@ the tested combination here.
 | `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
 | `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat` + `components.json.desktop` (`null` until first release) |
 | `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
-| `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived in plugin v11 U4** (final deprecation commit `542c397`) — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
+| `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived** — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 
 ## Matrix
 
@@ -46,15 +46,16 @@ the tested combination here.
 | `3.1.4` | `>=0.2.0 <1.0.0` (pin: `v0.3.2`) | `>=0.2.0 <1.0.0` (pin: `v0.4.0`) | `>=0.1.0 <2.0.0` (pin: `v1.0.3`) | `>=3.0.0 <4.0.0` (pin: `null` — first release pending) | dropped (legacy MCP fully removed) |
 
 Ranges are SemVer — a major bump in any component triggers a plugin major bump. Exact binary
-versions consumed by setup live in `components.json` (current: `daemon: v0.3.1`, `cli: v0.4.0`, `web: v1.0.2`).
-The `desktop` column entered the matrix in v3.0.0; the `—` for prior rows reflects that the
-component did not exist. The v3.0.0 pin is `null` until the first `clawket/desktop` GitHub
-Release lands — install gate treats `null` as a no-op skip.
+versions consumed by setup live in `components.json` (single SSoT — read directly rather than
+duplicating here). The `desktop` column entered the matrix in v3.0.0; the `—` for prior rows
+reflects that the component did not exist. The v3.0.0 pin is `null` until the first
+`clawket/desktop` GitHub Release lands — install gate treats `null` as a no-op skip.
 
 ## v3.0.0 breaking changes (summary)
 
 The simultaneous major bump across plugin shell + cli + daemon + web in v3.0 is justified by
-multiple cross-component contract breaks. See `MIGRATION-v2-to-v3.md` for the full guide.
+multiple cross-component contract breaks (summarized below; per-tag detail in the v3.0.x
+GitHub Release notes).
 
 - **Schema** — `tasks.tier`, `cycles.unit_id NOT NULL` + FK, `units` loses `status/approval_*`,
   `audit_log` table replaces `activity_log` semantics, QA workflow fields on `tasks`,
