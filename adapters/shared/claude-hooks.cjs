@@ -95,6 +95,22 @@ function allow() {
   process.exit(0);
 }
 
+// LM-11057: PreToolUse-specific allow emitter. Newer Claude Code releases
+// schema-validate hook output and reject the bare `{}` produced by `allow()`
+// with `Hook JSON output validation failed — (root): Invalid input`. Emit the
+// fully-qualified PreToolUse decision instead so the harness always parses it.
+// allow() is left unchanged for non-PreToolUse hooks (PostToolUse, Subagent*)
+// where the empty-object form remains accepted.
+function allowPreToolUse() {
+  console.log(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'allow',
+    },
+  }));
+  process.exit(0);
+}
+
 // HOOK-251: append `{event,at}` JSON line to ~/.local/state/clawket/hook-events.log
 // so `clawket doctor` can show last_fired per hook event. Best-effort: any I/O
 // error is swallowed (the user-visible doctor row falls back to "—").
@@ -235,6 +251,15 @@ function readOnlyBashPatterns() {
     /^(docker|podman)\s+(ps|images|logs|inspect)/,
     /^cargo\s+(check|test|clippy)/,
     /^lsof\s/,
+    // LM-11057: code-search and text-processing tools are read-only.
+    // Without these, routine `grep`/`find`/`rg` calls fall through to PDD
+    // gates and emit deny JSON — which (a) interrupts ordinary investigation
+    // work and (b) surfaces as repeated "PreToolUse:Bash hook error" lines in
+    // Claude Code when the deny output is rendered.
+    /^(grep|egrep|fgrep|rg|ripgrep|ag|ack)\b/,
+    /^find\b/,
+    /^(awk|sed|tr|cut|sort|uniq|tee|jq|yq|xxd|hexdump|base64|comm|paste|diff|cmp)\b/,
+    /^xargs\b/,
   ];
 }
 
@@ -1861,8 +1886,8 @@ function runPreToolUse() {
   const agentTools = new Set(['Agent', 'TeamCreate', 'SendMessage']);
   const mutatingTools = new Set(['Edit', 'Write', 'Bash', 'NotebookEdit']);
 
-  if (readOnly.has(toolName)) allow();
-  if (!agentTools.has(toolName) && !mutatingTools.has(toolName) && !taskTools.has(toolName)) allow();
+  if (readOnly.has(toolName)) allowPreToolUse();
+  if (!agentTools.has(toolName) && !mutatingTools.has(toolName) && !taskTools.has(toolName)) allowPreToolUse();
 
   if (toolName === 'Bash') {
     const cmd = (toolInput.command || '').trim();
@@ -1986,8 +2011,8 @@ function runPreToolUse() {
       }
     }
 
-    if (cmd.startsWith('clawket ') || cmd.includes('clawket ')) allow();
-    if (readOnlyBashPatterns().some((re) => re.test(cmd))) allow();
+    if (cmd.startsWith('clawket ') || cmd.includes('clawket ')) allowPreToolUse();
+    if (readOnlyBashPatterns().some((re) => re.test(cmd))) allowPreToolUse();
   }
 
   // HOOK-003: X3 scenario_id format check on TaskUpdate calls.
@@ -2046,10 +2071,10 @@ function runPreToolUse() {
   // Disabled projects bypass workflow enforcement (active-task requirement,
   // agent-binding, etc.) but NOT destructive-pattern protection above —
   // those guard user data integrity regardless of Clawket policy state.
-  if (isProjectDisabled(clawket, cwd)) allow();
+  if (isProjectDisabled(clawket, cwd)) allowPreToolUse();
 
   const context = exec(`${clawket} dashboard --cwd "${cwd}" --show active`);
-  if (!context) allow();
+  if (!context) allowPreToolUse();
 
   const tasksJson = exec(`${clawket} task list --status in_progress`);
   let inProgressTasks = [];
@@ -2333,7 +2358,7 @@ function runPreToolUse() {
     process.exit(0);
   }
 
-  allow();
+  allowPreToolUse();
 }
 
 function runPostToolUse() {
