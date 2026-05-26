@@ -273,7 +273,10 @@ You: "Plan the authentication refactor"
   clawket unit create --plan PLAN-xxx "Unit 1 — OAuth Setup"
   clawket cycle create --project PROJ-xxx --unit UNIT-xxx "Sprint 1"
   clawket cycle activate CYC-xxx
-  clawket task create "Implement OAuth flow" --cycle CYC-xxx
+  clawket task create "Implement OAuth flow" --cycle CYC-xxx \
+    --intent "Add Google OAuth login" \
+    --prompt-template "Implement the OAuth flow end to end" \
+    --success-criteria "login redirects to /home,token persisted"
 ```
 
 **Plan mode (`/plan`):**

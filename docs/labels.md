@@ -82,6 +82,6 @@ classify the *kind* of change. Workflow state (in progress, blocked,
 done, cycle assignment) is tracked in the local SQLite database via
 `clawket task` — labels would duplicate that and drift.
 
-If a future workflow genuinely needs a new label across all 8 repos,
+If a future workflow genuinely needs a new label across all six repos,
 add it to `labels.yml` + this document in the same PR. Per-repo labels
 do not need this update.

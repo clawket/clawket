@@ -13,7 +13,7 @@ the tested combination here.
 | `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat` + `components.json.daemon` |
 | `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
 | `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat` + `components.json.desktop` (`null` until first release) |
-| `@clawket/landing` | `clawket/landing` | Cloudflare/GitHub Pages | n/a |
+| `@clawket/landing` | `clawket/landing` | Vercel (Git integration) | n/a |
 | `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived** — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 
 ## Matrix

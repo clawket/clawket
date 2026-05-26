@@ -272,7 +272,10 @@ Clawket이 플랜의 source of truth입니다 — Claude의 Plan Mode 파일(`~/
   clawket unit create --plan PLAN-xxx "Unit 1 — OAuth 설정"
   clawket cycle create --project PROJ-xxx --unit UNIT-xxx "Sprint 1"
   clawket cycle activate CYC-xxx
-  clawket task create "OAuth 흐름 구현" --cycle CYC-xxx
+  clawket task create "OAuth 흐름 구현" --cycle CYC-xxx \
+    --intent "Google OAuth 로그인 추가" \
+    --prompt-template "OAuth 흐름을 처음부터 끝까지 구현" \
+    --success-criteria "로그인 후 /home 으로 리다이렉트,토큰 영속화"
 ```
 
 **플랜 모드 (`/plan`):**

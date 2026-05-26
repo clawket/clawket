@@ -35,9 +35,9 @@ Clawket lives across six active GitHub repositories under the `@clawket` org:
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust daemon | axum + rusqlite + sqlite-vec; owns user data under XDG |
 | [`clawket/web`](https://github.com/clawket/web) | React 19 dashboard | Vite + Tailwind + dnd-kit |
 | [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app | `null`-pinned in `components.json` until first release |
-| [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Cloudflare/GitHub Pages |
+| [`clawket/landing`](https://github.com/clawket/landing) | Public landing + docs site | Vite + React Router; deployed on Vercel |
 
-The hero tagline is propagated verbatim across all repos; do not paraphrase it. The forbidden-language list (variants that lose meaning under compression) is recorded in the Clawket project's tagline decision knowledge — pull it via `clawket_search_knowledge` (MCP) or `clawket artifact search "Tagline decision"`.
+The hero tagline is propagated verbatim across all repos; do not paraphrase it. The forbidden-language list (variants that lose meaning under compression) is recorded in the Clawket project's tagline decision knowledge — pull it via `clawket_search_knowledge` (MCP) or `clawket knowledge search "Tagline decision"`.
 
 A wrapper that pins all sub-repos locally for development lives at `~/dev/repository/github/clawket/` (not a git repo itself; sub-repo paths are described in the wrapper's `CLAUDE.md`).
 
