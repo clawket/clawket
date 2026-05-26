@@ -59,8 +59,10 @@ clawket task create "FIX: <one-line defect summary>" \
   --unit <FIX_UNIT_ID> \
   --cycle <FIX_CYCLE_ID> \
   --scenario-id <SCENARIO_ID> \
-  --evidence "<evidence file:line>" \
-  --type code \
+  --intent "<one-sentence statement of the fix>" \
+  --prompt-template "<how to implement the fix>" \
+  --success-criteria "<verifiable Done condition for the fix>" \
+  --type bug \
   --body "<reasoning body>\n\n원본 QA task: <QA_TASK_ID>"
 ```
 
@@ -75,8 +77,8 @@ Task quality rules (applied here):
 ### 4. Link the fix-task ID into the original QA task
 
 ```bash
-clawket comment add --task <QA_TASK_ID> \
-  --body "defect → fix task: <FIX_TASK_ID>\nevidence: <file:line>\nreasoning: <summary>"
+clawket comment create "defect → fix task: <FIX_TASK_ID>\nevidence: <file:line>\nreasoning: <summary>" \
+  --task <QA_TASK_ID>
 ```
 
 ### 5. Code change (fix task in_progress)

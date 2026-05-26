@@ -92,7 +92,7 @@ New knowledge "next-major chess scope" → new ID `US-NEXT-CHESS-001`
 Add a comment to the round's cancelled QA task:
 
 ```bash
-clawket comment add --task <QA_TASK_ID> --body "<reason body>"
+clawket comment create "<reason body>" --task <QA_TASK_ID>
 ```
 
 Comment format:

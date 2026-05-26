@@ -70,15 +70,19 @@ Close a task. Evidence is required by the daemon (HTTP 400 `EVIDENCE_REQUIRED` i
 clawket task update $TASK_ID --status done --evidence "<file:line or external check>" --comment "$COMMENT"
 ```
 
-When the task transitions to `done` and the cycle's exit gate is met, the daemon emits a `completion-possible` SSE event rather than auto-completing. The operator must run `clawket cycle update <CYCLE-ID> --status completed` (and similarly for the plan) explicitly. This preserves the human review point at the cycle / plan boundary.
+When the task transitions to `done`, the daemon auto-cascades unit / cycle / plan completion: once every child of a unit (and every unit of a cycle, and every cycle of a plan) is terminal, the parent is marked completed automatically. You do not run `cycle update --status completed` by hand for the normal path.
 
-### `new "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> [--priority high|med|low]`
+### `new "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> [--priority critical|high|medium|low]`
 
-Create a new task in the active cycle. Always pass `--cycle <CYCLE-ID>` so the new task inherits an active cycle.
+Create a new task in the active cycle. Always pass `--cycle <CYCLE-ID>` so the new task inherits an active cycle. The daemon requires the execution envelope, so `--intent`, `--prompt-template`, and `--success-criteria` are mandatory (`ENVELOPE_REQUIRED_FIELDS_MISSING` → HTTP 400 otherwise).
 
 ```bash
-# Usage: new "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> [--priority high|med|low]
-clawket task create "$TITLE" --unit $UNIT_ID --cycle $CYCLE_ID --priority $PRIORITY
+# Usage: new "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> [--priority critical|high|medium|low]
+clawket task create "$TITLE" --unit $UNIT_ID --cycle $CYCLE_ID \
+  --intent "$INTENT" \
+  --prompt-template "$PROMPT_TEMPLATE" \
+  --success-criteria "$SUCCESS_CRITERIA" \
+  --priority $PRIORITY
 ```
 
 ## Quick reference
@@ -92,12 +96,16 @@ clawket dashboard --cwd .
 ### Task
 
 ```bash
-clawket task create "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> --priority high|med|low
+clawket task create "<title>" --unit <UNIT-ID> --cycle <CYCLE-ID> \
+  --intent "<one-sentence intent>" \
+  --prompt-template "<how an agent should approach it>" \
+  --success-criteria "<verifiable Done condition>" \
+  [--priority critical|high|medium|low]
 clawket task update <TASK-ID> --status in_progress|done|cancelled [--evidence "<text>"]
 clawket task list --cycle <CYCLE-ID>
 clawket task view <TASK-ID>
 clawket task search "<keyword>"
-clawket comment create --task <TASK-ID> --body "<comment>"
+clawket comment create "<comment>" --task <TASK-ID>
 ```
 
 ### Plan / Unit / Cycle
@@ -108,7 +116,7 @@ clawket plan list --project <PROJ-ID>
 clawket plan approve <PLAN-ID>           # draft → active (required before starting tasks)
 clawket unit create "<title>" --plan <PLAN-ID>
 clawket unit list --plan <PLAN-ID>
-clawket cycle create --unit <UNIT-ID> --title "<title>" --plan <PLAN-ID>
+clawket cycle create --project <PROJ-ID> --unit <UNIT-ID> "<title>"
 clawket cycle list --plan <PLAN-ID>
 clawket cycle activate <CYCLE-ID>        # planning → active
 clawket cycle update <CYCLE-ID> --status completed
