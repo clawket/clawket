@@ -211,7 +211,7 @@ clawket/
 | [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI + 내장 `clawket mcp` (rmcp 1.5) | GitHub Releases 바이너리 |
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust 데몬 (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases 바이너리 |
 | [`clawket/web`](https://github.com/clawket/web) | React 대시보드 | GitHub Releases tarball |
-| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 데스크톱 앱 (web 과 동일한 SPA 렌더) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — v3.0.0 에서는 `null` 핀, 첫 릴리즈 대기 중 |
+| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 데스크톱 앱 (web 과 동일한 SPA 렌더) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — `clawket/desktop` 첫 릴리즈 전까지 `null` 핀 |
 | [`clawket/landing`](https://github.com/clawket/landing) | 공개 랜딩 페이지 | Vercel |
 
 버전 호환 범위는 `docs/COMPATIBILITY.md` 참조.

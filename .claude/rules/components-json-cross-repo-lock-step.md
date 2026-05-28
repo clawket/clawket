@@ -10,7 +10,7 @@
 - `releaseing order` (daemon → cli → web → plugin) 위반 → 먼저 핀된 컴포넌트가 미배포 release 를 가리킴
 
 ## Evidence
-- `components.json:1-6` — 정본: `{ "daemon": "v3.0.0", "cli": "v3.0.0", "web": "v3.0.0", "vendor_adapter": null }`
+- `components.json:1-6` — 정본. 키는 `daemon` / `cli` / `web` (각각의 정확한 release tag) + `desktop: null` sentinel. 핀 값은 릴리즈마다 갱신되므로 파일을 직접 참조한다 (여기에 값을 복제하지 않는다).
 - `clawket/CLAUDE.md:93-104` — 핀 변경 4-step 체크리스트 (Release 존재 / 매트릭스 / major bump / order)
 - `clawket/CLAUDE.md:164-166` — 동반 변경 강제 (매트릭스 + major 판단 + Release 확인)
 - `docs/COMPATIBILITY.md:21-36` — 매트릭스 표 (plugin 버전 × daemon/cli/web 호환 범위)
@@ -23,7 +23,7 @@
 ## Enforcement gap
 - `components.json` diff 시 `docs/COMPATIBILITY.md` 의 plugin 행이 갱신되었는지 검사하는 pre-commit 없음
 - 핀된 tag 가 GitHub Releases 에 실존하는지 자동 검증 없음 (현재 install 시 fail)
-- 매트릭스의 SemVer range 와 핀 사이의 일관성 (예: `cli >=3.0.0 <4.0.0` 범위에 `v4.0.0` 핀 금지) 자동 검사 없음
+- 매트릭스의 SemVer range 와 핀 사이의 일관성 (예: `cli >=0.2.0 <1.0.0` 범위에 `v1.0.0` 핀 금지) 자동 검사 없음
 - plugin major bump (`package.json#version` + `.claude-plugin/plugin.json#version`) 동반 누락을 막는 lint 없음
 
 ## Rule body
@@ -41,6 +41,6 @@
 ### DON'T
 - `components.json` 만 단독 수정하지 마라 — 매트릭스 미갱신은 후속 사용자의 SessionStart 가 호환성 정보 없이 진행되게 함
 - 매트릭스 표의 과거 행 (예: `2.3.0` 행) 을 편집하지 마라 (snapshot-only) — 새 행을 추가만 한다
-- `vendor_adapter` 키를 v3 동안 non-null 로 바꾸지 마라 (`clawket/CLAUDE.md:22` invariant)
+- `desktop` 핀을 `clawket/desktop` 첫 release publish 전에 non-null 로 바꾸지 마라 — `null` 은 install gate 가 no-op skip 하는 sentinel (`clawket/CLAUDE.md` 컴포넌트 핀 행 참조)
 - release order 를 우회해 plugin 을 먼저 publish 하지 마라 — 다음 사용자의 ensureInstalled 가 component 404 로 실패
 - plugin 의 `compat` 범위 (`package.json#compat`) 와 매트릭스 가 어긋난 채로 머지하지 마라 — 둘 다 정본 표면이므로 동시 갱신

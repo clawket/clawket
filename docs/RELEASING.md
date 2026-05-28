@@ -17,7 +17,7 @@ Each component has its own repo and its own auto-release workflow. When a coordi
 | 5 | `clawket/clawket`  | Plugin shell | Marketplace install (`marketplace.json` on `main` HEAD) + git tag |
 | 6 | `clawket/landing`  | Public landing + docs site | Vercel (Git integration auto-builds on `main` push) |
 
-`clawket/desktop` slots between `web` and the plugin shell because it consumes the `web` tarball at build time (Tauri bundles the SPA into the renderer). During the v3.0.0 window the desktop pin is `null` (sentinel — sub-repo + first release pending), and the install gate treats that as a no-op skip; the order step is enforced only when the pin becomes a string tag.
+`clawket/desktop` slots between `web` and the plugin shell because it consumes the `web` tarball at build time (Tauri bundles the SPA into the renderer). Until the first `clawket/desktop` release lands the desktop pin is `null` (sentinel — sub-repo + first release pending), and the install gate treats that as a no-op skip; the order step is enforced only when the pin becomes a string tag.
 
 `clawket/mcp` (legacy Node MCP server) is no longer part of the release chain — removed from plugin dependencies in v2.3.2 and archived (the GitHub repo is read-only and remains as the npm replacement pointer).
 

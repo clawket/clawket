@@ -66,7 +66,7 @@ The script exits with:
 The current numbers are first-cut defaults. They will be revised after
 M6 (post-launch) when we have observed actual drift patterns and can
 pick a number based on data instead of intuition. The decision will be
-recorded as a Clawket knowledge artifact (`type=decision, scope=rag`).
+recorded as a Clawket knowledge entry (`type=decision`).
 
 | Signal | Warning | Fail |
 |---|---|---|

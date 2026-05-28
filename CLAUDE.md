@@ -15,11 +15,11 @@ gate 가 `components.json` 의 핀에 따라 GitHub Releases 에서 바이너리
 | 항목 | 값 |
 |---|---|
 | Stack | Node 20+ (CommonJS `.cjs`), zero runtime deps (dependencies 없음) |
-| 패키지 | `package.json` — `name: "clawket-plugin"`, `version: 3.0.0`, scripts: `setup` / `dev:fresh-install` / `test` |
-| 플러그인 ID | `clawket` (`.claude-plugin/plugin.json`) — v3.0.0 |
+| 패키지 | `package.json` — `name: "clawket-plugin"`, scripts: `setup` / `dev:fresh-install` / `test` (플러그인 버전은 `package.json#version` 정본) |
+| 플러그인 ID | `clawket` (`.claude-plugin/plugin.json`); 버전은 `plugin.json#version` 정본 |
 | MCP 등록 | `.mcp.json` → stdio `clawket mcp` (CLI 바이너리에 내장된 rmcp 1.5 서버) |
-| Compat 범위 | `@clawket/{cli,daemon,web,desktop} >=3.0.0 <4.0.0` (`package.json#compat`) |
-| 컴포넌트 핀 | `components.json` — `daemon/cli/web = v3.0.0`, `desktop = null` (sentinel; activates when first `clawket/desktop` release lands), `vendor_adapter = null` |
+| Compat 범위 | 컴포넌트별 SemVer 범위 — 정본 `package.json#compat` (현재 cli/daemon `>=0.2.0 <1.0.0`, web `>=0.1.0 <2.0.0`, desktop `>=3.0.0 <4.0.0`) |
+| 컴포넌트 핀 | `components.json` 이 정본 (정확한 cli/daemon/web 핀은 직접 참조). `desktop = null` sentinel — `clawket/desktop` 첫 릴리즈 전까지 no-op skip |
 | Clawket 프로젝트 | `PROJ-lattice-mono` (key `LM`) — wrapper 와 모든 sub-repo 공유 |
 
 ## Hook 라우팅 (`hooks/hooks.json`)
@@ -52,13 +52,13 @@ install 로직. 어떤 새 코드 경로에서도 이 함수를 우회해 별도
 2. Fast-path 검사 — `bin/clawket`, `daemon/bin/clawketd`, `web/dist/index.html`,
    `desktop/dl/<artifact>` 의 존재 + `.clawket-version` 마커가 핀된 버전과
    일치하는지 + 7 skill 무결성 (`verifySkills`). 모두 OK 면 즉시
-   `true`. 단, `components.json#desktop` 이 `null` (v3.0.0 sentinel — desktop
+   `true`. 단, `components.json#desktop` 이 `null` (sentinel — desktop
    sub-repo / first release 미배포) 일 때는 desktop 체크가 항상 통과한다.
 3. 그렇지 않으면 `withInstallLock(() => runSetup())` — `runSetup` 은
    `ensureCliBinary` / `ensureDaemonBinary` / `ensureWebBundle` /
    `ensureDesktopBundle` 순서로 GitHub Releases 에서 받아 `pluginRoot` 아래에
    푼다 (`adapters/shared/claude-hooks.cjs:2761`). `ensureDesktopBundle` 은
-   `null` 핀을 no-op 으로 skip 하므로 v3.0.0 에서는 실제 다운로드가 일어나지
+   `null` 핀을 no-op 으로 skip 하므로 desktop 핀이 `null` 인 동안에는 실제 다운로드가 일어나지
    않는다.
 4. Post-install 검증 — 데몬을 띄우고 `/health` ping. 실패 시 daemon 마커를 무효화해
    다음 세션이 재시도하도록 만들고 `false` 반환.

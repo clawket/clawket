@@ -212,7 +212,7 @@ clawket/
 | [`clawket/cli`](https://github.com/clawket/cli) | Rust CLI + embedded `clawket mcp` (rmcp 1.5) | GitHub Releases binary |
 | [`clawket/daemon`](https://github.com/clawket/daemon) | Rust daemon (axum + rusqlite + sqlite-vec + candle-core) | GitHub Releases binary |
 | [`clawket/web`](https://github.com/clawket/web) | React dashboard | GitHub Releases tarball |
-| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app (renders the same SPA as `web`) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — pinned to `null` in v3.0.0 until first release |
+| [`clawket/desktop`](https://github.com/clawket/desktop) | Tauri 2 desktop app (renders the same SPA as `web`) | GitHub Releases installer (`.dmg` / `.msi` / `.AppImage`) — pinned to `null` until the first `clawket/desktop` release |
 | [`clawket/landing`](https://github.com/clawket/landing) | Public landing page | Vercel |
 
 See `docs/COMPATIBILITY.md` for version range guarantees.
