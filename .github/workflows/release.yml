@@ -49,11 +49,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      # Static guard for the internal `compat` surface read at the
-      # COMPATIBILITY.md row-generation step further down. Failing here
-      # aborts before any tag/commit/publish — keeps a typoed key
-      # (e.g. "@clawket/typo") or a non-SemVer range from cascading.
-      - name: Validate package.json#compat
+      # Static guard for the two pinning surfaces read at the
+      # COMPATIBILITY.md row-generation step further down: package.json#compat
+      # (SemVer ranges) and components.json (exact pins). Failing here aborts
+      # before any tag/commit/publish — catches a typoed key
+      # (e.g. "@clawket/typo"), a non-SemVer range, AND a pin/range drift
+      # where components.json has been bumped past the compat range without
+      # the accompanying plugin major bump.
+      - name: Validate package.json#compat + components.json pins
         run: node scripts/validate-compat.cjs
       - name: Determine next version
         id: bump

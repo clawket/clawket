@@ -23,7 +23,8 @@
 ## Enforcement gap
 - `components.json` diff 시 `docs/COMPATIBILITY.md` 의 plugin 행이 갱신되었는지 검사하는 pre-commit 없음
 - 핀된 tag 가 GitHub Releases 에 실존하는지 자동 검증 없음 (현재 install 시 fail)
-- 매트릭스의 SemVer range 와 핀 사이의 일관성 (예: `cli >=0.2.0 <1.0.0` 범위에 `v1.0.0` 핀 금지) 자동 검사 없음 — 단, `package.json#compat` 자체의 schema (키 whitelist + SemVer range 문법) 는 `scripts/validate-compat.cjs` 가 release.yml 의 `Configure Git` 직후 step 에서 검사하므로 typo / 비-SemVer 값 cascade 는 차단됨
+- 매트릭스 (`docs/COMPATIBILITY.md`) 자체의 SemVer range vs 핀 일관성 검사는 없음 (매트릭스가 release.yml 의 row-generation step 에 의해 append-only 로 갱신되므로 정본 갱신 시점에만 정합).
+- **`package.json#compat` 의 schema (키 whitelist + SemVer range 문법) 와 `components.json` 의 핀 일관성 (예: `cli >=0.2.0 <1.0.0` 범위에 `v1.0.0` 핀 금지) 은 `scripts/validate-compat.cjs` 가 release.yml 의 `Configure Git` 직후 step 에서 검사**. typo / 비-SemVer 값 / pin·range drift 모두 release 전 차단됨 (테스트: `tests/validate-compat.test.cjs` 20개).
 - plugin major bump (`package.json#version` + `.claude-plugin/plugin.json#version`) 동반 누락을 막는 lint 없음
 
 ## Rule body
