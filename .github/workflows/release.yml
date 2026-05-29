@@ -49,6 +49,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+      # Static guard for the internal `compat` surface read at the
+      # COMPATIBILITY.md row-generation step further down. Failing here
+      # aborts before any tag/commit/publish — keeps a typoed key
+      # (e.g. "@clawket/typo") or a non-SemVer range from cascading.
+      - name: Validate package.json#compat
+        run: node scripts/validate-compat.cjs
       - name: Determine next version
         id: bump
         shell: bash

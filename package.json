@@ -8,7 +8,8 @@
     "setup": "node scripts/setup.cjs",
     "dev:fresh-install": "node scripts/dev-fresh-install.cjs",
     "test": "node --test tests/*.test.cjs",
-    "test:unit": "node --test tests/destructive-patterns.test.cjs tests/disabled-project-bypass.test.cjs tests/exit-plan-mode-strict.test.cjs tests/skills-integrity.test.cjs",
+    "test:unit": "node --test tests/destructive-patterns.test.cjs tests/disabled-project-bypass.test.cjs tests/exit-plan-mode-strict.test.cjs tests/skills-integrity.test.cjs tests/validate-compat.test.cjs",
+    "compat:check": "node scripts/validate-compat.cjs",
     "prepare": "husky"
   },
   "devDependencies": {
