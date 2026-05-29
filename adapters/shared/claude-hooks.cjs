@@ -1793,15 +1793,13 @@ async function runSessionStart() {
   const webUrl = getWebUrl();
 
   if (!context) {
-    const noProjectMsg = t('no_project', { cwd });
-    const statusLine = webUrl ? `  Web: ${webUrl}` : '';
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'SessionStart',
-        additionalContext: `${t('hook.session_start.context')}\n\n${noProjectMsg}` + (rules ? `\n\n${rules}` : ''),
-      },
-      systemMessage: `Clawket active — no project for this directory${statusLine ? `\n${statusLine}` : ''}`,
-    }));
+    // No project registered for this cwd → SessionStart is a no-op.
+    // Mirrors runUserPromptSubmit's `if (!context) allow()`: a directory that
+    // is not a registered Clawket project should not have the plugin's
+    // instruction context or onboarding guidance injected into the session.
+    // Emit nothing (empty stdout = no additionalContext, no systemMessage)
+    // rather than `{}`, sidestepping the SessionStart output schema entirely.
+    // install/migration bootstrap above still runs regardless of membership.
     process.exit(0);
   }
 
