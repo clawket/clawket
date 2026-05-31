@@ -21,7 +21,7 @@ Each component has its own repo and its own auto-release workflow. When a coordi
 
 `clawket/mcp` (legacy Node MCP server) is no longer part of the release chain — removed from plugin dependencies in v2.3.2 and archived (the GitHub repo is read-only and remains as the npm replacement pointer).
 
-`clawket/landing` is downstream of the plugin tag, not the binary components. The plugin `release.yml` dispatches `repository_dispatch{event_type: baseline-bumped, client_payload.tag: vX.Y.Z}` to `clawket/landing` after each successful tag (see `Notify clawket/landing of baseline bump` step). The landing repo's `.github/workflows/auto-update.yml` consumes that event, derives the hero label as `vMAJOR.MINOR`, runs `scripts/update-version-label.sh`, and opens an `auto-update/<tag>` PR. A daily `0 6 * * *` cron sweep on the landing side fetches the latest `clawket/clawket` release tag as a fallback if the dispatch was lost (PAT scope, transient API failure, etc.); `workflow_dispatch` with `dry_run=true` produces a diff-only preview. Landing builds remain deterministic and offline — the version is propagated by PR, not by build-time fetch.
+`clawket/landing` is downstream of the plugin tag, not the binary components. After publishing a plugin release, bump the landing hero label as a **manual release step**: in the `clawket/landing` checkout run `bash scripts/update-version-label.sh <tag>`, which rewrites the hero label (`clawket — vMAJOR.MINOR`) across all 20 locales in `src/i18n/dict.ts` in lock step, then open a PR to `main` (Vercel auto-builds on merge). There is no auto-dispatch bot — the version lives in `dict.ts`, and landing builds stay deterministic and offline.
 
 ## How a plugin patch happens automatically
 
@@ -64,7 +64,7 @@ The end-to-end loop a contributor follows when shipping a sub-repo (`cli` / `dae
 │      - fix: … → plugin patch                                          │
 │      - feat: … → plugin minor                                         │
 │  12. (if released) plugin tag pushed + GitHub Release published       │
-│  13. release.yml dispatches `baseline-bumped` → clawket/landing       │
+│  13. (manual) bump landing hero label + PR (see landing note below)   │
 │                                                                       │
 └───────────────────────────────────────────────────────────────────────┘
                           │
@@ -130,12 +130,12 @@ The end-to-end loop a contributor follows when shipping a sub-repo (`cli` / `dae
 | `components.json` | Exact `vX.Y.Z` of each binary consumed at install | Bumped automatically by component-bump PRs |
 | `adapters/shared/claude-hooks.cjs` env vars (`CLAWKET_CLI_VERSION`, `CLAWKET_DAEMON_VERSION`) | Local-dev override only | Not edited — env-only |
 | `docs/COMPATIBILITY.md` matrix row | Tested combination per plugin release | Appended automatically by `release.yml` |
-| `clawket/landing` `src/App.tsx` hero (`clawket — vMAJOR.MINOR`) | Public landing version label | Bumped automatically by `landing/.github/workflows/auto-update.yml` on `baseline-bumped` dispatch / daily cron |
+| `clawket/landing` `src/i18n/dict.ts` hero (`clawket — vMAJOR.MINOR`) | Public landing version label | Bumped manually via `bash scripts/update-version-label.sh <tag>` (20 locales lock-step) as a release step |
 
-### Required tokens for the landing dispatch chain
+### Required tokens
 
-- `clawket/clawket` secret `CLAWKET_RELEASE_PAT` — used by `release.yml` to call `repos/clawket/landing/dispatches`. This is a cross-repo write (firing `repository_dispatch` on a different repository) which the built-in `GITHUB_TOKEN` cannot authorize, so it requires a PAT. Required scopes: `repository_dispatch:write` (or fine-grained `contents:write`) on `clawket/landing`, in addition to the existing `clawket/clawket` scopes. If a dispatch step logs a permission error, the daily 06:00 UTC sweep on the consumer side still catches up — no plugin release is blocked.
-- Consumer side (`clawket/landing` `auto-update.yml`) — **uses the workflow's default `GITHUB_TOKEN`**. The workflow does only same-repo writes (checkout, push branch, open PR) and public-repo reads (release metadata on `clawket/clawket`, `clawket/cli`, `clawket/daemon`). The job-level `permissions: { contents: write, pull-requests: write }` block grants the necessary scopes. No PAT is required on consumer repos.
+- `clawket/clawket` secret `CLAWKET_RELEASE_PAT` — fine-grained PAT used by `release.yml` for the checkout, tag push, and GitHub Release creation. Required scopes: `contents: write` + `pull_requests: write` on `clawket/clawket`.
+- `clawket/landing` needs **no release token**. The hero label is bumped as a manual step (`bash scripts/update-version-label.sh <tag>` → PR), so there is no cross-repo dispatch and nothing to authorize.
 
 `CLAWKET_CLI_VERSION` lives only as an env-var fallback inside `claude-hooks.cjs` for local dev; in normal flow `components.json` is the single pinning source.
 
