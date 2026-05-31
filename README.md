@@ -50,11 +50,11 @@ A literal projection of [`hooks/hooks.json`](hooks/hooks.json) — 6 event types
 |---|---|---|---|
 | **SessionStart** | `startup\|clear\|compact` | `session-start.cjs` | Ensures the daemon is running, injects the project dashboard + rules, and runs the install gate. |
 | **UserPromptSubmit** | (all) | `user-prompt-submit.cjs` | Injects active-task context, warns when no active task is set. |
-| **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | Blocks mutating tools unless an active task exists; runs PDD anti-pattern checks (X3/X7/X8/X9). |
-| **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | Records file modifications to the active task; runs the X3 scenario-id check. |
+| **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | Blocks mutating tools unless an active task exists; runs anti-pattern checks (scenario link, agent batch size, evidence on completion, sync-layer purity). |
+| **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | Records file modifications to the active task; runs the scenario-id check. |
 | **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Prompts the agent to register the Plan Mode output as a Clawket plan. Routed via the `ExitPlanMode` tool matcher because Claude Code classifies plan-mode exit as a tool invocation, not a standalone hook event. |
-| **SubagentStart** | (all) | `subagent-start.cjs` | Binds the spawned sub-agent to its assigned task; runs X3/X7/X9 checks. |
-| **SubagentStop** | (all) | `subagent-stop.cjs` | Appends the result summary, runs the X8 evidence check, and auto-completes the task on success. |
+| **SubagentStart** | (all) | `subagent-start.cjs` | Binds the spawned sub-agent to its assigned task; runs the scenario-id, batch-size, and sync-purity checks. |
+| **SubagentStop** | (all) | `subagent-stop.cjs` | Appends the result summary, runs the evidence check, and auto-completes the task on success. |
 
 When a task transitions to `done`/`cancelled`, the daemon auto-cascades completion to Unit, Plan, and Cycle if all their children are terminal — no separate hook is required.
 
@@ -384,7 +384,7 @@ In `clawket doctor`, confirm that:
 - `[MCP] clawket mcp launcher: ~/.local/bin/clawket`
 - `[Plugin install] binary_version: <your dev version>`
 
-The override does not touch user data — `~/.local/share/clawket/`, `~/.cache/clawket/`, etc. stay shared between dev and marketplace binaries, so plans/tasks/SQLite carry over both ways. The `LM-8` path-separation invariant continues to hold.
+The override does not touch user data — `~/.local/share/clawket/`, `~/.cache/clawket/`, etc. stay shared between dev and marketplace binaries, so plans/tasks/SQLite carry over both ways. The path-separation invariant continues to hold.
 
 Restore the marketplace binary when finished testing:
 
@@ -409,16 +409,17 @@ Full details: [PRIVACY.md](PRIVACY.md).
 
 ## Telemetry
 
-Clawket records **no remote telemetry**. The only observability data it writes is the local activity log, stored in the SQLite database under the `activity_log` table. This table captures:
+Clawket records **no remote telemetry**. The only observability data it writes is the local audit trail, stored in the SQLite database under the `audit_log` table. This table captures:
 
 | Field | Description |
 |-------|-------------|
-| `event_type` | Action taken (e.g. `task.start`, `file.edit`, `hook.pre_tool_use`) |
-| `entity_id` | ID of the affected entity (task, knowledge, plan, etc.) |
-| `actor` | `"agent"` or `"user"` |
-| `session_id` | Local session identifier |
-| `ts` | Timestamp (UTC) |
-| `detail` | Optional JSON payload (e.g. file path, old/new status) |
+| `entity_type` | Kind of entity affected (`task` / `unit` / `cycle` / `plan` / `project`) |
+| `entity_id` | ID of the affected entity |
+| `op_type` | Operation (`status_change` / `created` / `updated` / `deleted` / `approved` / `activated` / `completed` / `POLICY_VIOLATION`) |
+| `field`, `old_value`, `new_value` | What changed, for field/status mutations |
+| `actor` | Who performed it (`claude` / `cli` / `external-api` / `system`) |
+| `at` | ISO 8601 UTC timestamp |
+| `prev_hash` | FNV-1a hash of the previous row — makes the trail tamper-evident |
 
 To inspect activity:
 
@@ -428,7 +429,7 @@ clawket watch --task TASK-xxx       # filter by task
 clawket replay TASK-xxx             # replay the run history of a task
 ```
 
-For raw historical rows, query `activity_log` in the SQLite DB directly (`sqlite3 ~/.local/share/clawket/db.sqlite`). Nothing in this log is ever transmitted outside your machine.
+For raw historical rows, query `audit_log` in the SQLite DB directly (`sqlite3 ~/.local/share/clawket/db.sqlite`). Nothing in this log is ever transmitted outside your machine.
 
 ## Contributing
 

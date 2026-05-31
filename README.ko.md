@@ -50,11 +50,11 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 |---|---|---|---|
 | **SessionStart** | `startup\|clear\|compact` | `session-start.cjs` | 데몬 기동 보장, 대시보드 + 규칙 주입, install gate 실행. |
 | **UserPromptSubmit** | (all) | `user-prompt-submit.cjs` | 활성 태스크 컨텍스트 주입, 활성 태스크 없으면 경고. |
-| **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | 활성 태스크 없으면 변경 작업 차단. PDD anti-pattern 검사 (X3/X7/X8/X9). |
-| **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | 파일 변경을 활성 태스크에 기록. X3 scenario-id 검사. |
+| **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | 활성 태스크 없으면 변경 작업 차단. anti-pattern 검사 (시나리오 연결, 서브에이전트 배치 크기, 완료 시 evidence, sync 계층 순수성). |
+| **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | 파일 변경을 활성 태스크에 기록. scenario-id 검사. |
 | **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Plan Mode 결과물을 Clawket plan 으로 등록하도록 안내. Claude Code 가 plan-mode 종료를 hook event 가 아닌 tool 호출로 분류하므로 `ExitPlanMode` tool matcher 로 라우팅. |
-| **SubagentStart** | (all) | `subagent-start.cjs` | 서브에이전트를 배정된 태스크에 바인딩. X3/X7/X9 검사. |
-| **SubagentStop** | (all) | `subagent-stop.cjs` | 결과 요약 첨부, X8 evidence 검사, 성공 시 태스크 자동 완료. |
+| **SubagentStart** | (all) | `subagent-start.cjs` | 서브에이전트를 배정된 태스크에 바인딩. scenario-id, 배치 크기, sync 순수성 검사. |
+| **SubagentStop** | (all) | `subagent-stop.cjs` | 결과 요약 첨부, evidence 검사, 성공 시 태스크 자동 완료. |
 
 태스크가 `done`/`cancelled` 로 전환되면 데몬이 Unit/Plan/Cycle 완료를 자동 cascade 한다 — 별도 훅이 필요하지 않다.
 
@@ -383,7 +383,7 @@ clawket doctor         # dev 바이너리로 해석되는지 확인
 - `[MCP] clawket mcp launcher: ~/.local/bin/clawket`
 - `[Plugin install] binary_version: <dev 빌드 버전>`
 
-이 오버라이드는 사용자 데이터를 건드리지 않습니다 — `~/.local/share/clawket/`, `~/.cache/clawket/` 등 XDG 경로는 dev / 마켓플레이스 바이너리 사이에서 그대로 공유되므로 플랜·태스크·SQLite 가 양방향으로 이어집니다. `LM-8` 경로 분리 invariant 도 그대로 유지됩니다.
+이 오버라이드는 사용자 데이터를 건드리지 않습니다 — `~/.local/share/clawket/`, `~/.cache/clawket/` 등 XDG 경로는 dev / 마켓플레이스 바이너리 사이에서 그대로 공유되므로 플랜·태스크·SQLite 가 양방향으로 이어집니다. 경로 분리 invariant 도 그대로 유지됩니다.
 
 테스트 종료 후 마켓플레이스 바이너리로 원복:
 
@@ -408,16 +408,17 @@ clawket --version      # 배포 버전으로 복귀
 
 ## 텔레메트리
 
-Clawket은 **원격 텔레메트리를 수집하지 않습니다**. 유일한 옵저버빌리티 데이터는 SQLite 데이터베이스의 `activity_log` 테이블에 기록되는 로컬 활동 로그입니다. 이 테이블에는 다음 정보가 담깁니다:
+Clawket은 **원격 텔레메트리를 수집하지 않습니다**. 유일한 옵저버빌리티 데이터는 SQLite 데이터베이스의 `audit_log` 테이블에 기록되는 로컬 감사 추적입니다. 이 테이블에는 다음 정보가 담깁니다:
 
 | 필드 | 설명 |
 |------|------|
-| `event_type` | 수행된 액션 (예: `task.start`, `file.edit`, `hook.pre_tool_use`) |
-| `entity_id` | 영향받은 엔티티 ID (태스크, knowledge, 플랜 등) |
-| `actor` | `"agent"` 또는 `"user"` |
-| `session_id` | 로컬 세션 식별자 |
-| `ts` | 타임스탬프 (UTC) |
-| `detail` | 선택적 JSON 페이로드 (예: 파일 경로, 이전/이후 상태) |
+| `entity_type` | 영향받은 엔티티 종류 (`task` / `unit` / `cycle` / `plan` / `project`) |
+| `entity_id` | 영향받은 엔티티 ID |
+| `op_type` | 수행된 작업 (`status_change` / `created` / `updated` / `deleted` / `approved` / `activated` / `completed` / `POLICY_VIOLATION`) |
+| `field`, `old_value`, `new_value` | 필드/상태 변경 시 무엇이 어떻게 바뀌었는지 |
+| `actor` | 수행 주체 (`claude` / `cli` / `external-api` / `system`) |
+| `at` | ISO 8601 UTC 타임스탬프 |
+| `prev_hash` | 직전 행의 FNV-1a 해시 — 감사 추적을 변조 감지 가능하게 만든다 |
 
 활동 조회 방법:
 
@@ -427,7 +428,7 @@ clawket watch --task TASK-xxx       # 특정 태스크 필터
 clawket replay TASK-xxx             # 태스크 런 이력 리플레이
 ```
 
-원시 이력 행이 필요하면 SQLite DB 의 `activity_log` 테이블을 직접 쿼리한다 (`sqlite3 ~/.local/share/clawket/db.sqlite`). 이 로그의 어떤 내용도 사용자 머신 밖으로 전송되지 않습니다.
+원시 이력 행이 필요하면 SQLite DB 의 `audit_log` 테이블을 직접 쿼리한다 (`sqlite3 ~/.local/share/clawket/db.sqlite`). 이 로그의 어떤 내용도 사용자 머신 밖으로 전송되지 않습니다.
 
 ## 기여
 

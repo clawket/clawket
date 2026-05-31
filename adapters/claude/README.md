@@ -19,7 +19,7 @@ The shared helper enforces four PDD v3.0 anti-patterns at the corresponding Clau
 | X3 — `scenario_id` NULL/format violation | `PreToolUse` (Bash `clawket task ...`), `PostToolUse` (Edit/Write), `SubagentStart` | `checkX3ScenarioId` | `CLAWKET_ENFORCE_SCENARIO_ID=strict\|warn\|off` |
 | X7 — sub-agent reasoning batch size > 30 | `PreToolUse` (Agent/TeamCreate/SendMessage), `SubagentStart` | `checkX7BatchSize` | `CLAWKET_ENFORCE_BATCH=strict\|warn\|off` |
 | X8 — `evidence` NULL on status transition | `PreToolUse` (`clawket task update`), `SubagentStop` | `checkX8Evidence` | `CLAWKET_ENFORCE_EVIDENCE=strict\|warn\|off` |
-| X9 — sync-context Agent dispatch (reasoning inside bulk sync) | `PreToolUse` (Bash + Agent dispatch), `SubagentStart` | `checkX9SyncReasoning` | `CLAWKET_ENFORCE_X9=strict\|warn\|off` |
+| X9 — sync-context Agent dispatch (reasoning inside bulk sync) | `PreToolUse` (Bash + Agent dispatch), `SubagentStart` | `checkX9SyncReasoning` | `CLAWKET_ENFORCE_SYNC_PURITY=strict\|warn\|off` |
 
 Global bypass: `CLAWKET_BYPASS_HOOKS=1` skips all four checks. The bypass is intentionally unauthenticated (no UID/root gate) — this is a developer-loop escape valve and must not be used to circumvent enforcement in routine work. Audit logs still record the bypass attempt at the hook entry point.
 

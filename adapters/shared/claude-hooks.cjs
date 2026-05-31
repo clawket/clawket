@@ -1399,7 +1399,7 @@ function checkX3ScenarioId({ task, scenarioId, context } = {}) {
     const validFormat = /^US-[A-Z0-9][A-Z0-9_-]*-\d+$/i.test(sid);
     if (!validFormat) {
       const reason =
-        `[Clawket X3] scenario_id format violation: "${sid}" does not match US-<DOMAIN>-<NNN>.\n` +
+        `[Clawket] scenario_id format violation: "${sid}" does not match US-<DOMAIN>-<NNN>.\n` +
         `Fix: clawket task update <id> --scenario-id "US-<DOMAIN>-NNN"`;
       process.stderr.write(reason + '\n');
       appendHookLog({ anti_pattern: 'X3', context, mode, scenario_id: sid, violation: 'bad_format' });
@@ -1414,8 +1414,8 @@ function checkX3ScenarioId({ task, scenarioId, context } = {}) {
   const taskId = task ? (task.ticket_number || task.id || '?') : '?';
   const taskTitle = task ? (task.title || '') : '';
   const reason =
-    `[Clawket X3] scenario_id is NULL for task ${taskId}${taskTitle ? ` — ${taskTitle}` : ''}. ` +
-    `PDD T7 anti-pattern: every task must map to exactly 1 scenario (US-<DOMAIN>-<NNN>).\n` +
+    `[Clawket] scenario_id is NULL for task ${taskId}${taskTitle ? ` — ${taskTitle}` : ''}. ` +
+    `Every task must map to exactly 1 scenario (US-<DOMAIN>-<NNN>).\n` +
     `Fix: clawket task update <id> --scenario-id "US-<DOMAIN>-NNN"`;
   process.stderr.write(reason + '\n');
   appendHookLog({ anti_pattern: 'X3', context, mode, task_id: taskId, violation: 'null_scenario_id' });
@@ -1481,8 +1481,8 @@ function checkX7BatchSize(prompt, opts = {}) {
   }
   const batchIdSuffix = opts && opts.batchId ? ` [batch_id=${opts.batchId}]` : '';
   const reason =
-    `[Clawket X7] Sub-agent batch size ${count} (limit 30) exceeds PDD A8 ceiling.${batchIdSuffix} ` +
-    `PDD A8 anti-pattern: batch > 30 risks attention degradation.\n` +
+    `[Clawket] Sub-agent batch size ${count} (limit 30) exceeds the batch ceiling.${batchIdSuffix} ` +
+    `A batch larger than 30 risks attention degradation.\n` +
     `Fix: split into multiple sub-agent dispatches of ≤ 30 scenarios each.\n` +
     `split:\n${splitLines.join('\n')}`;
   process.stderr.write(reason + '\n');
@@ -1534,7 +1534,7 @@ function checkX8Evidence({ task, newStatus } = {}) {
     const byteLen = Buffer.byteLength(evStr, 'utf8');
     if (byteLen > 4096) {
       const reason =
-        `[Clawket X8] evidence field exceeds 4 KiB (${byteLen} bytes). ` +
+        `[Clawket] evidence field exceeds 4 KiB (${byteLen} bytes). ` +
         `Truncate to a concise file:line reference or reasoning summary.`;
       process.stderr.write(reason + '\n');
       appendHookLog({ anti_pattern: 'X8', mode, violation: 'evidence_too_large', bytes: byteLen });
@@ -1549,9 +1549,9 @@ function checkX8Evidence({ task, newStatus } = {}) {
     const isFileLineRef = /\S+:\d+/.test(evStr);
     if (evStr.trim().length < MIN_EVIDENCE_CHARS && !isFileLineRef) {
       const reason =
-        `[Clawket X8] evidence is too short (${evStr.trim().length} chars, need >= ${MIN_EVIDENCE_CHARS} or file:line ref). ` +
-        `PDD T8 anti-pattern: trivial placeholders defeat audit trail.\n` +
-        `X8 fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars)`;
+        `[Clawket] evidence is too short (${evStr.trim().length} chars, need >= ${MIN_EVIDENCE_CHARS} or file:line ref). ` +
+        `Trivial placeholders defeat the audit trail.\n` +
+        `Fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars)`;
       process.stderr.write(reason + '\n');
       appendHookLog({ anti_pattern: 'X8', mode, violation: 'evidence_too_short', chars: evStr.trim().length });
       if (mode === 'strict') return { blocked: true, reason };
@@ -1569,9 +1569,9 @@ function checkX8Evidence({ task, newStatus } = {}) {
   let reason;
   if (isHardStatus || newStatus === 'defect' || newStatus === 'scenario_error' || isCancelled) {
     reason =
-      `[Clawket X8] evidence is NULL for task ${taskId} transitioning to status="${newStatus}". ` +
-      `PDD T8 anti-pattern: all status transitions require evidence (file:line or reasoning summary).\n` +
-      `X8 fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars)`;
+      `[Clawket] evidence is NULL for task ${taskId} transitioning to status="${newStatus}". ` +
+      `All status transitions require evidence (file:line or reasoning summary).\n` +
+      `Fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars)`;
     process.stderr.write(reason + '\n');
     appendHookLog({ anti_pattern: 'X8', mode, task_id: taskId, new_status: newStatus, violation: 'null_evidence' });
     if (mode === 'strict') return { blocked: true, reason };  // HOOK-024
@@ -1583,8 +1583,8 @@ function checkX8Evidence({ task, newStatus } = {}) {
   // hard-fail for blocked"); R2 QA flagged this as defect.
   if (isWarnStatus) {
     reason =
-      `[Clawket X8] evidence is NULL for task ${taskId} transitioning to status="${newStatus}". ` +
-      `X8 fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars) — evidence required for blocked.`;
+      `[Clawket] evidence is NULL for task ${taskId} transitioning to status="${newStatus}". ` +
+      `Fix: use --evidence with file:line or summary (>=${MIN_EVIDENCE_CHARS} chars) — evidence required for blocked.`;
     process.stderr.write(reason + '\n');
     appendHookLog({ anti_pattern: 'X8', mode, task_id: taskId, new_status: newStatus, violation: 'null_evidence_blocked' });
     if (mode === 'strict') return { blocked: true, reason };
@@ -1666,9 +1666,9 @@ function checkX9SyncReasoning(cmd, opts = {}) {
   // while sync is in flight is itself the X9 layering violation.
   if (syncContext && looksLikeAgentInvocation) {
     const reason =
-      `[Clawket X9] Agent dispatch inside active sync context (${syncContext}, sync started at ${syncEntryTimestamp}). ` +
-      `PDD A8: sync layer must not invoke reasoning agents. ` +
-      `X9 fix: complete bulk sync first, then dispatch new agent.`;
+      `[Clawket] Agent dispatch inside active sync context (${syncContext}, sync started at ${syncEntryTimestamp}). ` +
+      `The sync layer must not invoke reasoning agents. ` +
+      `Fix: complete bulk sync first, then dispatch new agent.`;
     process.stderr.write(reason + '\n');
     appendHookLog({ anti_pattern: 'X9', sync_context: syncContext, sync_entry_at: syncEntryTimestamp, violation: 'agent_in_sync' });
     if (mode === 'strict') return { blocked: true, reason };
@@ -1677,11 +1677,11 @@ function checkX9SyncReasoning(cmd, opts = {}) {
 
   if (looksLikeSync && containsReasoning) {
     const reason =
-      `[Clawket X9] Bulk-sync script appears to embed reasoning decisions ` +
+      `[Clawket] Bulk-sync script appears to embed reasoning decisions ` +
       `(sync started at ${syncEntryTimestamp}). ` +
-      `PDD A8: sync code must only transcribe TSV→DB (status mapping). ` +
+      `The sync layer must only transcribe TSV→DB (status mapping). ` +
       `Reasoning must happen in sub-agent dispatch step, not in the sync driver.\n` +
-      `X9 fix: complete bulk sync first, then dispatch new agent.\n` +
+      `Fix: complete bulk sync first, then dispatch new agent.\n` +
       `Fix: move all status-decision logic to sub-agent TSV emit; sync only reads TSV.status.`;
     process.stderr.write(reason + '\n');
     appendHookLog({ anti_pattern: 'X9', cmd: cmd.slice(0, 200), sync_entry_at: syncEntryTimestamp, violation: 'reasoning_in_sync' });
@@ -1693,9 +1693,9 @@ function checkX9SyncReasoning(cmd, opts = {}) {
   // HOOK-040: explicit sync context with reasoning
   if (syncContext && containsReasoning) {
     const reason =
-      `[Clawket X9] CLAWKET_SYNC_CONTEXT is set (${syncContext}, sync started at ${syncEntryTimestamp}) ` +
+      `[Clawket] CLAWKET_SYNC_CONTEXT is set (${syncContext}, sync started at ${syncEntryTimestamp}) ` +
       `but command contains reasoning keywords. Sync context must not contain reasoning.\n` +
-      `X9 fix: complete bulk sync first, then dispatch new agent.`;
+      `Fix: complete bulk sync first, then dispatch new agent.`;
     process.stderr.write(reason + '\n');
     appendHookLog({ anti_pattern: 'X9', sync_context: syncContext, sync_entry_at: syncEntryTimestamp, violation: 'reasoning_in_sync_context' });
     if (mode === 'strict') return { blocked: true, reason };
@@ -1950,7 +1950,7 @@ function runPreToolUse() {
         if (file) {
           let promptText = '';
           try { promptText = fs.readFileSync(file, 'utf8'); } catch (e) {
-            const reason = `[Clawket X7] batch validate: cannot read prompt file "${file}" (${e.message}).`;
+            const reason = `[Clawket] batch validate: cannot read prompt file "${file}" (${e.message}).`;
             process.stderr.write(reason + '\n');
             console.log(JSON.stringify({
               hookSpecificOutput: {
@@ -1972,7 +1972,7 @@ function runPreToolUse() {
             }));
             process.exit(1);
           }
-          process.stderr.write(`[Clawket X7] batch validate ${file}: ${x7File.count}/30 scenarios — pass\n`);
+          process.stderr.write(`[Clawket] batch validate ${file}: ${x7File.count}/30 scenarios — pass\n`);
         }
       }
     }
