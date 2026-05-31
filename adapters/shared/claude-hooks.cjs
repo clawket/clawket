@@ -1601,8 +1601,10 @@ function checkX8Evidence({ task, newStatus } = {}) {
  * that contain reasoning-related keywords alongside DB update patterns.
  * Checked on Bash tool calls.
  *
- * mode env: CLAWKET_SYNC_CONTEXT sets known-sync context (e.g. "bulk-sync")
- *   Without it, heuristic is purely text-based.
+ * mode env: CLAWKET_SYNC_CONTEXT marks an active bulk-sync block (e.g.
+ *   "bulk-sync"), set by the sync driver itself. Enforcement requires this
+ *   marker: without it the command surface is not scanned at all, so ordinary
+ *   multi-update scripts and unrelated commands never false-positive (#52).
  *
  * @param {string} cmd — bash command string
  * @returns {{ blocked: boolean, reason: string }}
@@ -1652,11 +1654,13 @@ function checkX9SyncReasoning(cmd, opts = {}) {
     /\b(?:Agent|TeamCreate|SendMessage)\s*\(/i.test(cmd) ||
     /\bsubagent\b/i.test(cmd);
 
-  const isPythonExec = /\bpython3?\s+\S+\.py\b/.test(cmd) || /\bpython3?\s+-c\b/.test(cmd);
-  // HOOK-031/035 (v3.0): widened gate. We still skip when there is no Python
-  // exec, no sync context, and no agent-in-sync signal — pure shell/grep
-  // commands stay false-positive-free.
-  if (!isPythonExec && !syncContext && !looksLikeAgentInvocation) return { blocked: false, reason: '' };
+  // #52: X9 only enforces inside an explicitly-marked bulk-sync block. Without
+  // the CLAWKET_SYNC_CONTEXT marker we never scan the command surface, so an
+  // ordinary script running many `clawket task update`s plus a human-readable
+  // summary — or any unrelated command (even a `gh issue create` body) that
+  // merely mentions "task update" / "TSV" / a reasoning word — cannot trip X9.
+  // Every violation branch below sits inside an active sync context by construction.
+  if (!syncContext) return { blocked: false, reason: '' };
 
   const looksLikeSync = syncPatterns.test(cmd);
   const containsReasoning = reasoningWords.test(cmd) || statusBranch.test(cmd);
@@ -1664,7 +1668,7 @@ function checkX9SyncReasoning(cmd, opts = {}) {
   // HOOK-031/035: Agent invocation inside an active sync context. Block in
   // strict regardless of reasoning keywords because dispatching a new agent
   // while sync is in flight is itself the X9 layering violation.
-  if (syncContext && looksLikeAgentInvocation) {
+  if (looksLikeAgentInvocation) {
     const reason =
       `[Clawket] Agent dispatch inside active sync context (${syncContext}, sync started at ${syncEntryTimestamp}). ` +
       `The sync layer must not invoke reasoning agents. ` +
@@ -1690,8 +1694,9 @@ function checkX9SyncReasoning(cmd, opts = {}) {
     return { blocked: false, reason };
   }
 
-  // HOOK-040: explicit sync context with reasoning
-  if (syncContext && containsReasoning) {
+  // HOOK-040: explicit sync context with reasoning (no recognizable sync driver
+  // shape, but reasoning keywords inside the marked sync block).
+  if (containsReasoning) {
     const reason =
       `[Clawket] CLAWKET_SYNC_CONTEXT is set (${syncContext}, sync started at ${syncEntryTimestamp}) ` +
       `but command contains reasoning keywords. Sync context must not contain reasoning.\n` +
