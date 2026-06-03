@@ -26,46 +26,46 @@ test('allowed keys whitelist matches manifest', () => {
 });
 
 test('accepts the canonical compat object', () => {
-  assert.deepEqual(validate({ compat: goodCompat }), []);
+  assert.deepEqual(validate(goodCompat), []);
 });
 
 test('rejects missing compat', () => {
-  const errs = validate({});
+  const errs = validate(undefined);
   assert.equal(errs.length, 1);
-  assert.match(errs[0], /missing/);
+  assert.match(errs[0], /compat\.json is missing or empty/);
 });
 
 test('rejects non-object compat', () => {
-  assert.equal(validate({ compat: 'string' }).length, 1);
-  assert.equal(validate({ compat: ['array'] }).length, 1);
-  assert.equal(validate({ compat: null }).length, 1);
+  assert.equal(validate('string').length, 1);
+  assert.equal(validate(['array']).length, 1);
+  assert.equal(validate(null).length, 1);
 });
 
 test('rejects unknown key', () => {
   const compat = { ...goodCompat, '@clawket/typo': '>=0.1.0' };
-  const errs = validate({ compat });
+  const errs = validate(compat);
   assert.ok(errs.some((e) => /unknown compat key/.test(e)));
 });
 
 test('rejects missing required key', () => {
   const { '@clawket/desktop': _drop, ...partial } = goodCompat;
-  const errs = validate({ compat: partial });
+  const errs = validate(partial);
   assert.ok(errs.some((e) => /missing compat key: @clawket\/desktop/.test(e)));
 });
 
 test('rejects non-string range', () => {
-  const errs = validate({ compat: { ...goodCompat, '@clawket/cli': 123 } });
+  const errs = validate({ ...goodCompat, '@clawket/cli': 123 });
   assert.ok(errs.some((e) => /must be a string/.test(e)));
 });
 
 test('rejects empty range', () => {
-  const errs = validate({ compat: { ...goodCompat, '@clawket/cli': '   ' } });
+  const errs = validate({ ...goodCompat, '@clawket/cli': '   ' });
   assert.ok(errs.some((e) => /is empty/.test(e)));
 });
 
 test('rejects garbage range', () => {
   for (const bad of ['bogus', '~1.0.0', '^1.0.0', '>=1', '>=1.0', 'latest', '1.0.0-beta']) {
-    const errs = validate({ compat: { ...goodCompat, '@clawket/cli': bad } });
+    const errs = validate({ ...goodCompat, '@clawket/cli': bad });
     assert.ok(
       errs.some((e) => /not a valid SemVer range/.test(e)),
       `expected ${JSON.stringify(bad)} to be rejected`
@@ -83,7 +83,7 @@ test('accepts valid range shapes used in the project', () => {
     '=1.2.3',
     '1.2.3',
   ]) {
-    const errs = validate({ compat: { ...goodCompat, '@clawket/cli': ok } });
+    const errs = validate({ ...goodCompat, '@clawket/cli': ok });
     assert.deepEqual(
       errs,
       [],
@@ -105,11 +105,11 @@ test('satisfies: comparator semantics', () => {
 });
 
 test('accepts canonical components + compat together', () => {
-  assert.deepEqual(validate({ compat: goodCompat }, goodComponents), []);
+  assert.deepEqual(validate(goodCompat, goodComponents), []);
 });
 
 test('rejects pin out of range', () => {
-  const errs = validate({ compat: goodCompat }, { ...goodComponents, cli: 'v1.0.0' });
+  const errs = validate(goodCompat, { ...goodComponents, cli: 'v1.0.0' });
   assert.ok(
     errs.some((e) => /does not satisfy/.test(e) && /cli/.test(e)),
     `expected drift error, got: ${JSON.stringify(errs)}`
@@ -117,45 +117,45 @@ test('rejects pin out of range', () => {
 });
 
 test('rejects pin below lower bound', () => {
-  const errs = validate({ compat: goodCompat }, { ...goodComponents, daemon: 'v0.1.0' });
+  const errs = validate(goodCompat, { ...goodComponents, daemon: 'v0.1.0' });
   assert.ok(errs.some((e) => /does not satisfy/.test(e) && /daemon/.test(e)));
 });
 
 test('null desktop pin is skipped (sentinel)', () => {
-  assert.deepEqual(validate({ compat: goodCompat }, goodComponents), []);
+  assert.deepEqual(validate(goodCompat, goodComponents), []);
   assert.deepEqual(
-    validate({ compat: goodCompat }, { ...goodComponents, desktop: null }),
+    validate(goodCompat, { ...goodComponents, desktop: null }),
     []
   );
 });
 
 test('rejects garbage pin format', () => {
-  const errs = validate({ compat: goodCompat }, { ...goodComponents, web: 'latest' });
+  const errs = validate(goodCompat, { ...goodComponents, web: 'latest' });
   assert.ok(errs.some((e) => /not a SemVer triple/.test(e)));
 });
 
 test('rejects non-string pin', () => {
-  const errs = validate({ compat: goodCompat }, { ...goodComponents, cli: 123 });
+  const errs = validate(goodCompat, { ...goodComponents, cli: 123 });
   assert.ok(errs.some((e) => /must be a string or null/.test(e)));
 });
 
 test('rejects missing components key', () => {
   const { web: _drop, ...partial } = goodComponents;
-  const errs = validate({ compat: goodCompat }, partial);
+  const errs = validate(goodCompat, partial);
   assert.ok(errs.some((e) => /components.json is missing key: web/.test(e)));
 });
 
 test('rejects non-object components', () => {
   assert.ok(
-    validate({ compat: goodCompat }, 'string').some((e) => /must be a plain object/.test(e))
+    validate(goodCompat, 'string').some((e) => /must be a plain object/.test(e))
   );
   assert.ok(
-    validate({ compat: goodCompat }, ['arr']).some((e) => /must be a plain object/.test(e))
+    validate(goodCompat, ['arr']).some((e) => /must be a plain object/.test(e))
   );
 });
 
 test('skips consistency check when components is undefined', () => {
-  assert.deepEqual(validate({ compat: goodCompat }), []);
-  assert.deepEqual(validate({ compat: goodCompat }, undefined), []);
-  assert.deepEqual(validate({ compat: goodCompat }, null), []);
+  assert.deepEqual(validate(goodCompat), []);
+  assert.deepEqual(validate(goodCompat, undefined), []);
+  assert.deepEqual(validate(goodCompat, null), []);
 });

@@ -1,7 +1,7 @@
 # Clawket Compatibility Matrix
 
 The plugin shell (`clawket/clawket`) declares permitted version ranges for each independent
-component in `package.json` (`compat` for external binaries and non-npm assets) and pins the
+component in `compat.json` (for external binaries and non-npm assets) and pins the
 exact binary version per release in `components.json`. Bumping the plugin requires recording
 the tested combination here.
 
@@ -9,10 +9,10 @@ the tested combination here.
 
 | Component | Repo | Distribution | Declared in plugin |
 |---|---|---|---|
-| `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust; `clawket` + embedded `clawket mcp`) | `compat` + `components.json.cli` |
-| `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat` + `components.json.daemon` |
-| `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat` + `components.json.web` |
-| `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat` + `components.json.desktop` (`null` until first release) |
+| `@clawket/cli` | `clawket/cli` | GitHub Releases binary (Rust; `clawket` + embedded `clawket mcp`) | `compat.json.cli` + `components.json.cli` |
+| `@clawket/daemon` | `clawket/daemon` | GitHub Releases binary (Rust, axum + rusqlite) | `compat.json.daemon` + `components.json.daemon` |
+| `@clawket/web` | `clawket/web` | GitHub Releases tarball (static SPA bundle) | `compat.json.web` + `components.json.web` |
+| `@clawket/desktop` | `clawket/desktop` | GitHub Releases installer (Tauri 2: `.dmg` / `.msi` / `.AppImage`) | `compat.json.desktop` + `components.json.desktop` (`null` until first release) |
 | `@clawket/landing` | `clawket/landing` | Vercel (Git integration) | n/a |
 | `@clawket/mcp` (legacy) | `clawket/mcp` | npm (Node stdio server) | **archived** — not installed since v2.3.2; replaced by `clawket mcp` subcommand |
 

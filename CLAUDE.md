@@ -18,7 +18,7 @@ gate 가 `components.json` 의 핀에 따라 GitHub Releases 에서 바이너리
 | 패키지 | `package.json` — `name: "clawket-plugin"`, scripts: `setup` / `dev:fresh-install` / `test` (플러그인 버전은 `package.json#version` 정본) |
 | 플러그인 ID | `clawket` (`.claude-plugin/plugin.json`); 버전은 `plugin.json#version` 정본 |
 | MCP 등록 | `.mcp.json` → stdio `clawket mcp` (CLI 바이너리에 내장된 rmcp 1.5 서버) |
-| Compat 범위 | 컴포넌트별 SemVer 범위 — 정본 `package.json#compat` (현재 cli/daemon `>=0.2.0 <1.0.0`, web `>=0.1.0 <2.0.0`, desktop `>=3.0.0 <4.0.0`) |
+| Compat 범위 | 컴포넌트별 SemVer 범위 — 정본 `compat.json` (현재 cli/daemon `>=0.2.0 <1.0.0`, web `>=0.1.0 <2.0.0`, desktop `>=3.0.0 <4.0.0`) |
 | 컴포넌트 핀 | `components.json` 이 정본 (정확한 cli/daemon/web 핀은 직접 참조). `desktop = null` sentinel — `clawket/desktop` 첫 릴리즈 전까지 no-op skip |
 | Clawket 프로젝트 | `PROJ-lattice-mono` (key `LM`) — wrapper 와 모든 sub-repo 공유 |
 

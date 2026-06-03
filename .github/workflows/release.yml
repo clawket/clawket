@@ -50,13 +50,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
       # Static guard for the two pinning surfaces read at the
-      # COMPATIBILITY.md row-generation step further down: package.json#compat
+      # COMPATIBILITY.md row-generation step further down: compat.json
       # (SemVer ranges) and components.json (exact pins). Failing here aborts
       # before any tag/commit/publish — catches a typoed key
       # (e.g. "@clawket/typo"), a non-SemVer range, AND a pin/range drift
       # where components.json has been bumped past the compat range without
       # the accompanying plugin major bump.
-      - name: Validate package.json#compat + components.json pins
+      - name: Validate compat.json + components.json pins
         run: node scripts/validate-compat.cjs
       - name: Determine next version
         id: bump
@@ -139,7 +139,7 @@ jobs:
           " "$NEXT"
 
           # Append COMPATIBILITY.md row, deriving every cell from
-          # components.json (exact pins) and package.json#compat
+          # components.json (exact pins) and compat.json
           # (SemVer ranges) — the two pinning surfaces that are the
           # actual source of truth. Copying the previous row was the
           # v3.0.4–v3.1.2 stale-row regression: the matrix drifted
@@ -149,7 +149,7 @@ jobs:
             const next = process.argv[1];
             const file = "docs/COMPATIBILITY.md";
             const components = JSON.parse(fs.readFileSync("components.json", "utf-8"));
-            const compat = JSON.parse(fs.readFileSync("package.json", "utf-8")).compat || {};
+            const compat = JSON.parse(fs.readFileSync("compat.json", "utf-8"));
             const pinCell = (key) => {
               const pin = components[key];
               const range = compat["@clawket/" + key] || "";

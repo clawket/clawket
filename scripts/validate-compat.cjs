@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// Validate package.json#compat AND components.json pin consistency: the two
+// Validate compat.json AND components.json pin consistency: the two
 // pinning surfaces that release.yml reads at the COMPATIBILITY.md row-generation
 // step (.github/workflows/release.yml). Failing here aborts the release before
 // any tag / commit / publish happens.
@@ -77,15 +77,14 @@ function satisfies(versionStr, range) {
   return clauses.some((c) => satisfiesClause(version, c));
 }
 
-function validate(pkg, components) {
+function validate(compat, components) {
   const errors = [];
-  const compat = pkg.compat;
   if (compat === undefined || compat === null) {
-    errors.push('package.json#compat is missing');
+    errors.push('compat.json is missing or empty');
     return errors;
   }
   if (typeof compat !== 'object' || Array.isArray(compat)) {
-    errors.push('package.json#compat must be a plain object');
+    errors.push('compat.json must be a plain object');
     return errors;
   }
 
@@ -149,7 +148,7 @@ function validate(pkg, components) {
       if (!satisfies(pin, range)) {
         errors.push(
           `components.json[${JSON.stringify(shortKey)}] = ${JSON.stringify(pin)} does not satisfy ` +
-            `package.json#compat[${JSON.stringify(key)}] = ${JSON.stringify(range)} ` +
+            `compat.json[${JSON.stringify(key)}] = ${JSON.stringify(range)} ` +
             `(pin/range drift — bump compat range or revert pin)`
         );
       }
@@ -160,18 +159,18 @@ function validate(pkg, components) {
 }
 
 function main() {
-  const pkgPath = process.argv[2]
+  const compatPath = process.argv[2]
     ? path.resolve(process.argv[2])
-    : path.resolve(__dirname, '..', 'package.json');
+    : path.resolve(__dirname, '..', 'compat.json');
   const componentsPath = process.argv[3]
     ? path.resolve(process.argv[3])
-    : path.resolve(path.dirname(pkgPath), 'components.json');
+    : path.resolve(path.dirname(compatPath), 'components.json');
 
-  let pkg;
+  let compat;
   try {
-    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    compat = JSON.parse(fs.readFileSync(compatPath, 'utf-8'));
   } catch (err) {
-    process.stderr.write(`validate-compat: cannot read ${pkgPath}: ${err.message}\n`);
+    process.stderr.write(`validate-compat: cannot read ${compatPath}: ${err.message}\n`);
     process.exit(2);
   }
 
@@ -189,13 +188,13 @@ function main() {
     }
   }
 
-  const errors = validate(pkg, components);
+  const errors = validate(compat, components);
   if (errors.length > 0) {
-    process.stderr.write(`validate-compat: ${errors.length} error(s) in ${pkgPath}\n`);
+    process.stderr.write(`validate-compat: ${errors.length} error(s) in ${compatPath}\n`);
     for (const e of errors) process.stderr.write(`  - ${e}\n`);
     process.exit(1);
   }
-  process.stdout.write(`validate-compat: ok (${pkgPath}${components ? ' + ' + componentsPath : ''})\n`);
+  process.stdout.write(`validate-compat: ok (${compatPath}${components ? ' + ' + componentsPath : ''})\n`);
 }
 
 if (require.main === module) {

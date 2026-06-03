@@ -126,7 +126,7 @@ The end-to-end loop a contributor follows when shipping a sub-repo (`cli` / `dae
 
 | Surface | What it pins | Editor |
 |---|---|---|
-| `package.json` `compat` | SemVer ranges per component | Bumped manually only when a component majors |
+| `compat.json` | SemVer ranges per component | Bumped manually only when a component majors |
 | `components.json` | Exact `vX.Y.Z` of each binary consumed at install | Bumped automatically by component-bump PRs |
 | `adapters/shared/claude-hooks.cjs` env vars (`CLAWKET_CLI_VERSION`, `CLAWKET_DAEMON_VERSION`) | Local-dev override only | Not edited — env-only |
 | `docs/COMPATIBILITY.md` matrix row | Tested combination per plugin release | Appended automatically by `release.yml` |
