@@ -4,7 +4,7 @@
   "gate.no_cycle": "Clawket PDD Gate 2: アクティブなサイクルがありません。\n`clawket cycle list` でサイクルの状態を確認し、\n`clawket cycle update <CYCLE-ID> --status active` でアクティブ化してください。\n新規サイクル: `clawket cycle create --unit <UNIT-ID> --title \"ラウンドN\" --plan <PLAN-ID>`",
   "gate.no_cycle_assignment": "Clawket PDD Gate: アクティブなタスクにサイクルが割り当てられていません。\n先にタスクをアクティブサイクルに割り当ててください: `clawket task update <TASK-ID> --cycle <CYCLE-ID>`.",
   "gate.all_blocked": "Clawket PDD Gate 3: すべてのアクティブタスクがブロックされています。\n依存タスクを先に完了するか、`clawket task update <ID> --status todo` でリセットしてください。",
-  "gate.no_agent_task": "Clawket: エージェント \"{name}\" に対するタスクがありません。`clawket task create --assignee {name}` で先に登録してください。",
+  "gate.no_agent_task": "Clawket: エージェント \"{name}\" に対するタスクがありません。`clawket task create \"<タイトル>\" --assignee {name} --cycle <CYCLE_ID>` で先に登録してください（アクティブな cycle は `clawket dashboard` で確認）。",
   "destructive.blocked": "Clawket: 危険パターンブロック [{id}] ({category})\n理由: {reason}\n解除: {remediation}",
   "plan_sync.registered": "# Clawket: プラン自動登録完了\n\nPlan ID: {planId}\nTitle: {title}{unitsNote}\n\nユニット登録後、`clawket cycle create --unit <UNIT-ID> --plan {planId}` でサイクルを開始してください。",
   "plan_sync.manual": "# Clawket: プランモード終了 — 手動登録が必要です\n{fileNote}\nClawketにこのプランを登録してください:\n1. `clawket plan create \"<title>\" --project <PROJ-ID>`\n2. `clawket unit create \"<title>\" --plan <PLAN-ID>` — ユニット登録\n3. `clawket cycle create --unit <UNIT-ID> --plan <PLAN-ID>` — サイクル開始\n4. `clawket task create \"<title>\" --cycle <CYCLE-ID> --unit <UNIT-ID>` — 最初のタスク",

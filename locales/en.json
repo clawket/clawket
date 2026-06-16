@@ -4,7 +4,7 @@
   "gate.no_cycle": "Clawket PDD Gate 2: No active Cycle.\nCheck cycle status with `clawket cycle list` and activate with `clawket cycle update <CYCLE-ID> --status active`.\nNew cycle: `clawket cycle create --unit <UNIT-ID> --title \"Round N\" --plan <PLAN-ID>`",
   "gate.no_cycle_assignment": "Clawket PDD Gate: Active task has no cycle assigned.\nAssign the task to an active cycle first: `clawket task update <TASK-ID> --cycle <CYCLE-ID>`.",
   "gate.all_blocked": "Clawket PDD Gate 3: All active tasks are blocked.\nUnblock a dependency or run `clawket task update <ID> --status todo` to reset.",
-  "gate.no_agent_task": "Clawket: No task assigned to agent \"{name}\". Register one with `clawket task create --assignee {name}`.",
+  "gate.no_agent_task": "Clawket: No task assigned to agent \"{name}\". Register one with `clawket task create \"<title>\" --assignee {name} --cycle <CYCLE_ID>` (find the active cycle with `clawket dashboard`).",
   "destructive.blocked": "Clawket: Destructive pattern blocked [{id}] ({category})\nReason: {reason}\nRemediation: {remediation}",
   "plan_sync.registered": "# Clawket: Plan registered automatically\n\nPlan ID: {planId}\nTitle: {title}{unitsNote}\n\nAfter registering units, run `clawket cycle create --unit <UNIT-ID> --plan {planId}` to start a Cycle.",
   "plan_sync.manual": "# Clawket: Plan Mode exited — manual registration required\n{fileNote}\nRegister this plan with Clawket:\n1. `clawket plan create \"<title>\" --project <PROJ-ID>`\n2. `clawket unit create \"<title>\" --plan <PLAN-ID>` — register each Unit\n3. `clawket cycle create --unit <UNIT-ID> --plan <PLAN-ID>` — start Cycle\n4. `clawket task create \"<title>\" --cycle <CYCLE-ID> --unit <UNIT-ID>` — first Task",

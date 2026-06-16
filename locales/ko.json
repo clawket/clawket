@@ -4,7 +4,7 @@
   "gate.no_cycle": "Clawket PDD Gate 2: 활성 Cycle이 없습니다.\n`clawket cycle list` 로 cycle 상태를 확인하고,\n`clawket cycle update <CYCLE-ID> --status active` 로 cycle을 활성화하세요.\n새 cycle: `clawket cycle create --unit <UNIT-ID> --title \"라운드 N\" --plan <PLAN-ID>`",
   "gate.no_cycle_assignment": "Clawket PDD Gate: 활성 태스크에 cycle이 배정되어 있지 않습니다.\n먼저 active cycle 에 태스크를 배정하세요: `clawket task update <TASK-ID> --cycle <CYCLE-ID>`.",
   "gate.all_blocked": "Clawket PDD Gate 3: 활성 태스크가 모두 blocked 상태입니다.\n의존 태스크를 먼저 완료하거나, `clawket task update <ID> --status todo` 로 되돌린 뒤 재시작하세요.",
-  "gate.no_agent_task": "Clawket: \"{name}\"에 대한 태스크가 없습니다. `clawket task create --assignee {name}`으로 먼저 등록하세요.",
+  "gate.no_agent_task": "Clawket: \"{name}\"에 대한 태스크가 없습니다. `clawket task create \"<제목>\" --assignee {name} --cycle <CYCLE_ID>`로 먼저 등록하세요 (활성 cycle 은 `clawket dashboard` 로 확인).",
   "destructive.blocked": "Clawket: 위험 패턴 차단 [{id}] ({category})\n사유: {reason}\n해제: {remediation}",
   "plan_sync.registered": "# Clawket: Plan 자동 등록 완료\n\nPlan ID: {planId}\nTitle: {title}{unitsNote}\n\nUnit 등록 후 `clawket cycle create --unit <UNIT-ID> --plan {planId}` 로 Cycle을 시작하세요.",
   "plan_sync.manual": "# Clawket: Plan Mode 종료 — 클라켓에 등록 필요\n{fileNote}\n이 플랜을 클라켓에 등록하세요:\n1. `clawket plan create \"<title>\" --project <PROJ-ID>` 로 plan 생성\n2. `clawket unit create \"<title>\" --plan <PLAN-ID>` — 각 Unit 등록\n3. `clawket cycle create --unit <UNIT-ID> --plan <PLAN-ID>` — Cycle 시작\n4. `clawket task create \"<title>\" --cycle <CYCLE-ID> --unit <UNIT-ID>` — 첫 Task 등록\n\n플랜 내용을 Read해서 직접 파악하고, clawket CLI로 등록하세요.",

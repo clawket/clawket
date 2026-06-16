@@ -2640,6 +2640,16 @@ function runSubagentStart() {
   const agentType = hookInput.agent_type || 'general-purpose';
   if (!agentId) process.exit(0);
 
+  // #56 part A: stand down on cwds clawket does not own. This hook previously
+  // had NO cwd-ownership gate, so its X7/X9 denials and task-binding fired even
+  // in projects owned by another work-management tool (e.g. SDI) or projects
+  // the user explicitly disabled. Mirror the UserPromptSubmit/PreToolUse gates
+  // (claude-hooks.cjs:1844, 2077-2080): a disabled project — or a cwd with no
+  // active clawket project (empty dashboard) — is a graceful no-op.
+  const cwd = hookInput.cwd || process.env.HOOK_CWD || process.cwd();
+  if (isProjectDisabled(clawket, cwd)) process.exit(0);
+  if (!exec(`${clawket} dashboard --cwd "${cwd}" --show active`)) process.exit(0);
+
   // HOOK-011~020: X7 — batch size check. Read scenario count from the agent's
   // prompt (hookInput.prompt or hookInput.tool_input.prompt). v3.0 default is
   // strict — block in strict mode (was warn-only in v2). batch_id is taken
