@@ -53,7 +53,7 @@ Clawket은 영구 DB, 로컬 벡터 RAG, MCP pull 인터페이스, 런타임 어
 | **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | 활성 태스크 없으면 변경 작업 차단. anti-pattern 검사 (시나리오 연결, 서브에이전트 배치 크기, 완료 시 evidence, sync 계층 순수성). |
 | **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | 파일 변경을 활성 태스크에 기록. scenario-id 검사. |
 | **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Plan Mode 결과물을 Clawket plan 으로 등록하도록 안내. Claude Code 가 plan-mode 종료를 hook event 가 아닌 tool 호출로 분류하므로 `ExitPlanMode` tool matcher 로 라우팅. |
-| **SubagentStart** | (all) | `subagent-start.cjs` | 서브에이전트를 배정된 태스크에 바인딩. scenario-id, 배치 크기, sync 순수성 검사. |
+| **SubagentStart** | (all) | `subagent-start.cjs` | 서브에이전트를 배정된 태스크에 바인딩 (비활성·미등록 프로젝트 디렉터리에서는 stand down — 다른 도구가 소유한 디렉터리에서는 발화하지 않음). scenario-id, 배치 크기, sync 순수성 검사. |
 | **SubagentStop** | (all) | `subagent-stop.cjs` | 결과 요약 첨부, evidence 검사, 성공 시 태스크 자동 완료. |
 
 태스크가 `done`/`cancelled` 로 전환되면 데몬이 Unit/Plan/Cycle 완료를 자동 cascade 한다 — 별도 훅이 필요하지 않다.
@@ -319,10 +319,10 @@ Clawket이 플랜의 source of truth입니다 — Claude의 Plan Mode 파일(`~/
 | **Project** | Clawket에 등록된 작업 디렉토리 |
 | **Plan** | 상위 의도 (로드맵). approve 후에만 task를 시작할 수 있음 |
 | **Unit** | 플랜 내 순수 그룹핑 엔티티 (상태 없음) |
-| **Task** | 원자적 작업 단위. 사이클 없이 생성 가능 (백로그로 이동) |
+| **Task** | 원자적 작업 단위. `clawket task create` 는 `--cycle` 필수 (API-TASK-001) — 생략 시 에러가 활성 사이클을 알려줌 |
 | **Cycle** | 스프린트 — 시간 제한 이터레이션. 활성 사이클에 배정돼야 시작 가능 |
 | **Knowledge** | 버전 관리되는 첨부 문서. 임베딩되어 하이브리드 검색에 사용되고 LLM에 노출됨 |
-| **Backlog** | 사이클 미배정 태스크. 드래그로 사이클에 배정 |
+| **Backlog** | 사이클 미배정 태스크 (예: 플랜 import). 사이클에 배정해 스케줄 |
 
 ### 상태 관리
 

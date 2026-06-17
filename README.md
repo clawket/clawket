@@ -53,7 +53,7 @@ A literal projection of [`hooks/hooks.json`](hooks/hooks.json) — 6 event types
 | **PreToolUse** | `Agent\|TeamCreate\|SendMessage\|Edit\|Write\|Bash` | `pre-tool-use.cjs` | Blocks mutating tools unless an active task exists; runs anti-pattern checks (scenario link, agent batch size, evidence on completion, sync-layer purity). |
 | **PostToolUse** | `Edit\|Write` | `post-tool-use.cjs` | Records file modifications to the active task; runs the scenario-id check. |
 | **PostToolUse** | `ExitPlanMode` | `plan-sync.cjs` | Prompts the agent to register the Plan Mode output as a Clawket plan. Routed via the `ExitPlanMode` tool matcher because Claude Code classifies plan-mode exit as a tool invocation, not a standalone hook event. |
-| **SubagentStart** | (all) | `subagent-start.cjs` | Binds the spawned sub-agent to its assigned task; runs the scenario-id, batch-size, and sync-purity checks. |
+| **SubagentStart** | (all) | `subagent-start.cjs` | Binds the spawned sub-agent to its assigned task (stands down in disabled or unregistered project directories, so it never fires in a directory another tool owns); runs the scenario-id, batch-size, and sync-purity checks. |
 | **SubagentStop** | (all) | `subagent-stop.cjs` | Appends the result summary, runs the evidence check, and auto-completes the task on success. |
 
 When a task transitions to `done`/`cancelled`, the daemon auto-cascades completion to Unit, Plan, and Cycle if all their children are terminal — no separate hook is required.
@@ -320,10 +320,10 @@ Open `http://localhost:19400` to see Board (current sprint), Backlog, Timeline (
 | **Project** | A working directory registered with Clawket |
 | **Plan** | High-level intent (roadmap). Must be approved before tasks can start |
 | **Unit** | Pure grouping entity (no status). Organizes tasks within a plan |
-| **Task** | Atomic task unit. Can be created without a cycle (goes to backlog) |
+| **Task** | Atomic task unit. `clawket task create` requires `--cycle` (API-TASK-001); when omitted the error names the active cycle to pass |
 | **Cycle** | Sprint — time-boxed iteration. Tasks must be assigned to an active cycle to start |
 | **Knowledge** | Attached document with versioning. Embedded for hybrid search and exposed to LLM. |
-| **Backlog** | Tasks without a cycle assignment. Drag to a cycle to schedule |
+| **Backlog** | Tasks not yet assigned to a cycle (e.g. from plan import). Assign to a cycle to schedule |
 
 ### State management
 
