@@ -2913,18 +2913,145 @@ function runTaskCompleted() {
   if (task) exec(`${clawket} task update "${task.id}" --status done --comment "자동 완료: 팀 에이전트 ${teammateName} 태스크 완료"`);
 }
 
+// ---------------------------------------------------------------------------
+// Stop-hook auto-advance (migration 027 / GET /continuation).
+//
+// Helpers below are pure / side-effect-scoped so they can be unit-tested in
+// isolation (see __test__ exports) without a live daemon.
+// ---------------------------------------------------------------------------
+
+/** Read the daemon TCP auth token (cacheDir/clawketd.token). Null when absent. */
+function getDaemonToken() {
+  try {
+    const tok = fs.readFileSync(path.join(cacheDir(), 'clawketd.token'), 'utf-8').trim();
+    return tok || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Marker file recording the last step id we injected for a session. */
+function continuationMarkerPath(sessionId) {
+  const safe = String(sessionId || 'unknown').replace(/[^A-Za-z0-9._-]/g, '_');
+  return path.join(cacheDir(), `continuation-${safe}.json`);
+}
+
+/**
+ * Sync GET /continuation?cwd=<cwd> via curl (the Stop hook runs synchronously
+ * under execSync, so async http isn't usable here — same constraint as
+ * validateStrictPlan). Returns the parsed JSON body, or null on any
+ * network/parse error (caller MUST treat null as "allow stop" — never block
+ * the agent because the daemon was unreachable).
+ */
+function fetchContinuation(cwd) {
+  let port;
+  try {
+    port = fs.readFileSync(path.join(cacheDir(), 'clawketd.port'), 'utf-8').trim();
+  } catch {
+    return null;
+  }
+  if (!port) return null;
+
+  const token = getDaemonToken();
+  const authHeader = token ? `-H 'X-Clawket-Token: ${token}'` : '';
+  const url = `http://127.0.0.1:${port}/continuation?cwd=${encodeURIComponent(cwd || '')}`;
+  const out = execDiag(
+    `curl -sS -w '\\n__HTTP__%{http_code}' ${authHeader} ${JSON.stringify(url)}`,
+    { timeout: 4000 }
+  );
+  if (!out.ok || !out.stdout) return null;
+  const splitIdx = out.stdout.lastIndexOf('\n__HTTP__');
+  if (splitIdx < 0) return null;
+  const body = out.stdout.slice(0, splitIdx);
+  const status = parseInt(out.stdout.slice(splitIdx + 9), 10);
+  if (!(status >= 200 && status < 300)) return null;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pure decision core for the Stop hook. Given the continuation response and the
+ * marker state, decide whether to block (inject) or allow the stop, and what
+ * the new marker should be. Side-effect free for testability.
+ *
+ * @param {object} input
+ * @param {object|null} input.continuation  parsed /continuation body, or null
+ * @param {string|null} input.lastStepId    step id injected on the prior turn
+ * @param {boolean} input.stopHookActive    Claude Code `stop_hook_active` flag
+ * @returns {{ block: boolean, reason?: string, marker: string|null }}
+ *   block=true  → emit {decision:"block", reason}; marker is the new step id.
+ *   block=false → allow stop; marker=null means clear the marker file.
+ */
+function decideContinuation({ continuation, lastStepId, stopHookActive }) {
+  // Daemon down / malformed / opt-out / plan complete → allow stop, clear marker.
+  if (!continuation || !continuation.next || !continuation.next.id) {
+    return { block: false, marker: null };
+  }
+  const next = continuation.next;
+  const instruction = continuation.instruction || `다음 작업을 진행하라: ${next.id}`;
+
+  // Progress guard: if the next actionable step is identical to what we already
+  // injected, the agent did not make progress on it — allow the stop to avoid an
+  // infinite re-injection loop. `stop_hook_active` (Claude is re-entering the
+  // Stop hook after a prior block) on the same step is the definitive signal.
+  if (lastStepId && next.id === lastStepId) {
+    return { block: false, marker: lastStepId };
+  }
+  if (stopHookActive && lastStepId && next.id === lastStepId) {
+    return { block: false, marker: lastStepId };
+  }
+
+  // First injection or a genuinely new step → block + inject.
+  return { block: true, reason: instruction, marker: next.id };
+}
+
 function runStop() {
   const pluginRoot = resolvePluginRoot(path.dirname(__filename));
   const { clawket } = runtime(pluginRoot);
-  const sessionId = process.env.CLAUDE_SESSION_ID || '';
-  if (!sessionId) process.exit(0);
 
+  const hookInput = readHookInput();
+  const sessionId = hookInput.session_id || process.env.CLAUDE_SESSION_ID || '';
+  const cwd = hookInput.cwd || process.env.HOOK_CWD || process.cwd();
+  const stopHookActive = hookInput.stop_hook_active === true;
+
+  // ---- 1. Preserve legacy run cleanup (auto-close open runs for the session).
+  if (sessionId) {
+    try {
+      const runs = JSON.parse(exec(`${clawket} run list --session-id "${sessionId}"`) || '[]');
+      for (const run of runs) {
+        if (!run.ended_at) exec(`${clawket} run finish "${run.id}" --result session_ended --notes "Auto-closed by Stop hook"`);
+      }
+    } catch {}
+  }
+
+  // ---- 2. Circuit breaker: explicit opt-out always allows the stop.
+  if (process.env.CLAWKET_NO_AUTO_ADVANCE === '1') process.exit(0);
+
+  // ---- 3. Auto-advance decision.
+  const markerFile = continuationMarkerPath(sessionId);
+  let lastStepId = null;
   try {
-    const runs = JSON.parse(exec(`${clawket} run list --session-id "${sessionId}"`) || '[]');
-    for (const run of runs) {
-      if (!run.ended_at) exec(`${clawket} run finish "${run.id}" --result session_ended --notes "Auto-closed by Stop hook"`);
-    }
-  } catch {}
+    lastStepId = (readJson(markerFile, {}) || {}).stepId || null;
+  } catch { lastStepId = null; }
+
+  const continuation = fetchContinuation(cwd);
+  const decision = decideContinuation({ continuation, lastStepId, stopHookActive });
+
+  if (decision.block) {
+    try { writeJson(markerFile, { stepId: decision.marker, ts: Date.now() }); } catch {}
+    process.stdout.write(JSON.stringify({ decision: 'block', reason: decision.reason }));
+    process.exit(0);
+  }
+
+  // Allow stop. Clear the marker when the plan is done / opted-out so the next
+  // active plan starts from a clean slate.
+  if (decision.marker === null) {
+    try { fs.unlinkSync(markerFile); } catch {}
+  }
+  process.exit(0);
 }
 
 // runSetup: attempt all three component installs and then throw an aggregate
@@ -3030,5 +3157,8 @@ module.exports = {
     fetchSha256Sums,
     parseSha256Sums,
     SKILLS_LIST,
+    // Migration 027 — Stop-hook auto-advance helpers (pure, unit-testable).
+    decideContinuation,
+    continuationMarkerPath,
   },
 };

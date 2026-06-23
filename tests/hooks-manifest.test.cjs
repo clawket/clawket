@@ -22,6 +22,7 @@ const EVENT_WHITELIST = new Set([
   'PostToolUse',
   'SubagentStart',
   'SubagentStop',
+  'Stop',
 ]);
 
 function loadManifest() {
@@ -101,7 +102,7 @@ test('hooks/hooks.json parses as valid JSON', () => {
   assert.doesNotThrow(loadManifest);
 });
 
-test('every top-level event key is in the 6-event Claude Code whitelist', () => {
+test('every top-level event key is in the 7-event Claude Code whitelist', () => {
   const manifest = loadManifest();
   validateManifest(manifest);
 });
