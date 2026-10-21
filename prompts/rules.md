@@ -70,8 +70,8 @@ Project
 3. Use `clawket <command> --help` for detailed usage of each command
 
 ### Working
-1. `clawket task update <ID> --status in_progress`
-2. `clawket task update <ID> --status done`
+1. `clawket task update <ID> --status in_progress` (also before dispatching a sub-agent assigned to the task — dispatch never starts it)
+2. `clawket task update <ID> --status done --evidence "<file:line | run:<RUN-ID>>"` (test results must cite a run recorded by `scripts/record-run.cjs`)
 3. `clawket task update <ID> --status cancelled` (add comment with reason)
 
 ### Enforced by hooks

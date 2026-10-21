@@ -19,6 +19,8 @@ const {
   writeJson,
 } = require('./common.cjs');
 const { buildSummary, parseInProgressTasks } = require('./session-context.cjs');
+const bashClassifier = require('./bash-classifier.cjs');
+const { execFileSync } = require('child_process');
 const { t: _t, resolveLocale, localeChain } = require('./locale.cjs');
 
 // Lazy locale resolution: cached after first call so every hook invocation
@@ -150,31 +152,6 @@ function isProjectDisabled(clawket, cwd) {
   return proj.enabled === 0;
 }
 
-// `plan list` / `cycle list` accept `--project <id>`, NOT `--cwd` — only
-// `dashboard` and `project resolve` accept `--cwd`. Earlier PreToolUse gates
-// passed `--cwd "${cwd}"` directly and silently treated the CLI's
-// `error: unexpected argument` (empty stdout) as "zero active plans / cycles",
-// which fired Gate 1 even when an active plan was present in the project.
-// Resolve the project once here so the gates can use the supported flag.
-//
-// Returns the project id string, or '' when no project is registered for
-// cwd (or the daemon is unreachable). The dashboard-empty allow() check
-// earlier in PreToolUse already short-circuits the truly-no-project path,
-// so an empty return here means the project resolved but had no `id` field
-// (defensive); callers fall back to global listing.
-function resolveProjectIdFromCwd(clawket, cwd) {
-  if (!cwd) return '';
-  const out = exec(`${clawket} project resolve --cwd "${cwd}" --format json`);
-  if (!out) return '';
-  try {
-    const proj = JSON.parse(out);
-    if (proj && typeof proj === 'object' && typeof proj.id === 'string') {
-      return proj.id;
-    }
-  } catch {}
-  return '';
-}
-
 // destructive-patterns.json catalog — loaded once, regex compiled once. Single
 // source of truth for shell hard-block rules (LM-7). See SSoT artifact for the
 // post-incident analysis that motivated each entry.
@@ -210,13 +187,15 @@ function loadDestructivePatterns(pluginRoot) {
   return _destructivePatternsCache;
 }
 
-function detectDestructive(cmd, pluginRoot) {
+// Destructive rules are evaluated on the commands the shell would execute
+// (bash-classifier.cjs), not on the raw text: a heredoc body, a grep pattern
+// or a commit message that merely mentions `git reset --hard` is data, while
+// `git -C . reset --hard`, `bash -c "…"`, `eval`, `xargs` and `$(…)` are
+// unwrapped and matched. Unparseable input falls back to each entry's raw
+// `regex` so the guard fails closed.
+function detectDestructive(cmd, pluginRoot, analysis) {
   if (!cmd || typeof cmd !== 'string') return null;
-  const patterns = loadDestructivePatterns(pluginRoot);
-  for (const p of patterns) {
-    if (p.compiled.test(cmd)) return p;
-  }
-  return null;
+  return bashClassifier.detectDestructive(cmd, loadDestructivePatterns(pluginRoot), analysis);
 }
 
 // Best-effort audit trail for hard-blocked commands. Posts to daemon /activity
@@ -239,34 +218,21 @@ function recordDestructiveBlock(pattern, cmd) {
   } catch {}
 }
 
-function readOnlyBashPatterns() {
-  return [
-    /^(npx\s+)?tsc(\s|$)/,
-    /^(npx\s+)?eslint(\s|$)/,
-    /^(npx\s+)?prettier(\s|$)/,
-    /^(npm|pnpm|yarn|bun)\s+test/,
-    /^(npm|pnpm|yarn|bun)\s+run\s+(test|lint|check|typecheck|build)/,
-    /^(npx|pnpm\s+exec)\s+vitest/,
-    /^(npx|pnpm\s+exec)\s+jest/,
-    /^git\s+(status|log|diff|show|branch|stash\s+list|remote|tag)/,
-    /^(ls|pwd|wc|du|df|which|where|type|file|stat)\b/,
-    /^(cat|head|tail|less|more)\s/,
-    /^(curl|wget)\s/,
-    /^(node|python3?|ruby)\s+-e\s/,
-    /^echo\s/,
-    /^(docker|podman)\s+(ps|images|logs|inspect)/,
-    /^cargo\s+(check|test|clippy)/,
-    /^lsof\s/,
-    // LM-11057: code-search and text-processing tools are read-only.
-    // Without these, routine `grep`/`find`/`rg` calls fall through to PDD
-    // gates and emit deny JSON — which (a) interrupts ordinary investigation
-    // work and (b) surfaces as repeated "PreToolUse:Bash hook error" lines in
-    // Claude Code when the deny output is rendered.
-    /^(grep|egrep|fgrep|rg|ripgrep|ag|ack)\b/,
-    /^find\b/,
-    /^(awk|sed|tr|cut|sort|uniq|tee|jq|yq|xxd|hexdump|base64|comm|paste|diff|cmp)\b/,
-    /^xargs\b/,
-  ];
+// Bash fast paths that skip the active-task gate. The decision comes from
+// bash-classifier.cjs: every executed command must be read-only (per-command
+// option tables — `sed -i`, `sort -o`, `find -delete`, `git branch -D`, `curl
+// -o` … are writers), a `clawket` call, or a verification command (build /
+// test / lint / typecheck, whose writes are confined to regenerable outputs).
+// Verification commands are allowed but recorded in hook.log so the audit
+// trail shows what ran outside a task. Any command substitution, subshell,
+// background job, `eval`/`exec`/`source`/`bash -c`, or write redirect other
+// than /dev/null disqualifies the fast path.
+function classifyBashFastPath(cmd, analysis) {
+  const result = bashClassifier.classify(cmd, analysis);
+  if (result.kind === 'verification') {
+    appendHookLog({ event: 'verification_command', cmd: cmd.slice(0, 500), commands: result.commands });
+  }
+  return result;
 }
 
 function detectCliTarget() {
@@ -1497,6 +1463,55 @@ function checkX7BatchSize(prompt, opts = {}) {
   return { blocked: false, reason, count };                         // HOOK-015 warn default
 }
 
+const RUN_REF_RE = /\brun:(RUN-[A-Za-z0-9_-]+)/g;
+
+function parseRunRefs(text) {
+  return [...String(text || '').matchAll(RUN_REF_RE)].map((m) => m[1]);
+}
+
+// Any `run:<token>` makes the evidence a reference claim; a token that is not
+// a run id (`run:undefined`, an unexpanded `run:${ID}`) must fail rather than
+// pass as free text. Same rule as the daemon (repo::runs::cites_runs).
+function citesRuns(text) {
+  return /\brun:\S/.test(String(text || ''));
+}
+
+function malformedRunRef(text) {
+  for (const m of String(text || '').matchAll(/\brun:(\S+)/g)) {
+    if (!/^RUN-[A-Za-z0-9_-]+[.,;:)\]]*$/.test(m[1])) return m[1];
+  }
+  return null;
+}
+
+// Same predicate the daemon applies (repo::runs evidence validation): a run
+// is evidence only once it finished and carries its full provenance.
+function runRecordProblem(id, run) {
+  if (!run) return `${id} does not exist`;
+  const missing = ['command', 'input_hash', 'report_hash'].filter((k) => !(typeof run[k] === 'string' && run[k].trim()));
+  if (typeof run.exit_code !== 'number') missing.push('exit_code');
+  if (run.status !== 'finished') return `${id} is not finished (status=${run.status})`;
+  if (missing.length) return `${id} is missing ${missing.join(', ')}`;
+  return null;
+}
+
+function validateRunRefs(ids) {
+  for (const id of ids) {
+    const res = daemonGet(`/runs/${encodeURIComponent(id)}`);
+    if (!res) return `daemon unreachable while resolving ${id}`;
+    if (res.status === 404) return `${id} does not exist`;
+    if (res.status !== 200 || !res.body) return `${id} could not be read (HTTP ${res.status})`;
+    const problem = runRecordProblem(id, res.body);
+    if (problem) return problem;
+  }
+  return null;
+}
+
+const TEST_CLAIM_RE = /\b(tests?|specs?|suites?|checks?|cargo test|pnpm test|npm test|vitest|jest|pytest|clippy|tsc|lint)\b[^.\n]{0,40}?\b(pass(?:ed|es|ing)?|green|succeed(?:ed|s)?|all ok)\b|\b\d+\s+(?:tests?\s+)?passed\b|\ball\s+green\b/i;
+
+function isUnreferencedTestClaim(text) {
+  return TEST_CLAIM_RE.test(String(text || '')) && parseRunRefs(text).length === 0;
+}
+
 /**
  * HOOK-021~030: X8 — evidence NULL / missing check.
  *
@@ -1546,6 +1561,36 @@ function checkX8Evidence({ task, newStatus } = {}) {
       appendHookLog({ anti_pattern: 'X8', mode, violation: 'evidence_too_large', bytes: byteLen });
       // 4 KiB violation is a hard block regardless of mode (corrupts audit trail)
       return { blocked: true, reason };
+    }
+    // Evidence by reference: `run:<RUN-ID>` points at a recorded verification
+    // run (command, input hash, exit code, report hash). A reference is only
+    // evidence if the run exists and is complete; the daemon re-validates on
+    // write, this check gives the agent the reason before the round trip.
+    const runRefs = parseRunRefs(evStr);
+    if (citesRuns(evStr)) {
+      const bad = malformedRunRef(evStr);
+      const problem = bad ? `run:${bad} is not a run id (expected run:RUN-<id>)` : validateRunRefs(runRefs);
+      if (problem) {
+        const reason = `[Clawket] evidence reference invalid: ${problem}\n` +
+          `Fix: record the verification with \`node "$CLAUDE_PLUGIN_ROOT/scripts/record-run.cjs" --task <TASK-ID> -- <command>\` and cite the printed run:<RUN-ID>.`;
+        process.stderr.write(reason + '\n');
+        appendHookLog({ anti_pattern: 'X8', mode, violation: 'evidence_run_invalid', refs: runRefs, problem });
+        if (mode === 'strict') return { blocked: true, reason };
+        return { blocked: false, reason };
+      }
+      return { blocked: false, reason: '' };
+    }
+    // A free-text claim that tests passed is not checkable. Test evidence must
+    // cite the run that produced it; other free text (file:line, reasoning)
+    // stays accepted.
+    if (isUnreferencedTestClaim(evStr)) {
+      const reason =
+        `[Clawket] evidence claims a test/check result without a run reference ("${evStr.slice(0, 80)}").\n` +
+        `Fix: record the run with \`node "$CLAUDE_PLUGIN_ROOT/scripts/record-run.cjs" --task <TASK-ID> -- <test command>\` and use --evidence "run:<RUN-ID>".`;
+      process.stderr.write(reason + '\n');
+      appendHookLog({ anti_pattern: 'X8', mode, violation: 'evidence_test_claim_unreferenced' });
+      if (mode === 'strict') return { blocked: true, reason };
+      return { blocked: false, reason };
     }
     // HOOK-026: minimum length check. Accept any string >= 16 chars OR any
     // file:line reference (path:digit) regardless of length, because compact
@@ -1821,8 +1866,7 @@ async function runSessionStart() {
   // Best-effort: skip silently on parse failure.
   let x3RiskLine = '';
   try {
-    const tasksJson = exec(`${clawket} task list --status in_progress --format json`);
-    const tasks = JSON.parse(tasksJson || '[]');
+    const tasks = loadGateState(clawket, cwd, process.env.CLAUDE_SESSION_ID || '').inProgress;
     const x3Tasks = tasks.filter((tk) => !tk.scenario_id);
     if (x3Tasks.length > 0) {
       const ids = x3Tasks.map((tk) => tk.ticket_number || tk.id).join(', ');
@@ -1874,6 +1918,271 @@ function runUserPromptSubmit() {
   }));
 }
 
+// ---------------------------------------------------------------------------
+// PreToolUse gate state
+//
+// Everything the workflow gate needs comes from one daemon call,
+// GET /gate/pre-tool-use?cwd=&session= (contract 1): the project resolved for
+// cwd (with its enabled flag), the project's in_progress / blocked / assigned
+// todo tasks, and its active plan / cycle counts. All task lookups are scoped
+// to that project, so a task left in_progress in another project cannot
+// satisfy this project's gate.
+//
+// Daemons that predate the endpoint (404, or no `contract` field) are served
+// by `loadGateStateLegacy`, which reproduces the same state with the CLI in at
+// most five calls and scopes tasks client-side by the project's ticket key.
+// ---------------------------------------------------------------------------
+
+const GATE_CONTRACT = 1;
+
+/**
+ * Sync GET against the daemon via curl (hooks run synchronously, so async
+ * http is not usable). Returns `{ status, body }` with body parsed as JSON
+ * (null when not JSON), or null when the daemon is unreachable.
+ */
+function daemonGet(pathname, { timeoutMs = 4000 } = {}) {
+  const port = getDaemonPort();
+  if (!port) return null;
+  const args = ['-sS', '--max-time', String(Math.max(1, Math.ceil(timeoutMs / 1000))), '-w', '\n__HTTP__%{http_code}'];
+  const token = getDaemonToken();
+  if (token) args.push('-H', `X-Clawket-Token: ${token}`);
+  args.push(`http://127.0.0.1:${port}${pathname}`);
+  let out;
+  try {
+    out = execFileSync('curl', args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs + 1000 });
+  } catch {
+    return null;
+  }
+  const splitIdx = out.lastIndexOf('\n__HTTP__');
+  if (splitIdx < 0) return null;
+  const status = parseInt(out.slice(splitIdx + 9), 10);
+  let body = null;
+  try { body = JSON.parse(out.slice(0, splitIdx)); } catch {}
+  return { status, body };
+}
+
+function parseJsonArray(raw) {
+  try {
+    const v = JSON.parse(raw || '');
+    return Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function isEnabledFlag(v) {
+  return !(v === 0 || v === false || v === '0');
+}
+
+function emptyGateState(source) {
+  return {
+    source,
+    registered: false,
+    project: null,
+    enabled: true,
+    inProgress: [],
+    blockedIds: new Set(),
+    todoAssigned: [],
+    activePlans: null,
+    activeCycles: null,
+    sessionRun: null,
+  };
+}
+
+function normalizeGateState(body) {
+  const state = emptyGateState('endpoint');
+  if (!body.project) return state;
+  state.registered = true;
+  state.project = body.project;
+  state.enabled = isEnabledFlag(body.project.enabled);
+  state.inProgress = Array.isArray(body.in_progress) ? body.in_progress : [];
+  state.blockedIds = new Set(Array.isArray(body.blocked_ids) ? body.blocked_ids : []);
+  state.todoAssigned = Array.isArray(body.todo_assigned) ? body.todo_assigned : [];
+  state.activePlans = Number.isInteger(body.active_plan_count) ? body.active_plan_count : null;
+  state.activeCycles = Number.isInteger(body.active_cycle_count) ? body.active_cycle_count : null;
+  state.sessionRun = body.session_run || null;
+  return state;
+}
+
+// Older daemons ignore `project_id` on GET /tasks, so the CLI's `--project`
+// filter is silently global. Tasks carry no project id, but every task of a
+// project with a key is numbered `<KEY>-<n>`; drop anything else (fail closed:
+// a foreign task must never satisfy this project's gate).
+function scopeTasksToProject(tasks, project) {
+  if (!project || !project.key) return tasks;
+  const prefix = `${project.key}-`;
+  return tasks.filter((tk) => typeof tk.ticket_number === 'string' && tk.ticket_number.startsWith(prefix));
+}
+
+function loadGateStateLegacy(clawket, cwd) {
+  const state = emptyGateState('legacy');
+  let project = null;
+  if (cwd) {
+    try {
+      const p = JSON.parse(exec(`${clawket} project resolve --cwd "${cwd}" --format json`) || 'null');
+      if (p && typeof p === 'object' && typeof p.id === 'string') project = p;
+    } catch {}
+  }
+  if (!project) {
+    // Unregistered cwd or daemon unreachable: the dashboard is the
+    // membership authority (it may resolve where `project resolve` cannot).
+    if (!exec(`${clawket} dashboard --cwd "${cwd}" --show active`)) return state;
+    process.stderr.write('[clawket] gate: project id unresolved for cwd; task lookups are not project-scoped\n');
+  }
+  state.registered = true;
+  state.project = project;
+  state.enabled = project ? isEnabledFlag(project.enabled) : true;
+  if (!state.enabled) return state;
+
+  const pf = project ? `--project "${project.id}" ` : '';
+  let tasks = parseJsonArray(exec(`${clawket} task list ${pf}--status in_progress,blocked,todo --format json`)) || [];
+  if (!tasks.some((tk) => tk.status === 'in_progress')) {
+    // Daemons before v0.4.1 read a comma list as one unknown status.
+    const ip = parseJsonArray(exec(`${clawket} task list ${pf}--status in_progress --format json`)) || [];
+    tasks = tasks.concat(ip.filter((tk) => !tasks.some((x) => x.id === tk.id)));
+  }
+  tasks = scopeTasksToProject(tasks, project);
+  state.inProgress = tasks.filter((tk) => tk.status === 'in_progress');
+  state.blockedIds = new Set(tasks.filter((tk) => tk.status === 'blocked').map((tk) => tk.id));
+  state.todoAssigned = tasks.filter((tk) => tk.status === 'todo' && tk.assignee);
+
+  const plans = parseJsonArray(exec(`${clawket} plan list ${pf}--status active --format json`));
+  state.activePlans = plans ? plans.length : null;
+  const cyclesRaw = exec(`${clawket} cycle list ${pf}--status active --format json`);
+  const cycles = parseJsonArray(cyclesRaw);
+  state.activeCycles = cycles ? cycles.length : null;
+  return state;
+}
+
+function loadGateState(clawket, cwd, sessionId) {
+  const qs = `cwd=${encodeURIComponent(cwd || '')}` + (sessionId ? `&session=${encodeURIComponent(sessionId)}` : '');
+  const res = daemonGet(`/gate/pre-tool-use?${qs}`);
+  if (res && res.status === 200 && res.body && res.body.contract === GATE_CONTRACT) {
+    return normalizeGateState(res.body);
+  }
+  return loadGateStateLegacy(clawket, cwd);
+}
+
+const AGENT_TOOLS = new Set(['Agent', 'TeamCreate', 'SendMessage']);
+const MUTATING_TOOLS = new Set(['Edit', 'Write', 'Bash', 'NotebookEdit']);
+
+function isHighTierModel(m) {
+  if (!m) return false;
+  if (/opus/.test(m)) return true;
+  if (/sonnet.*4[-_]5|sonnet.*4[-_][6-9]|claude-4/.test(m)) return true;
+  return false;
+}
+
+function isMedTierModel(m) {
+  if (!m) return false;
+  if (isHighTierModel(m)) return true;
+  if (/sonnet/.test(m)) return true;
+  if (/haiku.*3[-_]5|haiku.*3[-_][6-9]/.test(m)) return true;
+  return false;
+}
+
+/**
+ * Pure workflow-gate decision. No I/O and no state mutation — in particular
+ * an Agent dispatch never promotes a todo task to in_progress; the caller
+ * must start the task explicitly (`clawket task update <id> --status
+ * in_progress`) before dispatching.
+ *
+ * @returns {{ decision: 'allow'|'deny', reason?: string, context?: string,
+ *             agentBinding?: { name: string, task: object } }}
+ */
+function decideGate({ toolName, toolInput = {}, state, modelId = '' }) {
+  if (!state.registered || !state.enabled) return { decision: 'allow' };
+  const isAgent = AGENT_TOOLS.has(toolName);
+  const agentName = isAgent ? (toolInput.name || '') : '';
+  const todoForAgent = agentName ? state.todoAssigned.find((tk) => tk.assignee === agentName) : null;
+  const startHint = (task) => t('gate.agent_task_not_started', {
+    name: agentName,
+    id: task.ticket_number || task.id,
+  });
+
+  if (state.inProgress.length === 0) {
+    return { decision: 'deny', reason: todoForAgent ? startHint(todoForAgent) : t('gate.no_task') };
+  }
+  if (!state.activePlans) return { decision: 'deny', reason: t('gate.no_plan') };
+  if (state.activeCycles === 0) return { decision: 'deny', reason: t('gate.no_cycle') };
+
+  const runnable = state.inProgress.filter((tk) => !state.blockedIds.has(tk.id));
+  if (runnable.length === 0) {
+    const titles = state.inProgress.map((tk) => `  - [${tk.ticket_number || tk.id}] ${tk.title}`).join('\n');
+    return { decision: 'deny', reason: `${t('gate.all_blocked')}\nBlocked tasks:\n${titles}` };
+  }
+
+  // PDD A4 (Task ⊂ Cycle ⊂ Unit): mutating tools need a cycle assignment.
+  // Agent tools are exempt — the child tasks they create inherit the cycle.
+  if (MUTATING_TOOLS.has(toolName)) {
+    const noCycle = runnable.find((tk) => !tk.cycle_id);
+    if (noCycle) {
+      return {
+        decision: 'deny',
+        reason: `${t('gate.no_cycle_assignment')}\nTask: [${noCycle.ticket_number || noCycle.id}] ${noCycle.title}`,
+      };
+    }
+  }
+
+  if (agentName) {
+    const task = runnable.find((tk) => tk.assignee === agentName);
+    if (!task) {
+      return {
+        decision: 'deny',
+        reason: todoForAgent ? startHint(todoForAgent) : t('gate.no_agent_task', { name: agentName }),
+      };
+    }
+    return {
+      decision: 'allow',
+      context: `\n\n---\n[Clawket] 작업 티켓: ${task.ticket_number || task.id} — ${task.title}\nTask ID: ${task.id}`,
+      agentBinding: { name: agentName, task },
+    };
+  }
+
+  // FIX-PLUGIN-013 tier gate (low → any model; med → sonnet/haiku-3.5+;
+  // high → opus / sonnet-4.5+). The session's own run picks the task when
+  // known; otherwise the first runnable task.
+  const sessionTask = state.sessionRun && runnable.find((tk) => tk.id === state.sessionRun.task_id);
+  const task = sessionTask || runnable[0];
+  const taskTier = task && task.tier ? String(task.tier).toLowerCase() : 'low';
+  const model = String(modelId || '').toLowerCase();
+  if (taskTier === 'high' && model && !isHighTierModel(model)) {
+    return {
+      decision: 'deny',
+      reason:
+        `Clawket Tier Gate: task tier=high but current model "${model}" is not a high-tier model.\n` +
+        `High-tier tasks require claude-opus or claude-sonnet-4-5+ class models.\n` +
+        `Switch to a high-tier model, or update the task tier: \`clawket task update ${task.id} --tier med\``,
+    };
+  }
+  if (taskTier === 'med' && model && !isMedTierModel(model)) {
+    return {
+      decision: 'deny',
+      reason:
+        `Clawket Tier Gate: task tier=med but current model "${model}" is a low-tier model.\n` +
+        `Med-tier tasks require at least claude-sonnet or claude-haiku-3-5+ class models.\n` +
+        `Switch to a med-or-higher model, or update the task tier: \`clawket task update ${task.id} --tier low\``,
+    };
+  }
+  const tierUsed = (task && (task.tier_used || task.tier)) || 'med';
+  return { decision: 'allow', context: `CLAWKET_TIER_USED=${tierUsed}`, tierUsed: String(tierUsed) };
+}
+
+// Every PreToolUse deny goes out as the structured JSON decision with exit 0:
+// Claude Code only reads the JSON on exit 0, and any other non-2 exit code is
+// a non-blocking error that lets the tool call proceed.
+function denyPreToolUse(reason) {
+  process.stderr.write(`${reason}\n`);
+  console.log(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reason,
+    },
+  }));
+  process.exit(0);
+}
+
 function runPreToolUse() {
   recordHookEvent('PreToolUse');
   try { ensureXdgDirs(); } catch {}
@@ -1892,68 +2201,38 @@ function runPreToolUse() {
     'mcp__playwright__browser_console_messages', 'mcp__playwright__browser_resize',
   ]);
   const taskTools = new Set(['TaskCreate', 'TaskUpdate']);
-  const agentTools = new Set(['Agent', 'TeamCreate', 'SendMessage']);
-  const mutatingTools = new Set(['Edit', 'Write', 'Bash', 'NotebookEdit']);
 
   if (readOnly.has(toolName)) allowPreToolUse();
-  if (!agentTools.has(toolName) && !mutatingTools.has(toolName) && !taskTools.has(toolName)) allowPreToolUse();
+  if (!AGENT_TOOLS.has(toolName) && !MUTATING_TOOLS.has(toolName) && !taskTools.has(toolName)) allowPreToolUse();
 
   if (toolName === 'Bash') {
     const cmd = (toolInput.command || '').trim();
+    const analysis = bashClassifier.analyze(cmd);
 
-    // Hard-block destructive shell patterns BEFORE any auto-allow path so that
+    // Hard-block destructive commands BEFORE any auto-allow path so that
     // catalogued risks (e.g. `clawket plan delete --force`, `rm -rf` on user
-    // data dirs) cannot slip through clawket-prefix or read-only allowlists.
-    //
-    // v3 (US-053): the v2 `CLAWKET_ALLOW_DESTRUCTIVE=1` env-var bypass is
-    // REMOVED. Operators who genuinely need a destructive command must obtain
-    // user approval out-of-band and run it via a non-Claude shell. Pattern
-    // false-positives must be filed against destructive-patterns.json instead
-    // of being unblocked locally — this keeps the policy auditable and
-    // prevents agents from instructing users to set the bypass var.
-    const matched = detectDestructive(cmd, pluginRoot);
+    // data dirs) cannot slip through the clawket or read-only fast paths.
+    // There is no bypass (v3, US-053): false positives are fixed in the
+    // catalog, not unblocked locally.
+    const matched = detectDestructive(cmd, pluginRoot, analysis);
     if (matched) {
       recordDestructiveBlock(matched, cmd);
-      const reason = t('destructive.blocked', {
-          id: matched.id,
-          category: matched.category,
-          reason: matched.reason,
-          remediation: matched.remediation,
-        });
-      process.stderr.write(reason + '\n');
-      console.log(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'deny',
-          permissionDecisionReason: reason,
-        },
+      denyPreToolUse(t('destructive.blocked', {
+        id: matched.id,
+        category: matched.category,
+        reason: matched.reason,
+        remediation: matched.remediation,
       }));
-      process.exit(0);
     }
 
-    // HOOK-031~040: X9 — detect bulk-sync scripts that embed reasoning logic.
-    // v3.0 default = strict; passes toolName='Bash' so the agent-in-sync
-    // branch can fire when Bash spawns a subagent dispatcher.
+    // HOOK-031~040: X9 — bulk-sync scripts must not embed reasoning.
     {
       const x9 = checkX9SyncReasoning(cmd, { toolName: 'Bash' });
-      if (x9.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x9.reason,
-          },
-        }));
-        process.exit(0);
-      }
+      if (x9.blocked) denyPreToolUse(x9.reason);
     }
 
-    // HOOK-019: `clawket batch validate <prompt-file>` — intercept at the
-    // Bash hook layer and run checkX7BatchSize on the file contents. The
-    // CLI does not yet implement this subcommand natively (sub-repo `cli/`
-    // requires Rust toolchain rebuild), but the X7 helper is the same
-    // single-source enforcement point, so routing through here gives the
-    // spec-required behavior without a new CLI build.
+    // HOOK-019: `clawket batch validate <prompt-file>` runs the X7 batch-size
+    // check on the file contents at the hook layer.
     {
       const m = cmd.match(/^\s*clawket\s+batch\s+validate\s+(?:"([^"]+)"|'([^']+)'|(\S+))/);
       if (m) {
@@ -1961,415 +2240,95 @@ function runPreToolUse() {
         if (file) {
           let promptText = '';
           try { promptText = fs.readFileSync(file, 'utf8'); } catch (e) {
-            const reason = `[Clawket] batch validate: cannot read prompt file "${file}" (${e.message}).`;
-            process.stderr.write(reason + '\n');
-            console.log(JSON.stringify({
-              hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
-                permissionDecision: 'deny',
-                permissionDecisionReason: reason,
-              },
-            }));
-            process.exit(1);
+            denyPreToolUse(`[Clawket] batch validate: cannot read prompt file "${file}" (${e.message}).`);
           }
           const x7File = checkX7BatchSize(promptText, { batchId: 'cli-batch-validate' });
-          if (x7File.blocked) {
-            console.log(JSON.stringify({
-              hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
-                permissionDecision: 'deny',
-                permissionDecisionReason: x7File.reason,
-              },
-            }));
-            process.exit(1);
-          }
+          if (x7File.blocked) denyPreToolUse(x7File.reason);
           process.stderr.write(`[Clawket] batch validate ${file}: ${x7File.count}/30 scenarios — pass\n`);
         }
       }
     }
 
-    // HOOK-002/003/006: X3 — extend scenario_id enforcement to Bash invocations
-    // of `clawket task create` / `clawket task update`. Without this the only
-    // X3 path was the Claude-native TaskUpdate tool (line 1685), so a Bash
-    // shell invocation could bypass the enforcement entirely. Parses
-    // --scenario-id "<value>" from the command line; if missing on a `task
-    // create`, emits the NULL-scenario_id warning. Strict mode hard-blocks.
+    // HOOK-002/003/006: X3 — scenario_id enforcement on Bash invocations of
+    // `clawket task create` / `clawket task update`.
     if (/\bclawket\s+task\s+(?:create|update)\b/.test(cmd)) {
-      // Match --scenario-id <val>, --scenario-id=<val>, supporting quoted values.
       const sidMatch = cmd.match(/--scenario-id(?:\s+|=)(?:"([^"]*)"|'([^']*)'|(\S+))/);
       const explicitSid = sidMatch ? (sidMatch[1] ?? sidMatch[2] ?? sidMatch[3] ?? '') : null;
       const isCreate = /\bclawket\s+task\s+create\b/.test(cmd);
-      // For create: when --scenario-id is omitted, treat as NULL → X3 NULL path.
-      // For update: only validate if the user is actually setting --scenario-id;
-      // updates that don't touch scenario_id are not X3 events.
       let x3 = null;
       if (explicitSid !== null && explicitSid !== '') {
         x3 = checkX3ScenarioId({ scenarioId: explicitSid, context: 'pre-tool-use-bash' });
       } else if (isCreate) {
         x3 = checkX3ScenarioId({ task: { id: 'create-cmd', title: '(new task)' }, context: 'pre-tool-use-bash' });
       }
-      if (x3 && x3.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x3.reason,
-          },
-        }));
-        process.exit(0);
-      }
+      if (x3 && x3.blocked) denyPreToolUse(x3.reason);
     }
 
-    if (cmd.startsWith('clawket ') || cmd.includes('clawket ')) allowPreToolUse();
-    if (readOnlyBashPatterns().some((re) => re.test(cmd))) allowPreToolUse();
+    const fast = classifyBashFastPath(cmd, analysis);
+    if (fast.kind === 'readonly' || fast.kind === 'clawket' || fast.kind === 'verification') allowPreToolUse();
   }
 
-  // HOOK-003: X3 scenario_id format check on TaskUpdate calls.
-  // Validate that the scenario_id being set matches the canonical pattern.
   if (toolName === 'TaskUpdate') {
+    // HOOK-003: X3 scenario_id format check.
     const sid = toolInput.scenario_id;
     if (sid !== undefined && sid !== null && sid !== '') {
       const x3 = checkX3ScenarioId({ scenarioId: sid, context: 'pre-tool-use' });
-      if (x3.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x3.reason,
-          },
-        }));
-        process.exit(0);
-      }
+      if (x3.blocked) denyPreToolUse(x3.reason);
     }
-    // HOOK-021/023: X8 — check evidence when transitioning to status that
-    // requires audit-trail evidence. R3 fix (US-CKT-HOOK-023): added
-    // 'cancelled' to the whitelist. The R2 helper (checkX8Evidence) already
-    // treats cancelled as evidence-required (line ~1416 isCancelled), but
-    // the PreToolUse call site here was not updated, leaving the helper
-    // unreachable for cancelled. Now both layers agree: cancelled requires
-    // evidence (cancellation reason) so scenario_error refinement is auditable.
+    // HOOK-021/023: X8 — evidence on transitions that need an audit trail
+    // (cancelled included: the cancellation reason is the scenario_error
+    // refinement record).
     const newStatus = toolInput.status;
     if (newStatus && ['done', 'blocked', 'defect', 'scenario_error', 'cancelled'].includes(newStatus)) {
-      // Best-effort: fetch current task state to check evidence
       const taskId = toolInput.id || toolInput.task_id || '';
       let taskObj = null;
       if (taskId) {
         try {
-          const raw = exec(`${runtime(pluginRoot).clawket} task view "${taskId}" --format json`);
+          const raw = exec(`${clawket} task view "${taskId}" --format json`);
           if (raw) taskObj = JSON.parse(raw);
         } catch {}
       }
-      // Merge in any evidence being set in this update call
       if (taskObj && toolInput.evidence) taskObj.evidence = toolInput.evidence;
       const x8 = checkX8Evidence({ task: taskObj || { id: taskId, evidence: toolInput.evidence || null }, newStatus });
-      if (x8.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x8.reason,
-          },
-        }));
-        process.exit(0);
-      }
+      if (x8.blocked) denyPreToolUse(x8.reason);
     }
+  }
+
+  if (AGENT_TOOLS.has(toolName)) {
+    // HOOK-031/035: X9 — Agent dispatch inside an active sync context.
+    const promptForX9 = (toolInput.prompt || toolInput.message || '') + ' ' + JSON.stringify(toolInput).slice(0, 1000);
+    const x9Agent = checkX9SyncReasoning(promptForX9, { toolName });
+    if (x9Agent.blocked) denyPreToolUse(x9Agent.reason);
+    // HOOK-011/016/018: X7 — ≤ 30 unique scenario IDs per dispatch.
+    const promptText = toolInput.prompt || (toolInput.tool_input && toolInput.tool_input.prompt) || '';
+    const x7 = checkX7BatchSize(promptText, { batchId: toolInput.batch_id || process.env.CLAWKET_BATCH_ID || '' });
+    if (x7.blocked) denyPreToolUse(x7.reason);
   }
 
   const cwd = hookInput.cwd || process.env.HOOK_CWD || process.cwd();
+  const sessionId = hookInput.session_id || process.env.CLAUDE_SESSION_ID || '';
+  // Disabled projects bypass workflow enforcement but NOT the destructive
+  // guard above, which protects user data regardless of Clawket policy.
+  const state = loadGateState(clawket, cwd, sessionId);
+  const modelId = process.env.CLAWKET_MODEL_ID || process.env.CLAUDE_CODE_MODEL_ID || process.env.CLAUDE_MODEL || '';
+  const verdict = decideGate({ toolName, toolInput, state, modelId });
+  if (verdict.decision === 'deny') denyPreToolUse(verdict.reason);
 
-  // Disabled projects bypass workflow enforcement (active-task requirement,
-  // agent-binding, etc.) but NOT destructive-pattern protection above —
-  // those guard user data integrity regardless of Clawket policy state.
-  if (isProjectDisabled(clawket, cwd)) allowPreToolUse();
-
-  const context = exec(`${clawket} dashboard --cwd "${cwd}" --show active`);
-  if (!context) allowPreToolUse();
-
-  const tasksJson = exec(`${clawket} task list --status in_progress`);
-  let inProgressTasks = [];
-  try { inProgressTasks = JSON.parse(tasksJson || '[]'); } catch {}
-
-  if (inProgressTasks.length === 0) {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: t('gate.no_task'),
-      },
-    }));
-    process.exit(0);
+  if (verdict.agentBinding) {
+    // SubagentStart binds the new sub-agent to this task through the pending
+    // file (cache dir; plugin-owned transient state, not task state).
+    const pendingFile = path.join(cacheDir(), 'agent-pending.json');
+    const pending = readJson(pendingFile, []);
+    pending.push({
+      name: verdict.agentBinding.name,
+      task_id: verdict.agentBinding.task.id,
+      subagent_type: toolInput.subagent_type || 'general-purpose',
+      ts: Date.now(),
+    });
+    writeJson(pendingFile, pending);
   }
-
-  // PDD lifecycle gates (FIX-PLUGIN-001):
-  //   Gate 1 — active plan: at least one plan in status=active for this project.
-  //   Gate 2 — active cycle: at least one cycle in status=active.
-  //   Gate 3 — blocked task: the in_progress task must not have status=blocked.
-  //
-  // These gates fire AFTER the task-existence check so the "no task" error
-  // message takes priority (most actionable). Gates are best-effort — if the
-  // CLI call fails (daemon down, etc.) we fall through to allow() rather than
-  // blocking unnecessarily.
-  //
-  // Note: Gate 1+2 query the project resolved from cwd, not globally, so
-  // multi-project setups are each gated independently.
-  //
-  // Gate 1: active plan — HOOK-073 hard-block. Previously this gate was
-  // skipped when `plansJson === ''` (daemon down / CLI failure), which let
-  // mutations slip through with only a warning. We now hard-block: when the
-  // CLI returns nothing parseable we treat it as "active plan unknown" and
-  // deny. Exit code 2 surfaces the deny to outer harnesses that read exit
-  // codes (Claude Code uses the JSON decision regardless of code).
-  //
-  // `plan list` / `cycle list` accept `--project`, not `--cwd` — resolve the
-  // project from cwd first (see resolveProjectIdFromCwd docstring).
-  const projectId = resolveProjectIdFromCwd(clawket, cwd);
-  const projectFilter = projectId ? `--project "${projectId}" ` : '';
-  const plansJson = exec(`${clawket} plan list ${projectFilter}--status active --format json`);
-  let activePlans = [];
-  let plansParsed = false;
-  try { activePlans = JSON.parse(plansJson || '[]'); plansParsed = true; } catch {}
-  if (!plansParsed || activePlans.length === 0) {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: t('gate.no_plan'),
-      },
-    }));
-    process.exit(2);
-  }
-
-  // Gate 2: active cycle
-  const cyclesJson = exec(`${clawket} cycle list ${projectFilter}--status active --format json`);
-  let activeCycles = [];
-  try { activeCycles = JSON.parse(cyclesJson || '[]'); } catch {}
-  if (cyclesJson !== '' && activeCycles.length === 0) {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: t('gate.no_cycle'),
-      },
-    }));
-    process.exit(0);
-  }
-
-  // Gate 3: blocked task check — any in_progress task that has status=blocked
-  // must not block the whole gate, but we warn if the ONLY in_progress task is blocked.
-  const blockedJson = exec(`${clawket} task list --status blocked --format json`);
-  let blockedTasks = [];
-  try { blockedTasks = JSON.parse(blockedJson || '[]'); } catch {}
-  const blockedIds = new Set(blockedTasks.map((bt) => bt.id));
-  const runnableTasks = inProgressTasks.filter((it) => !blockedIds.has(it.id));
-  if (runnableTasks.length === 0 && inProgressTasks.length > 0) {
-    const blockedTitles = inProgressTasks.map((it) => `  - [${it.ticket_number || it.id}] ${it.title}`).join('\n');
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: t('gate.all_blocked') + `\nBlocked tasks:\n${blockedTitles}`,
-      },
-    }));
-    process.exit(0);
-  }
-
-  // Gate 4 (PDD A4 — Cycle ⊂ Unit): mutating tools require the in_progress
-  // task to carry an explicit cycle assignment. Without this gate a task in
-  // status=in_progress can mutate code while floating outside any cycle, which
-  // breaks the PDD lifecycle invariant ("Task ⊂ Cycle ⊂ Unit ⊂ Plan"). The
-  // check applies only when at least one runnable task exists; the "no task"
-  // and "all blocked" gates above already cover the empty/blocked cases. This
-  // gate does NOT fire for agent tools (Agent/TeamCreate/SendMessage) because
-  // those will create child tasks inheriting the parent's cycle.
-  if (mutatingTools.has(toolName) && runnableTasks.length > 0) {
-    const noCycleTask = runnableTasks.find((t2) => !t2.cycle_id);
-    if (noCycleTask) {
-      console.log(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'deny',
-          permissionDecisionReason: t('gate.no_cycle_assignment') +
-            `\nTask: [${noCycleTask.ticket_number || noCycleTask.id}] ${noCycleTask.title}`,
-        },
-      }));
-      process.exit(0);
-    }
-  }
-
-  if (agentTools.has(toolName)) {
-    // HOOK-031/035 (v3.0): X9 — Agent dispatch inside an active sync context
-    // is itself an X9 layering violation (sync layer must not invoke
-    // reasoning agents). v2 only inspected Bash commands. We pass the prompt
-    // and toolName so checkX9SyncReasoning's agent-in-sync branch fires.
-    {
-      const promptForX9 = (toolInput.prompt || toolInput.message || '') + ' ' +
-        JSON.stringify(toolInput).slice(0, 1000);
-      const x9Agent = checkX9SyncReasoning(promptForX9, { toolName });
-      if (x9Agent.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x9Agent.reason,
-          },
-        }));
-        process.exit(0);
-      }
-    }
-
-    // HOOK-011/016/018: X7 — batch size check on Agent dispatch. PDD A8
-    // requires ≤ 30 unique scenario IDs per sub-agent invocation. This was
-    // previously only checked at SubagentStart (line ~2236), but by then the
-    // tool was already approved. Fire here in PreToolUse so strict mode can
-    // hard-block the dispatch.
-    {
-      const promptText = toolInput.prompt || (toolInput.tool_input && toolInput.tool_input.prompt) || '';
-      const batchId = toolInput.batch_id || process.env.CLAWKET_BATCH_ID || '';
-      const x7 = checkX7BatchSize(promptText, { batchId });
-      if (x7.blocked) {
-        console.log(JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: x7.reason,
-          },
-        }));
-        process.exit(0);
-      }
-    }
-
-    const agentName = toolInput.name || '';
-    if (agentName) {
-      let taskForAgent = inProgressTasks.find((task) => task.assignee === agentName);
-      if (!taskForAgent) {
-        const todoJson = exec(`${clawket} task list --status todo`);
-        let todoTasks = [];
-        try { todoTasks = JSON.parse(todoJson || '[]'); } catch {}
-        const todoForAgent = todoTasks.find((task) => task.assignee === agentName);
-        if (todoForAgent) {
-          exec(`${clawket} task update "${todoForAgent.id}" --status in_progress`);
-          taskForAgent = todoForAgent;
-        } else {
-          console.log(JSON.stringify({
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'deny',
-              permissionDecisionReason: t('gate.no_agent_task', { name: agentName }),
-            },
-          }));
-          process.exit(0);
-        }
-      }
-
-      const pendingFile = path.join(cacheDir(), 'agent-pending.json');
-      const pending = readJson(pendingFile, []);
-      pending.push({
-        name: agentName,
-        task_id: taskForAgent.id,
-        subagent_type: toolInput.subagent_type || 'general-purpose',
-        ts: Date.now(),
-      });
-      writeJson(pendingFile, pending);
-
-      // Same schema contract as the tier path below: PreToolUse requires
-      // `permissionDecision`, so route the ticket context through the helper
-      // rather than emitting a bare additionalContext payload (which the
-      // harness rejects wholesale, dropping the binding context).
-      allowPreToolUse(
-        `\n\n---\n[Clawket] 작업 티켓: ${taskForAgent.ticket_number || taskForAgent.id} — ${taskForAgent.title}\nTask ID: ${taskForAgent.id}`
-      );
-    }
-  }
-
-  // FIX-PLUGIN-013: Tier mismatch gate (G2/G3 enforcement).
-  //
-  // Tasks carry a `tier` field (low | med | high) set by the daemon
-  // (FIX-DAEMON-001). The current model ID is read from CLAUDE_CODE_MODEL_ID
-  // env var (set by Claude Code) or CLAWKET_MODEL_ID override.
-  //
-  // Tier rules:
-  //   low  → any model is acceptable
-  //   med  → model must be med or high tier (not haiku-class)
-  //   high → model must be high tier only (opus-class or sonnet-4-5+)
-  //
-  // On mismatch: deny with a clear message + process.exit(3) to signal
-  // "unsupported environment" to any outer harness reading exit codes.
-  // exit(3) is used only after the deny JSON has been emitted so Claude Code
-  // receives the structured deny regardless of exit code handling.
-  {
-    const task = runnableTasks[0] || inProgressTasks[0];
-    const taskTier = task && task.tier ? String(task.tier).toLowerCase() : 'low';
-    const modelId = (
-      process.env.CLAWKET_MODEL_ID ||
-      process.env.CLAUDE_CODE_MODEL_ID ||
-      process.env.CLAUDE_MODEL ||
-      ''
-    ).toLowerCase();
-
-    // Classify model into low | med | high based on name substrings.
-    // High tier: opus-class models, sonnet-4-5+, claude-4+.
-    // Med tier: sonnet-class (< 4-5), haiku-3-5+.
-    // Low tier: haiku (< 3-5), or unknown (default permissive).
-    const isHighTierModel = (m) => {
-      if (!m) return false;
-      if (/opus/.test(m)) return true;
-      if (/sonnet.*4[-_]5|sonnet.*4[-_][6-9]|claude-4/.test(m)) return true;
-      return false;
-    };
-    const isMedTierModel = (m) => {
-      if (!m) return false;
-      if (isHighTierModel(m)) return true; // high is a superset of med
-      if (/sonnet/.test(m)) return true;
-      if (/haiku.*3[-_]5|haiku.*3[-_][6-9]/.test(m)) return true;
-      return false;
-    };
-
-    let tierMismatch = false;
-    let tierReason = '';
-    if (taskTier === 'high' && modelId && !isHighTierModel(modelId)) {
-      tierMismatch = true;
-      tierReason =
-        `Clawket Tier Gate: task tier=high but current model "${modelId}" is not a high-tier model.\n` +
-        `High-tier tasks require claude-opus or claude-sonnet-4-5+ class models.\n` +
-        `Switch to a high-tier model, or update the task tier: \`clawket task update ${task.id} --tier med\``;
-    } else if (taskTier === 'med' && modelId && !isMedTierModel(modelId)) {
-      tierMismatch = true;
-      tierReason =
-        `Clawket Tier Gate: task tier=med but current model "${modelId}" is a low-tier model.\n` +
-        `Med-tier tasks require at least claude-sonnet or claude-haiku-3-5+ class models.\n` +
-        `Switch to a med-or-higher model, or update the task tier: \`clawket task update ${task.id} --tier low\``;
-    }
-
-    if (tierMismatch) {
-      console.error(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'deny',
-          permissionDecisionReason: tierReason,
-        },
-      }));
-      // Exit code 3 = "unsupported environment" per v3 plan §11.
-      process.exit(3);
-    }
-
-    // TIER-050: surface the resolved tier in CLAWKET_TIER_USED so downstream
-    // model routing (and audit logs) can read which tier the gate accepted.
-    // The env is propagated to the current process AND surfaced to Claude Code
-    // as an additionalContext line.
-    //
-    // This used to emit `additionalContext: { env: {...} }` with no
-    // `permissionDecision`, which is two schema violations at once: the field
-    // must be a string, and PreToolUse requires the decision. Claude Code
-    // rejected the whole payload with `Hook JSON output validation failed —
-    // (root): Invalid input` on every non-allowlisted Bash call, so the tier
-    // was never actually observable and users saw an error per command.
-    // Routing through allowPreToolUse() keeps the decision field mandatory.
-    const tierUsed = (task && (task.tier_used || task.tier)) || 'med';
-    process.env.CLAWKET_TIER_USED = String(tierUsed);
-    allowPreToolUse(`CLAWKET_TIER_USED=${tierUsed}`);
-  }
-
-  allowPreToolUse();
+  if (verdict.tierUsed) process.env.CLAWKET_TIER_USED = verdict.tierUsed;
+  allowPreToolUse(verdict.context);
 }
 
 function runPostToolUse() {
@@ -2420,8 +2379,8 @@ function runPostToolUse() {
         // HOOK-001: X3 — warn on in_progress tasks without scenario_id even
         // when there's no active run (best-effort, non-blocking).
         try {
-          const tasksRaw = exec(`${clawket} task list --status in_progress --format json`);
-          const tasks = JSON.parse(tasksRaw || '[]');
+          const cwd = hookInput.cwd || process.env.HOOK_CWD || process.cwd();
+          const tasks = loadGateState(clawket, cwd, sessionId).inProgress;
           for (const tk of tasks) {
             checkX3ScenarioId({ task: tk, context: 'post-tool-use' });
           }
@@ -2897,30 +2856,6 @@ function runSubagentStop() {
   clearSyncContext();
 }
 
-function runTaskCreated() {
-  const pluginRoot = resolvePluginRoot(path.dirname(__filename));
-  const { clawket } = runtime(pluginRoot);
-  const hookInput = readHookInput();
-  const teammateName = hookInput.teammate_name || '';
-  if (!teammateName) process.exit(0);
-  let tasks = [];
-  try { tasks = JSON.parse(exec(`${clawket} task list --status todo`) || '[]'); } catch {}
-  const task = tasks.find((item) => item.assignee === teammateName);
-  if (task) exec(`${clawket} task update "${task.id}" --status in_progress --comment "자동 시작: 팀 에이전트 ${teammateName} 태스크 생성"`);
-}
-
-function runTaskCompleted() {
-  const pluginRoot = resolvePluginRoot(path.dirname(__filename));
-  const { clawket } = runtime(pluginRoot);
-  const hookInput = readHookInput();
-  const teammateName = hookInput.teammate_name || '';
-  if (!teammateName) process.exit(0);
-  let tasks = [];
-  try { tasks = JSON.parse(exec(`${clawket} task list --status in_progress`) || '[]'); } catch {}
-  const task = tasks.find((item) => item.assignee === teammateName);
-  if (task) exec(`${clawket} task update "${task.id}" --status done --comment "자동 완료: 팀 에이전트 ${teammateName} 태스크 완료"`);
-}
-
 // ---------------------------------------------------------------------------
 // Stop-hook auto-advance (migration 027 / GET /continuation).
 //
@@ -2945,39 +2880,14 @@ function continuationMarkerPath(sessionId) {
 }
 
 /**
- * Sync GET /continuation?cwd=<cwd> via curl (the Stop hook runs synchronously
- * under execSync, so async http isn't usable here — same constraint as
- * validateStrictPlan). Returns the parsed JSON body, or null on any
+ * Sync GET /continuation?cwd=<cwd> through daemonGet. Returns the parsed JSON body, or null on any
  * network/parse error (caller MUST treat null as "allow stop" — never block
  * the agent because the daemon was unreachable).
  */
 function fetchContinuation(cwd) {
-  let port;
-  try {
-    port = fs.readFileSync(path.join(cacheDir(), 'clawketd.port'), 'utf-8').trim();
-  } catch {
-    return null;
-  }
-  if (!port) return null;
-
-  const token = getDaemonToken();
-  const authHeader = token ? `-H 'X-Clawket-Token: ${token}'` : '';
-  const url = `http://127.0.0.1:${port}/continuation?cwd=${encodeURIComponent(cwd || '')}`;
-  const out = execDiag(
-    `curl -sS -w '\\n__HTTP__%{http_code}' ${authHeader} ${JSON.stringify(url)}`,
-    { timeout: 4000 }
-  );
-  if (!out.ok || !out.stdout) return null;
-  const splitIdx = out.stdout.lastIndexOf('\n__HTTP__');
-  if (splitIdx < 0) return null;
-  const body = out.stdout.slice(0, splitIdx);
-  const status = parseInt(out.stdout.slice(splitIdx + 9), 10);
-  if (!(status >= 200 && status < 300)) return null;
-  try {
-    return JSON.parse(body);
-  } catch {
-    return null;
-  }
+  const res = daemonGet(`/continuation?cwd=${encodeURIComponent(cwd || '')}`);
+  if (!res || !(res.status >= 200 && res.status < 300)) return null;
+  return res.body;
 }
 
 /**
@@ -3139,8 +3049,6 @@ module.exports = {
   runStop,
   runSubagentStart,
   runSubagentStop,
-  runTaskCompleted,
-  runTaskCreated,
   runUserPromptSubmit,
   // Exposed for test harnesses only.
   __test__: {
@@ -3171,5 +3079,20 @@ module.exports = {
     // Migration 027 — Stop-hook auto-advance helpers (pure, unit-testable).
     decideContinuation,
     continuationMarkerPath,
+    // PreToolUse gate (project-scoped state + pure decision).
+    decideGate,
+    normalizeGateState,
+    scopeTasksToProject,
+    loadGateState,
+    loadGateStateLegacy,
+    classifyBashFastPath,
+    detectDestructive,
+    loadDestructivePatterns,
+    // X8 evidence by reference.
+    parseRunRefs,
+    citesRuns,
+    malformedRunRef,
+    runRecordProblem,
+    isUnreferencedTestClaim,
   },
 };

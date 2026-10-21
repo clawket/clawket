@@ -83,7 +83,9 @@ function preToolUseSites() {
 
 test('every PreToolUse emission site sets permissionDecision', () => {
   const sites = preToolUseSites();
-  assert.ok(sites.length > 5, `expected several emission sites, found ${sites.length}`);
+  // PreToolUse output is emitted only through allowPreToolUse/denyPreToolUse;
+  // at least those two sites must be found or the scan itself is broken.
+  assert.ok(sites.length >= 2, `expected the allow + deny emission sites, found ${sites.length}`);
   const missing = sites.filter((s) => !/permissionDecision:/.test(s.body));
   assert.deepEqual(
     missing.map((s) => `${s.rel}:${s.line}`),

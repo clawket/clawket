@@ -13,7 +13,7 @@ fail() { echo "✗ $1"; FAILED=1; }
 # 1. Unit tests when any tracked surface changes (adapters / tests / skills / manifests / hooks).
 if echo "$STAGED" | grep -qE '^(adapters/|tests/|skills/|\.claude-plugin/|hooks/hooks\.json$|components\.json$|package\.json$|scripts/)'; then
   echo "▸ pnpm test:unit"
-  pnpm -s test:unit || fail "unit tests failed (run: pnpm test:unit)"
+  pnpm -s run test:unit || fail "unit tests failed (run: pnpm test:unit)"
 fi
 
 # 2. components.json drift gate — bump must arrive with COMPATIBILITY matrix update

@@ -1,10 +1,27 @@
 {
-  "schema_version": "v3",
-  "description": "Destructive shell pattern catalog enforced by PreToolUse hook (LM-7). Each entry is a single regex compiled with the given flags; a match denies the Bash tool call. The reason and remediation fields support locale-keyed objects (en/ko/ja) or a plain string fallback.",
+  "schema_version": "v4",
+  "description": "v4 Destructive shell pattern catalog enforced by the PreToolUse hook (LM-7). Each entry's `match` is a structural rule evaluated against every command the shell would execute (adapters/shared/bash-classifier.cjs): `command` (argv[0] basename after wrappers such as env/xargs/timeout/sudo), `subcommand` (path after the tool's global options, e.g. `git -C x`), `flags` (every group present as a short letter or long flag), `arg` (exact argument), `argPattern`/`operandPattern`/`firstOperandPattern` (regex over arguments), `sqlPattern` (regex over SQL or inline code handed to a SQL client or interpreter, including heredoc and piped literals), `writeRedirectPattern` (regex over truncating redirect targets). An array means any alternative. Quoted arguments and heredoc bodies are data unless an executing command receives them; `bash -c`, `eval`, `xargs`, `find -exec` and command substitutions are parsed recursively. `regex` is the raw-text fallback used only when the command (or a nested fragment) cannot be parsed. The reason and remediation fields support locale-keyed objects (en/ko/ja) or a plain string fallback.",
   "patterns": [
     {
       "id": "rm-rf-clawket-data",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "rm"
+        ],
+        "flags": [
+          [
+            "r",
+            "R",
+            "--recursive"
+          ],
+          [
+            "f",
+            "--force"
+          ]
+        ],
+        "operandPattern": "(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data/clawket)"
+      },
       "regex": "\\brm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*r|--recursive))(?=[\\s\\S]*(?:-[a-zA-Z]*f|--force))(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data/clawket))",
       "flags": "i",
       "reason": {
@@ -21,6 +38,23 @@
     {
       "id": "rm-rf-bare-home-or-root",
       "category": "catastrophic",
+      "match": {
+        "command": [
+          "rm"
+        ],
+        "flags": [
+          [
+            "r",
+            "R",
+            "--recursive"
+          ],
+          [
+            "f",
+            "--force"
+          ]
+        ],
+        "operandPattern": "^(?:~|~/|\\$\\{?HOME\\}?/?|/|/\\*|/Users/[^/]+/?|/home/[^/]+/?)$"
+      },
       "regex": "\\brm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*r|--recursive))(?=[\\s\\S]*(?:-[a-zA-Z]*f|--force))(?=[\\s\\S]*(?:(?:^|\\s)(?:~|\\$\\{?HOME\\}?|/Users/[^/\\s]+|/home/[^/\\s]+|/)\\s*(?:$|;|&&|\\|\\||\\|)))",
       "flags": "i",
       "reason": {
@@ -37,6 +71,14 @@
     {
       "id": "sqlite-destructive-clawket-db",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "sqlite3",
+          "sqlite"
+        ],
+        "argPattern": "(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite)",
+        "sqlPattern": "DROP\\s+TABLE|DELETE\\s+FROM|DROP\\s+DATABASE|TRUNCATE\\b"
+      },
       "regex": "\\bsqlite3?\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite))(?=[\\s\\S]*(?:DROP\\s+TABLE|DELETE\\s+FROM|DROP\\s+DATABASE|TRUNCATE\\b))",
       "flags": "i",
       "reason": {
@@ -53,6 +95,25 @@
     {
       "id": "clawket-delete-force-aggregate",
       "category": "history-loss",
+      "match": {
+        "command": [
+          "clawket"
+        ],
+        "subcommand": [
+          [
+            [
+              "plan",
+              "unit",
+              "cycle",
+              "project"
+            ],
+            "delete"
+          ]
+        ],
+        "arg": [
+          "--force"
+        ]
+      },
       "regex": "\\bclawket\\s+(?:plan|unit|cycle|project)\\s+delete\\b[\\s\\S]*--force\\b",
       "flags": "i",
       "reason": {
@@ -69,6 +130,19 @@
     {
       "id": "git-reset-hard",
       "category": "uncommitted-loss",
+      "match": {
+        "command": [
+          "git"
+        ],
+        "subcommand": [
+          [
+            "reset"
+          ]
+        ],
+        "arg": [
+          "--hard"
+        ]
+      },
       "regex": "\\bgit\\s+reset\\s+--hard\\b",
       "flags": "i",
       "reason": {
@@ -85,6 +159,27 @@
     {
       "id": "docker-rm-volumes",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "docker",
+          "podman"
+        ],
+        "subcommand": [
+          [
+            "rm"
+          ],
+          [
+            "container",
+            "rm"
+          ]
+        ],
+        "flags": [
+          [
+            "v",
+            "--volumes"
+          ]
+        ]
+      },
       "regex": "\\bdocker\\s+rm\\b(?=[\\s\\S]*(?:-[a-zA-Z]*v\\b|--volumes\\b))",
       "flags": "i",
       "reason": {
@@ -101,6 +196,12 @@
     {
       "id": "chmod-zero-lockout",
       "category": "lockout",
+      "match": {
+        "command": [
+          "chmod"
+        ],
+        "firstOperandPattern": "^0+$"
+      },
       "regex": "\\bchmod\\s+(?:000|0)(?=\\s|$)",
       "flags": "",
       "reason": {
@@ -117,6 +218,15 @@
     {
       "id": "find-delete-protected",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "find"
+        ],
+        "argPattern": "(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data)",
+        "arg": [
+          "-delete"
+        ]
+      },
       "regex": "\\bfind\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|\\.config/clawket|\\.local/state/clawket|\\.claude/plugins/data))(?=[\\s\\S]*\\s-delete\\b)",
       "flags": "i",
       "reason": {
@@ -133,6 +243,14 @@
     {
       "id": "alter-drop-column-clawket-db",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "sqlite3",
+          "sqlite"
+        ],
+        "argPattern": "(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite)",
+        "sqlPattern": "\\bALTER\\s+TABLE\\b[\\s\\S]*\\bDROP\\s+COLUMN\\b"
+      },
       "regex": "\\bsqlite3?\\b(?=[\\s\\S]*(?:\\.local/share/clawket|\\.cache/clawket|/clawket/db\\.sqlite))(?=[\\s\\S]*\\bALTER\\s+TABLE\\b)(?=[\\s\\S]*\\bDROP\\s+COLUMN\\b)",
       "flags": "i",
       "reason": {
@@ -149,6 +267,28 @@
     {
       "id": "alter-drop-column-bare",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "sqlite3",
+          "sqlite",
+          "psql",
+          "mysql",
+          "mariadb",
+          "duckdb",
+          "sqlcmd",
+          "clickhouse-client",
+          "python",
+          "python2",
+          "python3",
+          "node",
+          "ruby",
+          "perl",
+          "php",
+          "deno",
+          "bun"
+        ],
+        "sqlPattern": "\\bALTER\\s+TABLE\\s+\\S+\\s+DROP\\s+COLUMN\\b"
+      },
       "regex": "\\bALTER\\s+TABLE\\s+\\S+\\s+DROP\\s+COLUMN\\b",
       "flags": "i",
       "reason": {
@@ -165,6 +305,28 @@
     {
       "id": "drop-table-standalone",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "sqlite3",
+          "sqlite",
+          "psql",
+          "mysql",
+          "mariadb",
+          "duckdb",
+          "sqlcmd",
+          "clickhouse-client",
+          "python",
+          "python2",
+          "python3",
+          "node",
+          "ruby",
+          "perl",
+          "php",
+          "deno",
+          "bun"
+        ],
+        "sqlPattern": "\\bDROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?\\S+"
+      },
       "regex": "(?:^|\\s|;)DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?!.*clawket)\\S+",
       "flags": "i",
       "reason": {
@@ -181,6 +343,28 @@
     {
       "id": "truncate-any-table",
       "category": "data-loss",
+      "match": {
+        "command": [
+          "sqlite3",
+          "sqlite",
+          "psql",
+          "mysql",
+          "mariadb",
+          "duckdb",
+          "sqlcmd",
+          "clickhouse-client",
+          "python",
+          "python2",
+          "python3",
+          "node",
+          "ruby",
+          "perl",
+          "php",
+          "deno",
+          "bun"
+        ],
+        "sqlPattern": "\\bTRUNCATE\\s+(?:TABLE\\s+)?\\S+"
+      },
       "regex": "(?:^|\\s|;)TRUNCATE\\s+(?:TABLE\\s+)?\\S+",
       "flags": "i",
       "reason": {
@@ -197,6 +381,20 @@
     {
       "id": "redirect-overwrite-clawket-db",
       "category": "data-loss",
+      "match": [
+        {
+          "writeRedirectPattern": "(?:\\.local/share/clawket/|\\.cache/clawket/|clawket/db\\.sqlite)"
+        },
+        {
+          "command": [
+            "tee",
+            "cp",
+            "mv",
+            "dd"
+          ],
+          "argPattern": "(?:\\.local/share/clawket/|\\.cache/clawket/|clawket/db\\.sqlite)"
+        }
+      ],
       "regex": "(?:^|\\s|;|&&|\\|\\|)>\\s*(?:[^>\\s]+/)?(?:\\.local/share/clawket/|\\.cache/clawket/|clawket/db\\.sqlite)",
       "flags": "i",
       "reason": {
