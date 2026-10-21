@@ -67,9 +67,9 @@ scenario_id<TAB>status<TAB>reasoning<TAB>evidence<TAB>tier_used<TAB>batch_id<TAB
 Enforced:
 
 - `scenario_id` — `US-<DOMAIN>-<NNN>` (regex). Reject any task missing a scenario_id.
-- `status` — `pass` | `defect` | `scenario_error`.
+- `status` — `pass` | `defect` | `scenario_error` | `harness_error`. `harness_error` means the check could not run (tool crash, missing fixture, timeout): it is not a defect, it keeps the round from converging, and the row is re-queued keyed by (scenario, failure signature) up to the sync `retry_cap` (default 3) before it is reported under `retry_exhausted`.
 - `reasoning` — Given → When → Then code trace. Always required.
-- `evidence` — `<file>:<line>`. Required for every row (even `pass`, to give regression baseline).
+- `evidence` — `<file>:<line>`, or `run:<RUN-ID>` for an executed test/check (validated against the run record). Required for every row (even `pass`, to give regression baseline).
 - `tier_used` — `haiku` | `sonnet` | `opus`. Always populated.
 - `batch_id` — `BATCH-<26-char-ULID>`. Required on every row.
 - `escalation_reason` — required when `tier_used = opus`.
@@ -99,7 +99,7 @@ When all sub-agent TSVs have arrived, sync **separately** — no reasoning in th
 clawket discover-loop sync <tsv> --unit U --cycle C
 ```
 
-The daemon does the status mapping (`pass → done` / `defect → blocked` / `scenario_error → cancelled`), extracts `scenario_amendment`, persists `escalation_reason`, produces a retry queue knowledge, and writes the Round R evidence knowledge — all in one transaction.
+The daemon does the status mapping (`pass → done` / `defect → blocked` / `scenario_error → cancelled` / `harness_error → todo` with `harness_error` recorded), extracts `scenario_amendment`, persists `escalation_reason`, produces a retry queue knowledge, and writes the Round R evidence knowledge — all in one transaction.
 
 **Streaming mode (large rounds, ≥ 1000 rows)** — sync each 30-scenario batch as soon as its TSV arrives:
 

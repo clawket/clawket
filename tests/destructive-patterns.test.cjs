@@ -17,17 +17,19 @@ const catalog = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '..', 'adapters', 'shared', 'destructive-patterns.json'), 'utf-8'),
 );
 
+const bc = require('../adapters/shared/bash-classifier.cjs');
+
+// Each rule is exercised through the same structural matcher the hook uses
+// (commands the shell would execute), not by testing its regex on raw text.
 function patternById(id) {
   const p = catalog.patterns.find((x) => x.id === id);
   if (!p) throw new Error(`pattern not in catalog: ${id}`);
-  return new RegExp(p.regex, p.flags || '');
+  return { test: (cmd) => bc.matchPattern(p, cmd) };
 }
 
 function detectDestructive(cmd) {
-  for (const p of catalog.patterns) {
-    if (new RegExp(p.regex, p.flags || '').test(cmd)) return p.id;
-  }
-  return null;
+  const hit = bc.detectDestructive(cmd, catalog.patterns);
+  return hit ? hit.id : null;
 }
 
 test('catalog has at least 7 patterns (LM-7 acceptance)', () => {
@@ -57,153 +59,154 @@ test('every pattern carries reason + remediation', () => {
 // ── rm-rf-clawket-data ────────────────────────────────────────────────────
 test('rm-rf-clawket-data: positives', () => {
   const re = patternById('rm-rf-clawket-data');
-  assert.match('rm -rf ~/.claude/plugins/data/clawket-clawket-clawket', re); // marketplace install-data layout
-  assert.match('rm -rf ~/.local/share/clawket', re);
-  assert.match('rm -rf ~/.local/share/clawket/db.sqlite', re);
-  assert.match('rm -rf ~/.cache/clawket/clawketd.sock', re);
-  assert.match('rm -rf ~/.config/clawket', re);
-  assert.match('rm -rf ~/.local/state/clawket/logs', re);
-  assert.match('rm -fr ~/.local/share/clawket', re); // flag order swap
-  assert.match('rm -Rf ~/.local/share/clawket', re); // -R uppercase
-  assert.match('rm --recursive --force ~/.local/share/clawket', re);
-  assert.match('rm --force --recursive ~/.local/share/clawket', re);
-  assert.match('cd /tmp && rm -rf ~/.local/share/clawket', re); // chained command
+  assert.ok(re.test('rm -rf ~/.claude/plugins/data/clawket-clawket-clawket'), 'rm -rf ~/.claude/plugins/data/clawket-clawket-clawket'); // marketplace install-data layout
+  assert.ok(re.test('rm -rf ~/.local/share/clawket'), 'rm -rf ~/.local/share/clawket');
+  assert.ok(re.test('rm -rf ~/.local/share/clawket/db.sqlite'), 'rm -rf ~/.local/share/clawket/db.sqlite');
+  assert.ok(re.test('rm -rf ~/.cache/clawket/clawketd.sock'), 'rm -rf ~/.cache/clawket/clawketd.sock');
+  assert.ok(re.test('rm -rf ~/.config/clawket'), 'rm -rf ~/.config/clawket');
+  assert.ok(re.test('rm -rf ~/.local/state/clawket/logs'), 'rm -rf ~/.local/state/clawket/logs');
+  assert.ok(re.test('rm -fr ~/.local/share/clawket'), 'rm -fr ~/.local/share/clawket'); // flag order swap
+  assert.ok(re.test('rm -Rf ~/.local/share/clawket'), 'rm -Rf ~/.local/share/clawket'); // -R uppercase
+  assert.ok(re.test('rm --recursive --force ~/.local/share/clawket'), 'rm --recursive --force ~/.local/share/clawket');
+  assert.ok(re.test('rm --force --recursive ~/.local/share/clawket'), 'rm --force --recursive ~/.local/share/clawket');
+  assert.ok(re.test('cd /tmp && rm -rf ~/.local/share/clawket'), 'cd /tmp && rm -rf ~/.local/share/clawket'); // chained command
 });
 
 test('rm-rf-clawket-data: negatives', () => {
   const re = patternById('rm-rf-clawket-data');
-  assert.doesNotMatch('rm -rf /tmp/scratch', re); // non-protected path
-  assert.doesNotMatch('rm -r ~/.local/share/clawket', re); // missing -f
-  assert.doesNotMatch('rm -f ~/.local/share/clawket', re); // missing -r
-  assert.doesNotMatch('ls ~/.local/share/clawket', re);
-  assert.doesNotMatch('rm -rf ~/Documents/clawket-export.tar', re); // arbitrary user file
+  assert.ok(!re.test('rm -rf /tmp/scratch'), 'rm -rf /tmp/scratch'); // non-protected path
+  assert.ok(!re.test('rm -r ~/.local/share/clawket'), 'rm -r ~/.local/share/clawket'); // missing -f
+  assert.ok(!re.test('rm -f ~/.local/share/clawket'), 'rm -f ~/.local/share/clawket'); // missing -r
+  assert.ok(!re.test('ls ~/.local/share/clawket'), 'ls ~/.local/share/clawket');
+  assert.ok(!re.test('rm -rf ~/Documents/clawket-export.tar'), 'rm -rf ~/Documents/clawket-export.tar'); // arbitrary user file
 });
 
 // ── rm-rf-bare-home-or-root ───────────────────────────────────────────────
 test('rm-rf-bare-home-or-root: positives', () => {
   const re = patternById('rm-rf-bare-home-or-root');
-  assert.match('rm -rf ~', re);
-  assert.match('rm -rf $HOME', re);
-  assert.match('rm -rf ${HOME}', re);
-  assert.match('rm -rf /', re);
-  assert.match('rm -rf /Users/jdoe', re);
-  assert.match('rm -rf /home/jdoe', re);
+  assert.ok(re.test('rm -rf ~'), 'rm -rf ~');
+  assert.ok(re.test('rm -rf $HOME'), 'rm -rf $HOME');
+  assert.ok(re.test('rm -rf ${HOME}'), 'rm -rf ${HOME}');
+  assert.ok(re.test('rm -rf /'), 'rm -rf /');
+  assert.ok(re.test('rm -rf /Users/jdoe'), 'rm -rf /Users/jdoe');
+  assert.ok(re.test('rm -rf /home/jdoe'), 'rm -rf /home/jdoe');
 });
 
 test('rm-rf-bare-home-or-root: negatives', () => {
   const re = patternById('rm-rf-bare-home-or-root');
-  assert.doesNotMatch('rm -rf ~/.cache/foo', re); // subpath, not bare home
-  assert.doesNotMatch('rm -rf /tmp/scratch', re);
+  assert.ok(!re.test('rm -rf ~/.cache/foo'), 'rm -rf ~/.cache/foo'); // subpath, not bare home
+  assert.ok(!re.test('rm -rf /tmp/scratch'), 'rm -rf /tmp/scratch');
 });
 
 // ── sqlite-destructive-clawket-db ─────────────────────────────────────────
 test('sqlite-destructive-clawket-db: positives', () => {
   const re = patternById('sqlite-destructive-clawket-db');
-  assert.match('sqlite3 ~/.local/share/clawket/db.sqlite "DROP TABLE plans"', re);
-  assert.match('sqlite3 ~/.local/share/clawket/db.sqlite "DELETE FROM tasks"', re);
-  assert.match('sqlite3 ~/.local/share/clawket/db.sqlite "drop table plans"', re); // case insensitive
+  assert.ok(re.test('sqlite3 ~/.local/share/clawket/db.sqlite "DROP TABLE plans"'), 'sqlite3 ~/.local/share/clawket/db.sqlite "DROP TABLE plans"');
+  assert.ok(re.test('sqlite3 ~/.local/share/clawket/db.sqlite "DELETE FROM tasks"'), 'sqlite3 ~/.local/share/clawket/db.sqlite "DELETE FROM tasks"');
+  assert.ok(re.test('sqlite3 ~/.local/share/clawket/db.sqlite "drop table plans"'), 'sqlite3 ~/.local/share/clawket/db.sqlite "drop table plans"'); // case insensitive
 });
 
 test('sqlite-destructive-clawket-db: stdin-redirected SQL is a known limitation', () => {
-  // The pattern only inspects the visible command; SQL piped via < file.sql is
-  // not analysed (would require reading the file). Document the gap so it is
-  // not mistaken for a regression.
+  // SQL read from a file (< file.sql) is not analysed — that would require
+  // reading the file. Document the gap so it is not mistaken for a regression.
+  // (Heredoc, here-string and piped literal SQL ARE analysed; see
+  // tests/bash-classifier.test.cjs.)
   const re = patternById('sqlite-destructive-clawket-db');
-  assert.doesNotMatch('sqlite3 ~/.local/share/clawket/db.sqlite < drop.sql', re);
+  assert.ok(!re.test('sqlite3 ~/.local/share/clawket/db.sqlite < drop.sql'), 'sqlite3 ~/.local/share/clawket/db.sqlite < drop.sql');
 });
 
 test('sqlite-destructive-clawket-db: negatives', () => {
   const re = patternById('sqlite-destructive-clawket-db');
-  assert.doesNotMatch('sqlite3 ~/.local/share/clawket/db.sqlite "SELECT * FROM plans"', re);
-  assert.doesNotMatch('sqlite3 /tmp/test.db "DROP TABLE x"', re); // non-clawket DB
-  assert.doesNotMatch('sqlite3 ~/.local/share/clawket/db.sqlite ".tables"', re);
+  assert.ok(!re.test('sqlite3 ~/.local/share/clawket/db.sqlite "SELECT * FROM plans"'), 'sqlite3 ~/.local/share/clawket/db.sqlite "SELECT * FROM plans"');
+  assert.ok(!re.test('sqlite3 /tmp/test.db "DROP TABLE x"'), 'sqlite3 /tmp/test.db "DROP TABLE x"'); // non-clawket DB
+  assert.ok(!re.test('sqlite3 ~/.local/share/clawket/db.sqlite ".tables"'), 'sqlite3 ~/.local/share/clawket/db.sqlite ".tables"');
 });
 
 // ── clawket-delete-force-aggregate ────────────────────────────────────────
 test('clawket-delete-force-aggregate: positives', () => {
   const re = patternById('clawket-delete-force-aggregate');
-  assert.match('clawket plan delete PLAN-XXX --force', re);
-  assert.match('clawket unit delete UNIT-XXX --force', re);
-  assert.match('clawket cycle delete CYC-XXX --force', re);
-  assert.match('clawket project delete PROJ-XXX --force', re);
+  assert.ok(re.test('clawket plan delete PLAN-XXX --force'), 'clawket plan delete PLAN-XXX --force');
+  assert.ok(re.test('clawket unit delete UNIT-XXX --force'), 'clawket unit delete UNIT-XXX --force');
+  assert.ok(re.test('clawket cycle delete CYC-XXX --force'), 'clawket cycle delete CYC-XXX --force');
+  assert.ok(re.test('clawket project delete PROJ-XXX --force'), 'clawket project delete PROJ-XXX --force');
 });
 
 test('clawket-delete-force-aggregate: negatives', () => {
   const re = patternById('clawket-delete-force-aggregate');
-  assert.doesNotMatch('clawket task delete TASK-XXX --force', re); // task allowed (cancel preferred but not catastrophic)
-  assert.doesNotMatch('clawket plan delete PLAN-XXX', re); // no --force
-  assert.doesNotMatch('clawket plan view PLAN-XXX', re);
+  assert.ok(!re.test('clawket task delete TASK-XXX --force'), 'clawket task delete TASK-XXX --force'); // task allowed (cancel preferred but not catastrophic)
+  assert.ok(!re.test('clawket plan delete PLAN-XXX'), 'clawket plan delete PLAN-XXX'); // no --force
+  assert.ok(!re.test('clawket plan view PLAN-XXX'), 'clawket plan view PLAN-XXX');
 });
 
 // ── git-reset-hard ────────────────────────────────────────────────────────
 test('git-reset-hard: positives', () => {
   const re = patternById('git-reset-hard');
-  assert.match('git reset --hard', re);
-  assert.match('git reset --hard HEAD~1', re);
-  assert.match('git reset --hard origin/main', re);
+  assert.ok(re.test('git reset --hard'), 'git reset --hard');
+  assert.ok(re.test('git reset --hard HEAD~1'), 'git reset --hard HEAD~1');
+  assert.ok(re.test('git reset --hard origin/main'), 'git reset --hard origin/main');
 });
 
 test('git-reset-hard: negatives', () => {
   const re = patternById('git-reset-hard');
-  assert.doesNotMatch('git reset HEAD~1', re); // soft reset
-  assert.doesNotMatch('git reset --soft HEAD~1', re);
-  assert.doesNotMatch('git status', re);
+  assert.ok(!re.test('git reset HEAD~1'), 'git reset HEAD~1'); // soft reset
+  assert.ok(!re.test('git reset --soft HEAD~1'), 'git reset --soft HEAD~1');
+  assert.ok(!re.test('git status'), 'git status');
 });
 
 // ── docker-rm-volumes ─────────────────────────────────────────────────────
 test('docker-rm-volumes: positives', () => {
   const re = patternById('docker-rm-volumes');
-  assert.match('docker rm -v container1', re);
-  assert.match('docker rm --volumes container1', re);
-  assert.match('docker rm -fv container1', re);
+  assert.ok(re.test('docker rm -v container1'), 'docker rm -v container1');
+  assert.ok(re.test('docker rm --volumes container1'), 'docker rm --volumes container1');
+  assert.ok(re.test('docker rm -fv container1'), 'docker rm -fv container1');
 });
 
 test('docker-rm-volumes: negatives', () => {
   const re = patternById('docker-rm-volumes');
-  assert.doesNotMatch('docker rm container1', re); // no -v
-  assert.doesNotMatch('docker ps', re);
-  assert.doesNotMatch('docker rm -f container1', re); // -f only, no -v
+  assert.ok(!re.test('docker rm container1'), 'docker rm container1'); // no -v
+  assert.ok(!re.test('docker ps'), 'docker ps');
+  assert.ok(!re.test('docker rm -f container1'), 'docker rm -f container1'); // -f only, no -v
 });
 
 // ── chmod-zero-lockout ────────────────────────────────────────────────────
 test('chmod-zero-lockout: positives', () => {
   const re = patternById('chmod-zero-lockout');
-  assert.match('chmod 000 file.txt', re);
-  assert.match('chmod 0 file.txt', re);
+  assert.ok(re.test('chmod 000 file.txt'), 'chmod 000 file.txt');
+  assert.ok(re.test('chmod 0 file.txt'), 'chmod 0 file.txt');
 });
 
 test('chmod-zero-lockout: negatives', () => {
   const re = patternById('chmod-zero-lockout');
-  assert.doesNotMatch('chmod 600 file.txt', re);
-  assert.doesNotMatch('chmod 0644 file.txt', re); // 0644 is not 0/000
-  assert.doesNotMatch('chmod +x script.sh', re);
+  assert.ok(!re.test('chmod 600 file.txt'), 'chmod 600 file.txt');
+  assert.ok(!re.test('chmod 0644 file.txt'), 'chmod 0644 file.txt'); // 0644 is not 0/000
+  assert.ok(!re.test('chmod +x script.sh'), 'chmod +x script.sh');
 });
 
 // ── find-delete-protected ─────────────────────────────────────────────────
 test('find-delete-protected: positives', () => {
   const re = patternById('find-delete-protected');
-  assert.match('find ~/.local/share/clawket -name "*.log" -delete', re);
-  assert.match('find ~/.cache/clawket -mtime +30 -delete', re);
-  assert.match('find ~/.claude/plugins/data -name "*.tmp" -delete', re);
+  assert.ok(re.test('find ~/.local/share/clawket -name "*.log" -delete'), 'find ~/.local/share/clawket -name "*.log" -delete');
+  assert.ok(re.test('find ~/.cache/clawket -mtime +30 -delete'), 'find ~/.cache/clawket -mtime +30 -delete');
+  assert.ok(re.test('find ~/.claude/plugins/data -name "*.tmp" -delete'), 'find ~/.claude/plugins/data -name "*.tmp" -delete');
 });
 
 test('find-delete-protected: negatives', () => {
   const re = patternById('find-delete-protected');
-  assert.doesNotMatch('find /tmp -name "*.log" -delete', re); // non-protected
-  assert.doesNotMatch('find ~/.local/share/clawket -name "*.log"', re); // no -delete
+  assert.ok(!re.test('find /tmp -name "*.log" -delete'), 'find /tmp -name "*.log" -delete'); // non-protected
+  assert.ok(!re.test('find ~/.local/share/clawket -name "*.log"'), 'find ~/.local/share/clawket -name "*.log"'); // no -delete
 });
 
 // ── redirect-overwrite-clawket-db ─────────────────────────────────────────
 test('redirect-overwrite-clawket-db: positives', () => {
   const re = patternById('redirect-overwrite-clawket-db');
-  assert.match('echo "" > ~/.local/share/clawket/db.sqlite', re);
-  assert.match('cat /dev/null >~/.local/share/clawket/db.sqlite', re);
+  assert.ok(re.test('echo "" > ~/.local/share/clawket/db.sqlite'), 'echo "" > ~/.local/share/clawket/db.sqlite');
+  assert.ok(re.test('cat /dev/null >~/.local/share/clawket/db.sqlite'), 'cat /dev/null >~/.local/share/clawket/db.sqlite');
 });
 
 test('redirect-overwrite-clawket-db: negatives', () => {
   const re = patternById('redirect-overwrite-clawket-db');
-  assert.doesNotMatch('cat ~/.local/share/clawket/db.sqlite', re); // read only
-  assert.doesNotMatch('echo "" > /tmp/log.txt', re);
+  assert.ok(!re.test('cat ~/.local/share/clawket/db.sqlite'), 'cat ~/.local/share/clawket/db.sqlite'); // read only
+  assert.ok(!re.test('echo "" > /tmp/log.txt'), 'echo "" > /tmp/log.txt');
 });
 
 // ── integration: detectDestructive aggregate behaviour ────────────────────
@@ -226,4 +229,24 @@ test('detectDestructive: safe commands return null', () => {
 test('detectDestructive: clawket task delete (non-aggregate) is allowed', () => {
   // tasks are cancelable; only plan/unit/cycle/project --force is hard-blocked.
   assert.equal(detectDestructive('clawket task delete TASK-XXX --force'), null);
+});
+
+// ── literal text is data, executed text is a command (structural matching) ─
+const RH = ['git', 'reset', '--hard'].join(' ');
+
+test('detectDestructive: mentions inside data are not commands', () => {
+  assert.equal(detectDestructive(`grep -rn "${RH}" docs/`), null);
+  assert.equal(detectDestructive(`git log --grep="${RH}"`), null);
+  assert.equal(detectDestructive(`echo 'never run ${RH}'`), null);
+  assert.equal(detectDestructive(`cat > notes.md <<'EOF'\n${RH}\nEOF`), null);
+  assert.equal(detectDestructive('git commit -m "docs: explain TRUNCATE semantics"'), null);
+  assert.equal(detectDestructive('rg -n "DROP TABLE" migrations/'), null);
+});
+
+test('detectDestructive: evasions of the raw-text rules are caught', () => {
+  assert.equal(detectDestructive(['git', '-C', '.', 'reset', '--hard'].join(' ')), 'git-reset-hard');
+  assert.equal(detectDestructive('git reset --har""d'), 'git-reset-hard');
+  assert.equal(detectDestructive(`bash -c "${RH}"`), 'git-reset-hard');
+  assert.equal(detectDestructive('docker container rm -v c1'), 'docker-rm-volumes');
+  assert.equal(detectDestructive('env X=1 rm -rf "$HOME"'), 'rm-rf-bare-home-or-root');
 });

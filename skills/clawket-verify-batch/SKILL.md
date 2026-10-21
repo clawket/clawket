@@ -79,9 +79,9 @@ scenario_id<TAB>status<TAB>reasoning<TAB>evidence<TAB>tier_used<TAB>batch_id<TAB
 Fields:
 
 - `scenario_id` — must match `US-<DOMAIN>-<NNN>` (regex enforced).
-- `status` — `pass` | `defect` | `scenario_error`.
+- `status` — `pass` | `defect` | `scenario_error` | `harness_error`. `harness_error` means the check could not run (tool crash, missing fixture, timeout): it is not a defect, it keeps the round from converging, and the row is re-queued keyed by (scenario, failure signature) up to the sync `retry_cap` (default 3) before it is reported under `retry_exhausted`.
 - `reasoning` — code-trace body (Given → When → Then).
-- `evidence` — `<file>:<line>`. Required for `defect` and `scenario_error`; recommended for `pass` (gives a baseline for regression diff).
+- `evidence` — `<file>:<line>` for code-trace reasoning, or `run:<RUN-ID>` when the verdict rests on an executed test/check (record it with `node "$CLAUDE_PLUGIN_ROOT/scripts/record-run.cjs" --task <TASK-ID> -- <command>`). The daemon rejects a `run:` reference that does not resolve to a finished run carrying command, input hash, exit code and report hash. Required for `defect`, `scenario_error` and `harness_error`; recommended for `pass` (gives a baseline for regression diff).
 - `tier_used` — `haiku` | `sonnet` | `opus`.
 - `batch_id` — groups the rows of one batch.
 - `escalation_reason` — required when `tier_used = opus`.

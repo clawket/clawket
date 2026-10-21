@@ -36,3 +36,6 @@ plans/
 # Local review-gate artifacts (airpilot run-gate): per-HEAD reports, verdict
 # slots and the KPI log. Regenerated on every gate run, machine-specific.
 .airpilot/
+
+# Local generated artifacts (verification run reports, screenshots, logs)
+.local/

@@ -93,7 +93,7 @@ A8 운영 규약.
 3. **Bulk sync ≠ reasoning**
    - Python ThreadPoolExecutor 16-worker 등 드라이버는 TSV → DB transcription 만
    - reasoning 결정을 sync 코드에 끼워넣지 않는다 (Anti-pattern X9)
-   - sync 는 status 매핑 (pass→done, defect→blocked, scenario_error→cancelled) 만
+   - sync 는 status 매핑 (pass→done, defect→blocked, scenario_error→cancelled, harness_error→todo) 만
 4. **batch_id 추적**
    - 같은 batch 산출의 task 들은 `tasks.batch_id` 로 묶임
    - attention 분산 의심 시 같은 batch 의 후반 task 만 재검증 가능
@@ -156,9 +156,9 @@ A8 운영 규약.
 ```
 QA-<scenario-id>:
   scenario_id: US-<DOMAIN>-<NNN>            (강제 — T7)
-  status: pass | defect | scenario_error
+  status: pass | defect | scenario_error | harness_error   (harness_error = 검증 실행 불가; defect 아님, 수렴 차단, (scenario, failure signature) 별 retry_cap 회 재시도)
   reasoning: 코드 추론 근거                   (모든 status 에 강제 — T8)
-  evidence: file:line                       (defect / scenario_error 시 강제)
+  evidence: file:line | run:<RUN-ID>        (defect / scenario_error / harness_error 시 강제; 실행한 테스트 근거는 run:<RUN-ID>)
   tier_used: opus | sonnet | haiku          (sub-agent 사용 모델)
   batch_id: BATCH-<ULID>                    (sub-agent invocation 식별)
   defect_task: <결함 task ID>                (status=defect 일 때만)
